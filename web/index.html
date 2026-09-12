@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cabin-agent-sim</title>
+<style>
+  :root {
+    --bg: #fafafa; --panel: #ffffff; --line: #d0d0d0;
+    --ink: #111111; --muted: #777777; --dark: #161616;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+    padding: 18px 22px 40px;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    background: var(--dark); color: #fff;
+    margin: -18px -22px 18px; padding: 14px 22px;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: .04em; }
+  header .tag { color: #cfcfcf; font-size: 12px; }
+  header .right { margin-left: auto; font-size: 12px; color: #cfcfcf; }
+  main { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 14px 16px;
+  }
+  .card h2 {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  #scene { flex: 1 1 640px; min-width: 320px; }
+  #scene svg { width: 100%; height: auto; display: block; }
+  .side { flex: 0 1 360px; min-width: 300px; display: flex; flex-direction: column; gap: 18px; }
+  .bar { margin-bottom: 8px; }
+  .bar .label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+  .bar .track { height: 8px; background: #e6e6e6; border-radius: 4px; overflow: hidden; }
+  .bar .fill { height: 100%; background: #333; border-radius: 4px; transition: width .5s; }
+  #speech {
+    font-size: 15px; padding: 12px 14px; border-left: 3px solid #333;
+    min-height: 22px;
+  }
+  #log { font-size: 12px; color: var(--muted); }
+  #log div { padding: 3px 0; border-bottom: 1px dotted #e2e2e2; }
+  #log b { color: var(--ink); font-weight: 600; }
+  #hud-values { font-size: 12px; color: var(--muted); margin-top: 8px; text-align: center; }
+  #qpanel { display: none; margin-top: 18px; max-width: 860px; }
+  #qpanel.show { display: block; }
+  .qrow { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
+  .qrow .dim { width: 110px; }
+  .qrow .track { flex: 1; height: 10px; background: #e6e6e6; }
+  .qrow .fill { height: 100%; background: #333; }
+  .qrow .val { width: 60px; text-align: right; font-variant-numeric: tabular-nums; }
+  #qitems { font-size: 11px; color: var(--muted); margin-top: 10px; max-height: 140px; overflow: auto; }
+  #qitems div { padding: 1px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>cabin-agent-sim</h1>
+  <span class="tag" id="persona">persona —</span>
+  <span class="right">step <b id="step">0</b>/<span id="maxstep">–</span> &nbsp;·&nbsp; provider <span id="provider">–</span></span>
+</header>
+
+<main>
+  <div class="card" id="scene">
+    <h2>cabin — side view</h2>
+    <svg viewBox="0 0 920 420" xmlns="http://www.w3.org/2000/svg">
+      <!-- car body -->
+      <rect x="60" y="110" width="800" height="262" rx="22" fill="#f2f2f2" stroke="#9a9a9a" stroke-width="2"/>
+      <line x1="60" y1="356" x2="860" y2="356" stroke="#b9b9b9" stroke-width="2"/>
+      <text x="72" y="118" font-size="11" fill="#7a7a7a">highly automated · no steering wheel</text>
+
+      <!-- HUD strip -->
+      <rect x="560" y="150" width="240" height="46" rx="6" fill="#fff" stroke="#9a9a9a" stroke-width="2"/>
+      <rect x="568" y="158" width="52" height="16" rx="8" fill="#222"/>
+      <text x="577" y="170" font-size="11" fill="#fff">HUD</text>
+      <text x="628" y="168" font-size="12" fill="#444">READY</text>
+      <text x="628" y="186" font-size="12" fill="#999">auto pilot engaged</text>
+
+      <!-- floor rail -->
+      <line x1="230" y1="356" x2="580" y2="356" stroke="#888" stroke-width="3"/>
+      <text x="240" y="376" font-size="10" fill="#999">slider mm</text>
+
+      <!-- rotation inset (top view, top-left) -->
+      <circle cx="120" cy="186" r="34" fill="#fff" stroke="#9a9a9a" stroke-width="2"/>
+      <circle cx="120" cy="186" r="20" fill="none" stroke="#ccc" stroke-width="1"/>
+      <g id="rot-arrow">
+        <line x1="120" y1="186" x2="136" y2="186" stroke="#222" stroke-width="3"/>
+        <line x1="132" y1="180" x2="138" y2="186" stroke="#222" stroke-width="3"/>
+        <line x1="132" y1="192" x2="138" y2="186" stroke="#222" stroke-width="3"/>
+      </g>
+      <text x="104" y="232" font-size="10" fill="#999">ROT</text>
+
+      <!-- vending machine -->
+      <rect x="700" y="242" width="130" height="122" fill="#fff" stroke="#8c8c8c" stroke-width="2"/>
+      <text x="711" y="258" font-size="10" fill="#666">VENDING</text>
+      <g id="slots"></g>
+
+      <!-- table -->
+      <g id="table-folded" display="block">
+        <rect x="622" y="300" width="15" height="58" fill="#dedede" stroke="#8c8c8c" stroke-width="2"/>
+      </g>
+      <g id="table-open" display="none">
+        <rect x="486" y="304" width="140" height="16" rx="3" fill="#dedede" stroke="#8c8c8c" stroke-width="2"/>
+        <line x1="560" y1="320" x2="560" y2="354" stroke="#8c8c8c" stroke-width="3"/>
+      </g>
+
+      <!-- seat -->
+      <rect x="180" y="352" width="180" height="10" fill="#ccc"/>
+      <rect id="cushion" x="250" y="306" width="74" height="24" rx="4" fill="#fff" stroke="#666" stroke-width="3"/>
+      <g id="seatline">
+        <line id="backrest" x1="306" y1="306" x2="306" y2="238" stroke="#333" stroke-width="10" stroke-linecap="round"/>
+        <circle id="headrest" cx="306" cy="230" r="11" fill="#fff" stroke="#333" stroke-width="3"/>
+      </g>
+    </svg>
+    <div id="hud-values"></div>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <h2>mood</h2>
+      <div class="bar"><div class="label"><span>comfort</span><span id="v-comfort">–</span></div><div class="track"><div class="fill" id="b-comfort" style="width:0%"></div></div></div>
+      <div class="bar"><div class="label"><span>energy</span><span id="v-energy">–</span></div><div class="track"><div class="fill" id="b-energy" style="width:0%"></div></div></div>
+      <div class="bar"><div class="label"><span>suspicion</span><span id="v-susp">–</span></div><div class="track"><div class="fill" id="b-susp" style="width:0%"></div></div></div>
+    </div>
+    <div class="card">
+      <h2>says</h2>
+      <div id="speech">—</div>
+    </div>
+    <div class="card">
+      <h2>activity</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</main>
+
+<div class="card" id="qpanel">
+  <h2>trust questionnaire — MDMT (Ullman &amp; Malle, 2019)</h2>
+  <div id="qrows"></div>
+  <div id="qitems"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const SLIDER = { min: 260, max: 460, px0: 250, px1: 540 };
+const HEIGHT = { min: 240, max: 330, top0: 310, top1: 230 };
+const RECLINE = { min: 80, max: 110 };
+const ROT = { min: -8, max: 8 };
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function render(state) {
+  const c = state.cabin, s = c.seat, t = c.table;
+  $("persona").textContent = "persona — " + state.persona;
+  $("maxstep").textContent = state.max_steps;
+  $("step").textContent = state.step;
+
+  const tSl = (s.slider_mm - SLIDER.min) / (SLIDER.max - SLIDER.min);
+  const seatX = lerp(SLIDER.px0, SLIDER.px1, Math.max(0, Math.min(1, tSl)));
+  const tH = (s.height_mm - HEIGHT.min) / (HEIGHT.max - HEIGHT.min);
+  const keepTop = lerp(HEIGHT.top0, HEIGHT.top1, Math.max(0, Math.min(1, tH)));
+
+  $("cushion").setAttribute("x", seatX);
+  $("cushion").setAttribute("y", keepTop);
+
+  const px = seatX + 58, py = keepTop + 2;
+  const rad = (s.recline_deg - 90) * Math.PI / 180;
+  const len = 68;
+  const ex = px - Math.sin(rad) * len;
+  const ey = py - Math.cos(rad) * len;
+  $("backrest").setAttribute("x1", px); $("backrest").setAttribute("y1", py);
+  $("backrest").setAttribute("x2", ex); $("backrest").setAttribute("y2", ey);
+  $("headrest").setAttribute("cx", ex); $("headrest").setAttribute("cy", ey - 10);
+
+  const rotPx = (s.rotation_deg / ROT.max) * 60;
+  $("rot-arrow").setAttribute("transform", `rotate(${rotPx} 120 186)`);
+
+  const names = ["SNACK", "WATER", "COFFEE"];
+  $("slots").innerHTML = names.map((n, i) => {
+    const y = 266 + i * 34;
+    const key = n.toLowerCase();
+    return `<rect x="710" y="${y}" width="110" height="28" rx="3" fill="#eee" stroke="#bbb"/>
+            <text x="718" y="${y+19}" font-size="11" fill="#444">${n} x${c.vending[key]}</text>`;
+  }).join("");
+
+  $("table-folded").setAttribute("display", t.folded ? "block" : "none");
+  $("table-open").setAttribute("display", t.folded ? "none" : "block");
+
+  $("hud-values").textContent =
+    `slider ${s.slider_mm} mm  ·  height ${s.height_mm} mm  ·  recline ${s.recline_deg}°  ·  rotation ${s.rotation_deg}°`;
+
+  const mv = state.mood, pct = (v) => Math.round((v || 0) * 100);
+  $("b-comfort").style.width = pct(mv.comfort) + "%";
+  $("b-energy").style.width = pct(mv.energy) + "%";
+  $("b-susp").style.width = pct(mv.suspicion) + "%";
+  $("v-comfort").textContent = mv.comfort.toFixed(2);
+  $("v-energy").textContent = mv.energy.toFixed(2);
+  $("v-susp").textContent = mv.suspicion.toFixed(2);
+
+  $("speech").textContent = state.say || "—";
+
+  $("log").innerHTML = state.activity.slice().reverse().map((e) => {
+    if (e.event === "decide") {
+      return `<div><b>${e.step}</b> ${e.action ? e.action + " — " : ""}${e.say || ""}</div>`;
+    }
+    if (e.event === "act") {
+      return `<div><b>${e.step}</b> ↵ ${e.ok ? e.detail : "✗ " + e.detail}</div>`;
+    }
+    return `<div><b>${e.step}</b> ${e.event}</div>`;
+  }).join("");
+
+  if (state.done && state.questionnaire) {
+    renderQ(state.questionnaire);
+  }
+}
+
+function renderQ(q) {
+  $("qpanel").classList.add("show");
+  const all = Object.entries(q.subscales).map(([d, v]) => [d, v, null]).concat(
+    Object.entries(q.factors).map(([f, v]) => [f, v, "factor"])
+  );
+  $("qrows").innerHTML = all.map(([d, v, kind]) => `
+    <div class="qrow">
+      <span class="dim">${d}${kind ? " <em style='color:#999;font-style:normal;font-size:10px'>(" + kind + ")</em>" : ""}</span>
+      <span class="track"><span class="fill" style="width:${(v / 7 * 100).toFixed(0)}%; display:block; height:100%"></span></span>
+      <span class="val">${v} / 7</span>
+    </div>`).join("");
+  $("qitems").innerHTML = Object.entries(q.items).map(([d, it]) =>
+    `<div><b>${d}:</b> ` + Object.entries(it).map(([k, v]) =>
+      `${k} = ${v === null ? "DNF" : v}`).join(" · ") + `</div>`
+  ).join("");
+}
+
+async function poll() {
+  try {
+    const r = await fetch("/api/state");
+    render(await r.json());
+  } catch (_) { /* server briefly unavailable */ }
+}
+setInterval(poll, 1000);
+poll();
+</script>
+</body>
+</html>

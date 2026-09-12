@@ -1,0 +1,24 @@
+{
+  "name": "Phill",
+  "blurb": "33-year-old entry-level officer from Aachen, married, no kids. Weekend commute. First time inside a highly automated car interior: movable driver seat, head-up display, vending machine, no steering wheel, and a foldable table. He does not care much about the car itself - he just wants to get somewhere.",
+  "traits": ["introvert", "suspicious", "confident", "uninterested in cars"],
+  "verbosity": "low",
+  "seat": {
+    "slider_mm": 330,
+    "height_mm": 280,
+    "recline_deg": 95,
+    "rotation_deg": 0
+  },
+  "tolerance": {
+    "slider_mm": 90,
+    "height_mm": 35,
+    "recline_deg": 12,
+    "rotation_deg": 8
+  },
+  "mood": {
+    "energy": 0.6,
+    "suspicion": 0.5
+  },
+  "vending_interest": "low",
+  "curiosity": 0.1
+}

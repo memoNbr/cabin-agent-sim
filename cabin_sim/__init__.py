@@ -1,0 +1,1 @@
+"""cabin-agent-sim: a cognitive agent with a persona inside a car interior."""
