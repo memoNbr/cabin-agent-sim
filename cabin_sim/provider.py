@@ -23,7 +23,7 @@ class GroqProvider:
 
         self.client = httpx.Client(base_url="https://api.groq.com/openai/v1")
         self.key = os.environ["GROQ_API_KEY"]
-        self.model = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
+        self.model = os.environ.get("GROQ_MODEL", "allam-2-7b")
 
     def complete(self, messages):
         resp = self.client.post(

@@ -6,6 +6,7 @@ until max_steps, then administers the MDMT trust questionnaire.
 """
 
 import threading
+import time
 
 from . import actions
 from .agent import CognitiveAgent
@@ -14,13 +15,14 @@ from .world import Cabin
 
 
 class Session:
-    def __init__(self, persona, provider, max_steps=120, step_interval=1.2,
-                 seed=1):
+    def __init__(self, persona, provider, max_steps=300, step_interval=1.2,
+                 duration=0.0, seed=1):
         self.persona = persona
         self.cabin = Cabin()
         self.agent = CognitiveAgent(persona, provider, self.cabin, seed=seed)
         self.max_steps = max_steps
         self.step_interval = step_interval
+        self.duration = duration
         self.step = 0
         self.done = False
         self.questionnaire = None
@@ -38,7 +40,9 @@ class Session:
         self._thread.start()
 
     def _run(self):
-        while self.step < self.max_steps and not self.done:
+        deadline = time.monotonic() + self.duration if self.duration > 0 else None
+        while (self.step < self.max_steps and not self.done and
+               (deadline is None or time.monotonic() < deadline)):
             self.step_once()
             if self.step_interval:
                 threading.Event().wait(self.step_interval)

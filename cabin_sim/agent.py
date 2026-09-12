@@ -15,6 +15,7 @@ validated before it touches the cabin, and every cabin change is clamped.
 
 import json
 import random
+import time
 
 from . import actions
 
@@ -69,6 +70,31 @@ SETTLED = [
     "I will leave it as is.",
     "Fine for now.",
 ]
+
+SPONTANEOUS = {
+    "suspicious": [
+        "No steering wheel. Of course.",
+        "I keep reaching for pedals that are not there.",
+        "Why is this seat twisted to the side?",
+        "The car keeps deciding things before I have even looked.",
+        "Right... it moves by itself. Taking my time with it.",
+    ],
+    "content": [
+        "Actually, this is not bad.",
+        "Almost relaxing.",
+        "I could get used to this, maybe.",
+        "It rides smoothly, at least.",
+        "Plenty of legroom now.",
+    ],
+    "neutral": [
+        "Another weekend commute.",
+        "Hope the week will be quiet.",
+        "Home in about an hour, probably.",
+        "I should reply to that email later.",
+        "A bit of quiet before the week starts.",
+        "Nice that nobody is honking for a change.",
+    ],
+}
 
 
 class AgentDecision:
@@ -139,20 +165,64 @@ class CognitiveAgent:
 
     def _system_prompt(self):
         p = self.persona
+        interest = p.get("vending_interest", "low")
+        vending_rule = {
+            "low": "It is a short weekend drive and you do not need anything from the vending machine. Ignore it unless you are actually parched or hungry.",
+            "medium": "You use the vending machine occasionally, at most one item at a time.",
+            "high": "You use the vending machine freely.",
+        }[interest]
+        talk = p.get("talkativeness", 0.5)
+        talk_rule = (
+            "often" if talk >= 0.66 else
+            "occasionally" if talk >= 0.33 else "rarely"
+        )
+        intro = p.get("self") or (
+            f"You are {p['name']}, a person on a weekend drive. "
+            f"{p.get('blurb', '')}"
+        )
         return (
-            f"You are {p['name']}. {p['blurb']}\n"
+            f"{intro}\n"
             f"Traits: {', '.join(p['traits'])}.\n"
+            f"You speak briefly, in a down-to-earth way, never like an assistant, "
+            "and you never announce yourself or your name.\n"
             f"Preferred seat settings: {p['seat']}. "
             f"Tolerance for deviation: {p['tolerance']}.\n"
+            f"Vending rule: {vending_rule}\n"
+            "3a. Move ONE seat axis at a time and stop as soon as it is within "
+            "the tolerance of your preferred value - do not overshoot it.\n"
+            "3b. Never push the same adjustment more than twice in a row.\n"
+            "3c. Pick EXACTLY one action per step. Never combine actions.\n"
+            "3d. There is no steering wheel and no pedals. Never mention them.\n"
+            "4a. You also talk {talk_rule}, whenever you feel like it: react to "
+            "the drive, mutter, comment on the cabin. In that case say it with "
+            "\"action\": null - a comment or reaction, not a plan of what you "
+            "will do next.\n"
             "You are not an assistant and not a robot. You are a person in a car.\n"
             + SYSTEM_RULES
         )
 
     def _build_messages(self):
+        recent = " | ".join(
+            f"{m['action'] or 'talk'}: {m['say'][:40]}"
+            for m in self.memory[-4:]
+        )
+        v = self.cabin.vending
+        taken = [k for k, start in (("snack", 5), ("water", 5), ("coffee", 5))
+                 if start - v.stock.get(k, start) > 0]
+        note = ""
+        if taken:
+            item = taken[0]
+            if item == "snack":
+                note = "\nYou already had a snack earlier. Do not take more."
+            elif item == "water":
+                note = "\nYou already had a drink earlier. No more vending for now."
         user = (
             json.dumps({"cabin": self.cabin.to_dict(),
                         "mood": self.mood}, indent=2)
-            + "\n\nWhat do you do next? Keep it a single small step."
+            + note
+            + "\n\nWhat do you do next? Keep it a single small step.\n"
+            + (f"Recent: {recent}\n" if recent else "")
+            + "(If you would rather just talk this step, \"action\": null is fine.)"
         )
         return [
             {"role": "system", "content": self._system_prompt()},
@@ -163,7 +233,15 @@ class CognitiveAgent:
         if self.provider.name == "scripted":
             raw = self.provider.complete([])
         else:
-            raw = self.provider.complete(self._build_messages())
+            try:
+                raw = self.provider.complete(self._build_messages())
+            except Exception:  # noqa: BLE001 - be resilient to rate limits etc.
+                time.sleep(3.0)
+                try:
+                    raw = self.provider.complete(self._build_messages())
+                except Exception:  # noqa: BLE001 - still down? use scripted brain
+                    self.provider_failures = getattr(self, "provider_failures", 0) + 1
+                    raw = scripted_decision(self)
         decision = self._parse(raw)
         self.last_say = decision.say
         self.memory.append({"action": decision.action, "say": decision.say})
@@ -223,11 +301,26 @@ def scripted_decision(agent) -> str:
             action = "get_coffee" if interest == "high" else "get_water"
             return _json(action, PHRASES[action])
 
-    # settled and confident: occasionally try the novelty, otherwise hold
+    # settled: occasionally try the novelty, otherwise talk or hold
     if rng.random() < agent.persona.get("curiosity", 0.1):
         action = "deploy_table" if agent.cabin.table.folded else "stow_table"
         return _json(action, PHRASES[action])
-    return _json(None, rng.choice(SETTLED))
+
+    if rng.random() < agent.persona.get("talkativeness", 0.5) * 0.6:
+        if agent.mood["suspicion"] > 0.55:
+            pool = SPONTANEOUS["suspicious"]
+        elif agent.mood["comfort"] > 0.6:
+            pool = SPONTANEOUS["content"]
+        else:
+            pool = SPONTANEOUS["neutral"]
+    else:
+        # quiet beat: mostly say nothing, sometimes a short remark
+        if rng.random() < 0.6:
+            return _json(None, "")
+        pool = SETTLED
+    last = agent.memory[-1].get("say") if agent.memory else ""
+    candidates = [line for line in pool if line != last] or pool
+    return _json(None, rng.choice(candidates))
 
 
 def _json(action, say):

@@ -101,10 +101,13 @@ def _llm_ratings(agent, persona):
     lines.append('Reply with ONLY JSON, e.g. {"1": 4, "2": "DNF", ..., "16": 3}.')
     user = "\n".join(lines)
 
-    raw = agent.provider.complete([
-        {"role": "system", "content": "Answer the questionnaire as the participant."},
-        {"role": "user", "content": user},
-    ])
+    try:
+        raw = agent.provider.complete([
+            {"role": "system", "content": "Answer the questionnaire as the participant."},
+            {"role": "user", "content": user},
+        ])
+    except Exception:  # noqa: BLE001 - fall back to mood-driven answers
+        return _scripted_ratings(agent)
     try:
         data = json.loads(raw)
     except (TypeError, ValueError):

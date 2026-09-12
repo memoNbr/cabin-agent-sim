@@ -3,6 +3,7 @@
 Not running a template: this is the CLI of the sim.
 
   python -m cabin_sim.main                  # browser view on :8000
+  python -m cabin_sim.main --duration 300   # 5-minute browser session
   python -m cabin_sim.main --steps 40       # headless run, prints the log
   python -m cabin_sim.main --persona personas/phill.json --provider groq
 """
@@ -24,9 +25,11 @@ def _parse(argv):
     parser.add_argument("--provider", default=None,
                         help="groq | ollama | scripted (default: from .env)")
     parser.add_argument("--steps", type=int, default=300,
-                        help="decision steps per session (server) or total (headless)")
+                        help="decision steps: total (headless) or safety cap (server)")
     parser.add_argument("--interval", type=float, default=1.2,
                         help="seconds between decisions in the browser run")
+    parser.add_argument("--duration", type=float, default=300.0,
+                        help="seconds the browser session runs (default 300 = 5 min)")
     parser.add_argument("--seed", type=int, default=1,
                         help="random seed for reproducible runs")
     parser.add_argument("--port", type=int, default=8000,
@@ -60,7 +63,8 @@ def main(argv=None):
     from .session import Session
 
     session = Session(persona, provider, max_steps=args.steps,
-                      step_interval=args.interval, seed=args.seed)
+                      step_interval=args.interval, duration=args.duration,
+                      seed=args.seed)
 
     if args.headless:
         _run_headless(session)
@@ -69,7 +73,9 @@ def main(argv=None):
     from .server import serve
 
     url = f"http://127.0.0.1:{args.port}"
-    print(f"Open {url} in your browser. (Ctrl+C to stop)", flush=True)
+    mins = args.duration / 60
+    print(f"Open {url} in your browser. Session: {mins:.2g} min. "
+          f"(Ctrl+C to stop)", flush=True)
     try:
         serve(session, args.port)
     except KeyboardInterrupt:
