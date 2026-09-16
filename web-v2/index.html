@@ -504,6 +504,7 @@
     t: 0, running: true, timeScale: 4,
     phase: "setup", done: false,
     speed: 0, targetSpeed: 0, gNow: 0, joltNow: 0,
+    rain: 0,
     mood: { comfort: 0.4, energy: 0.6, suspicion: 0.5 },
     memory: [], forgot: [], forgotCount: 0,
     thoughts: [], speech: "", lastModule: "",
@@ -643,6 +644,7 @@
   var CVW = 980, CVH = 540, CVF = 560, CVN = 16;
   var GLIGHT = { x: -0.5, y: 0.72, z: 0.42 };
   var CamB = { p: { x: 78, y: 68, z: -112 }, f: { x: 0, y: 0, z: 1 }, r: { x: 1, y: 0, z: 0 }, u: { x: 0, y: 1, z: 0 } };
+  var CamBase = CamB;
   var DLS = [];
   var GX = null;
   (function () {
@@ -659,10 +661,23 @@
     var f = n3(sub3(tgt, pos)), r = n3(cr3(f, { x: 0, y: 1, z: 0 })), u = cr3(r, f);
     return { p: pos, f: f, r: r, u: u };
   }
-  function camAt(t) {
-    return lookAt(
+  function camAt(t, swayK) {
+    // ride inertia: during curves the world leans into the corner,
+    // braking dives the nose, jolts rattle harder than idle breathing
+    var l = ((S.rot % 360) + 360) % 360;
+    var side = Math.sin((l - 20) * Math.PI / 180);
+    var sK = swayK || 0;
+    var crv = Math.max(0, S.gNow - 0.22) * 9.2 * (side >= 0 ? 1 : -1) * sK;
+    var dv = (S.speed < 55 && S.targetSpeed < S.speed) ? (55 - S.speed) / 55 * 4.2 * sK : 0;
+    var base = lookAt(
       { x: 78 + Math.sin(t * 1.1) * 0.7, y: 68 + Math.sin(t * 1.6) * 0.5, z: -112 + Math.sin(t * 0.9) * 0.4 },
-      { x: 16, y: 44, z: 34 });
+      { x: 16, y: 42, z: 18 });
+    if (!sK) return base;
+    var swT = { x: base.r.x * crv, y: Math.max(0, crv) * 0.28, z: base.r.z * crv + dv };
+    return {
+      p: { x: base.p.x + swT.x, y: base.p.y + swT.y, z: base.p.z + swT.z },
+      f: base.f, r: base.r, u: base.u
+    };
   }
   function proj(p) {
     var d = sub3(p, CamB.p), D = d3(d, CamB.f);
@@ -781,34 +796,51 @@
     for (var si = 0; si < st.length; si++) {
       pushSph(v3(st[si][0], st[si][1], st[si][2]), st[si][3], "rgba(210,220,255,.8)", { alpha: 0.8 });
     }
-    /* road sheet */
-    pushP([v3(-1700, 0, 210), v3(1700, 0, 210), v3(1700, -140, 2600), v3(-1700, -140, 2600)], "rgb(12,14,12)", null);
-    pushP([v3(-240, 0, 210), v3(240, 0, 210), v3(240, -140, 2600), v3(-240, -140, 2600)], "rgb(16,18,15)", { alpha: 0.85 });
+    /* road sheet — the world leans into corners with swing, braking dives it */
+    var parax = (CamB.p.x - CamBase.p.x) * 0.85 + (CamB.p.z - CamBase.p.z) * 0.25;
+    pushP([v3(-1700 + parax, 0, 210), v3(1700 + parax, 0, 210), v3(1700 + parax, -140, 2600), v3(-1700 + parax, -140, 2600)], "rgb(12,14,12)", null);
+    pushP([v3(-240 + parax, 0, 210), v3(240 + parax, 0, 210), v3(240 + parax, -140, 2600), v3(-240 + parax, -140, 2600)], "rgb(16,18,15)", { alpha: 0.85 });
+    /* near asphalt grain racing past */
+    for (var gr = 0; gr < 14; gr++) {
+      var gz = 212 + ((m * 1.6 + gr * 97) % 580);
+      var gx = -150 + ((gr * 71) % 280);
+      pushP([v3(gx, 0.05, gz), v3(gx + 5, 0.05, gz), v3(gx + 5, 0.05, gz + 22), v3(gx, 0.05, gz + 22)], "rgba(46,52,58,.4)", { alpha: 0.5 });
+    }
     /* moving lane dashes */
     for (var k = 0; k < 40; k++) {
       var zz = 260 + k * 26 - (m % 26);
       if (zz < 244) zz += 40 * 26;
-      pushP([v3(-163, 0.12, zz), v3(-157, 0.12, zz), v3(-157, 0.12, zz + 9), v3(-163, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
-      pushP([v3(157, 0.12, zz), v3(163, 0.12, zz), v3(163, 0.12, zz + 9), v3(157, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
+      pushP([v3(-163 + parax, 0.12, zz), v3(-157 + parax, 0.12, zz), v3(-157 + parax, 0.12, zz + 9), v3(-163 + parax, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
+      pushP([v3(157 + parax, 0.12, zz), v3(163 + parax, 0.12, zz), v3(163 + parax, 0.12, zz + 9), v3(157 + parax, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
     }
+    /* headlamp beam washing over the asphalt ahead */
+    pushP([v3(-30, 0.06, 300), v3(30, 0.06, 300), v3(30, 0.06, 2200), v3(-30, 0.06, 2200)], "rgba(180,200,235,.05)", { alpha: 0.5 + Math.atan(S.joltNow * 3) * 0.25 });
+    pushP([v3(-13, 0.08, 330), v3(13, 0.08, 330), v3(13, 0.08, 1300), v3(-13, 0.08, 1300)], "rgba(220,232,255,.07)", { alpha: 0.45 });
     /* lamp posts + guardrail */
-    pushP([v3(-588, -1, 180), v3(-532, -1, 180), v3(-532, 1.4, 2600), v3(-588, 1.4, 2600)], "#22282f", null);
-    pushP([v3(532, -1, 180), v3(588, -1, 180), v3(588, 1.4, 2600), v3(532, 1.4, 2600)], "#22282f", null);
+    pushP([v3(-588 + parax, -1, 180), v3(-532 + parax, -1, 180), v3(-532 + parax, 1.4, 2600), v3(-588 + parax, 1.4, 2600)], "#22282f", null);
+    pushP([v3(532 + parax, -1, 180), v3(588 + parax, -1, 180), v3(588 + parax, 1.4, 2600), v3(532 + parax, 1.4, 2600)], "#22282f", null);
     for (var p = 0; p < 46; p++) {
       var pz = 250 + p * 30 - (m % 30);
       if (pz < 235) pz += 46 * 30;
-      pushP([v3(-564, 0, pz), v3(-556, 0, pz), v3(-556, 12, pz), v3(-564, 12, pz)], "rgb(12,15,20)", null);
-      pushP([v3(556, 0, pz), v3(564, 0, pz), v3(564, 12, pz), v3(556, 12, pz)], "rgb(12,15,20)", null);
-      pushSph(v3(-560, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
-      pushSph(v3(-560, 14, pz), 7, "rgba(240,226,166,.14)", null);
-      pushSph(v3(560, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
-      pushSph(v3(560, 14, pz), 7, "rgba(240,226,166,.14)", null);
+      pushP([v3(-564 + parax, 0, pz), v3(-556 + parax, 0, pz), v3(-556 + parax, 12, pz), v3(-564 + parax, 12, pz)], "rgb(12,15,20)", null);
+      pushP([v3(556 + parax, 0, pz), v3(564 + parax, 0, pz), v3(564 + parax, 12, pz), v3(556 + parax, 12, pz)], "rgb(12,15,20)", null);
+      pushSph(v3(-560 + parax, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
+      pushSph(v3(-560 + parax, 14, pz), 7, "rgba(240,226,166,.14)", null);
+      pushSph(v3(-560 + parax, 14, pz), 15, "rgba(240,226,166,.05)", null);
+      pushSph(v3(560 + parax, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
+      pushSph(v3(560 + parax, 14, pz), 7, "rgba(240,226,166,.14)", null);
+      pushSph(v3(560 + parax, 14, pz), 15, "rgba(240,226,166,.05)", null);
+      /* sodium pools on the road */
+      pushP([v3(-620 + parax, 0.1, pz - 9), v3(-500 + parax, 0.1, pz - 9), v3(-500 + parax, 0.1, pz + 11), v3(-620 + parax, 0.1, pz + 11)], "rgba(240,226,166,.05)", { alpha: 0.5 });
+      pushP([v3(500 + parax, 0.1, pz - 9), v3(620 + parax, 0.1, pz - 9), v3(620 + parax, 0.1, pz + 11), v3(500 + parax, 0.1, pz + 11)], "rgba(240,226,166,.05)", { alpha: 0.5 });
     }
-    /* oncoming traffic glow */
+    /* oncoming traffic glow — twin headlights drifting up the left lane */
     for (var c2 = 0; c2 < 3; c2++) {
       var cz = 900 + (((m * 1.7 + c2 * 380) % 1400));
       pushSph(v3(-330 + c2 * 30, 3.5, cz), 3.2, "rgba(240,238,214,.6)", { alpha: 0.55 });
       pushSph(v3(-318 + c2 * 30, 3.5, cz), 1.6, "rgba(255,255,240,.9)", { alpha: 0.7 });
+      pushSph(v3(-363 + c2 * 30, 3.5, cz), 3.0, "rgba(240,238,214,.5)", { alpha: 0.5 });
+      pushSph(v3(-352 + c2 * 30, 3.5, cz), 1.5, "rgba(255,255,240,.85)", { alpha: 0.65 });
     }
   }
 
@@ -823,6 +855,16 @@
       pushP(gi[i], "rgba(190,210,255,.045)", null);
     }
     pushP(gi[0], null, { stroke: "rgba(160,170,190,.5)", lw: 2.5 });
+    /* rain beading on the windscreen, running down in thin streaks */
+    if (S.rain > 0.02) {
+      var sweep = (S.t * 0.32) % 1;
+      for (var r = 0; r < 44; r++) {
+        var rx = -74 + ((r * 41) % 148), ry = 50 + ((r * 29) % 22);
+        if (Math.abs(((rx / 148) + 0.5) - sweep) < 0.06) continue;
+        var sl = (r % 7) - 3;
+        pushP([v3(rx + sl, ry, 132), v3(rx + sl + 0.8, ry, 132), v3(rx + sl + 0.8, ry + 5, 129), v3(rx + sl, ry + 5, 129)], "rgba(205,220,240,.20)", { alpha: 0.85 });
+      }
+    }
   }
 
   function addFloor() {
@@ -830,6 +872,14 @@
     pushP([v3(-95, 0.4, 70), v3(95, 0.4, 70), v3(95, 0.4, 122), v3(-95, 0.4, 122)], "rgba(0,0,0,.4)", { alpha: 0.55 });
     pushP([v3(-30, 0.2, -55), v3(-25, 0.2, -55), v3(-25, 0.2, 105), v3(-30, 0.2, 105)], "rgb(26,30,40)", { alpha: 0.6 });
     pushP([v3(25, 0.2, -55), v3(30, 0.2, -55), v3(30, 0.2, 105), v3(25, 0.2, 105)], "rgb(26,30,40)", { alpha: 0.6 });
+    /* footwell mats with inlaid edge stitching */
+    pushP([v3(-44, 0.35, 2), v3(-6, 0.35, 2), v3(-6, 0.35, 70), v3(-44, 0.35, 70)], "rgba(17,19,25,.95)", null);
+    pushP([v3(-44, 0.55, 2), v3(-6, 0.55, 2), v3(-6, 0.55, 6), v3(-44, 0.55, 6)], "rgba(201,162,39,.14)", null);
+    pushP([v3(-44, 0.55, 66), v3(-6, 0.55, 66), v3(-6, 0.55, 70), v3(-44, 0.55, 70)], "rgba(201,162,39,.14)", null);
+    pushP([v3(6, 0.35, 2), v3(44, 0.35, 2), v3(44, 0.35, 70), v3(6, 0.35, 70)], "rgba(17,19,25,.95)", null);
+    pushP([v3(6, 0.55, 2), v3(44, 0.55, 2), v3(44, 0.55, 6), v3(6, 0.55, 6)], "rgba(201,162,39,.14)", null);
+    /* warm ambient wash pooling under the cabin */
+    pushP([v3(-70, 0.3, -40), v3(70, 0.3, -40), v3(70, 0.3, 110), v3(-70, 0.3, 110)], "rgba(230,200,90,.035)", { alpha: 0.6 });
     pushSph(v3(0, 0.6, -6), 34, "rgba(0,0,0,.45)", { alpha: 0.6 });
   }
 
@@ -839,17 +889,39 @@
     pushP([v3(80, 0, -60), v3(86, 0, -60), v3(86, 79, -60), v3(80, 79, -60)], shade("#10131b", faceN(v3(80, 0, -60), v3(86, 0, -60), v3(86, 79, -60))), null);
     /* left door card */
     pushP([v3(-84, 0, -58), v3(-84, 0, 112), v3(-84, 46, 114), v3(-84, 46, -56)], shade("#1b2231", faceN(v3(-84, 0, -58), v3(-84, 0, 112), v3(-84, 46, 114))), null);
+    /* upper door roll + armrest + handle recess */
+    pushP([v3(-85, 30, -20), v3(-85, 30, 100), v3(-85, 37, 100), v3(-85, 37, -20)], shade("#232b3d", faceN(v3(-85, 30, -20), v3(-85, 30, 100), v3(-85, 37, 100))), null);
     pushP([v3(-86, 26, -14), v3(-86, 26, 96), v3(-86, 29, 96), v3(-86, 29, -14)], shade("#2b2415", faceN(v3(-86, 26, -14), v3(-86, 26, 96), v3(-86, 29, 96))), null);
+    pushP([v3(-87, 38, 2), v3(-83, 38, 2), v3(-83, 40, 40), v3(-87, 40, 40)], "rgba(120,130,155,.28)", null);
     pushP([v3(-88, 12, -34), v3(-80, 12, -34), v3(-80, 19, -34), v3(-88, 19, -34)], shade("#2a3146", faceN(v3(-88, 12, -34), v3(-80, 12, -34), v3(-80, 19, -34))), null);
     pushP([v3(-88, 12, -34), v3(-88, 12, 2), v3(-88, 19, 2), v3(-88, 19, -34)], shade("#252b3f", faceN(v3(-88, 12, -34), v3(-88, 12, 2), v3(-88, 19, 2))), null);
     pushP([v3(-88, 12, 2), v3(-80, 12, 2), v3(-80, 19, 2), v3(-88, 19, 2)], shade("#2a3146", faceN(v3(-88, 12, 2), v3(-80, 12, 2), v3(-80, 19, 2))), null);
-    pushP([v3(-87, 40, -2), v3(-84, 40, -2), v3(-84, 40, 46), v3(-87, 40, 46)], "rgba(201,162,39,.25)", null);
+    /* ambient light ribbon along the door */
+    pushP([v3(-88, 40, -2), v3(-84, 40, -2), v3(-84, 40, 46), v3(-87, 40, 46)], "rgba(201,162,39,.25)", null);
+    pushP([v3(-86.5, 29.5, -40), v3(-86.5, 29.5, 96), v3(-86.5, 31, 96), v3(-86.5, 31, -40)], "rgba(107,213,192,.16)", null);
     /* right door card (near camera edge) */
     pushP([v3(84, 0, -58), v3(84, 0, 96), v3(84, 46, 98), v3(84, 46, -56)], shade("#161c2a", faceN(v3(84, 0, -58), v3(84, 0, 96), v3(84, 46, 98))), null);
     /* roof + panoroof */
     pushP([v3(-98, 77, -80), v3(98, 77, -80), v3(98, 77, 150), v3(-98, 77, 150)], shade("#0e1119", v3(0, 1, 0)), null);
     pushP([v3(-64, 76.2, -48), v3(64, 76.2, -48), v3(64, 76.2, 112), v3(-64, 76.2, 112)], "rgb(17,26,44)", { alpha: 0.82 });
     pushP([v3(-90, 74.6, -60), v3(90, 74.6, -60), v3(90, 75.4, -60), v3(-90, 75.4, -60)], "rgba(230,200,90,.35)", null);
+    /* ambient light bands framing the glass roof */
+    pushP([v3(-70, 75.3, -56), v3(-64, 75.3, -56), v3(-64, 75.3, 120), v3(-70, 75.3, 120)], "rgba(230,200,90,.22)", null);
+    pushP([v3(64, 75.3, -56), v3(70, 75.3, -56), v3(70, 75.3, 120), v3(64, 75.3, 120)], "rgba(230,200,90,.22)", null);
+    pushP([v3(-70, 75.3, 120), v3(70, 75.3, 120), v3(70, 75.3, 125), v3(-70, 75.3, 125)], "rgba(107,213,192,.16)", null);
+    /* second-row bench behind the pillar line, split back with dropped armrest */
+    pushP([v3(-92, 30, -50), v3(92, 30, -50), v3(92, 34, -66), v3(-92, 34, -66)], shade("#1a2334", faceN(v3(-92, 30, -50), v3(92, 30, -50), v3(92, 34, -66))), null);
+    pushP([v3(-92, 34, -66), v3(92, 34, -66), v3(92, 62, -80), v3(-92, 62, -80)], shade("#232b40", faceN(v3(-92, 34, -66), v3(92, 34, -66), v3(92, 62, -80)), 0.03), null);
+    pushP([v3(-92, 62, -80), v3(92, 62, -80), v3(92, 66, -78), v3(-92, 66, -78)], shade("#2c3550", faceN(v3(-92, 62, -80), v3(92, 62, -80), v3(92, 66, -78))), null);
+    pushP([v3(-30, 30, -50), v3(-30, 30, -66), v3(-30, 60, -79), v3(-30, 60, -80)], "rgba(0,0,0,.35)", null);
+    pushP([v3(30, 30, -50), v3(30, 30, -66), v3(30, 60, -79), v3(30, 60, -80)], "rgba(0,0,0,.35)", null);
+    pushP([v3(-8, 30, -50), v3(8, 30, -50), v3(8, 40, -64), v3(-8, 40, -64)], shade("#2b3350", faceN(v3(-8, 30, -50), v3(8, 30, -50), v3(8, 40, -64))), null);
+    pushP([v3(-8, 40, -64), v3(8, 40, -64), v3(8, 42, -63), v3(-8, 42, -63)], "rgba(230,200,90,.10)", null);
+    /* integrated rear headrests */
+    pushP([v3(-70, 62, -79), v3(-48, 62, -79), v3(-48, 74, -77), v3(-70, 74, -77)], shade("#242c44", faceN(v3(-70, 62, -79), v3(-48, 62, -79), v3(-48, 74, -77))), null);
+    pushP([v3(48, 62, -79), v3(70, 62, -79), v3(70, 74, -77), v3(48, 74, -77)], shade("#242c44", faceN(v3(48, 62, -79), v3(70, 62, -79), v3(70, 74, -77))), null);
+    /* rear parcel shelf catches the cabin glow */
+    pushP([v3(-92, 58, -88), v3(92, 58, -88), v3(92, 60, -93), v3(-92, 60, -93)], "rgba(24,30,44,.9)", null);
   }
 
   function addDash() {
@@ -874,27 +946,42 @@
     pushP([v3(-69, 26, 114), v3(-55, 26, 114), v3(-55, 26.4, 116), v3(-69, 26.4, 116)], "rgba(201,162,39,.5)", null);
   }
 
+  function seatSlide() {
+    /* seat rails run slightly downhill toward the rear; the pedestal
+       carriages slide forward as the cushion is raised (38..46 cm) */
+    return ((S.hgt - 38) / 8) * 7;
+  }
   function addSeat() {
     var hgt = S.hgt, ct = hgt, cb = hgt - 12, yawI = S.rot;
     var SHIFT_ROT = ((S.rot % 360) + 360) % 360;
     var yawDeg = SHIFT_ROT;
-    /* floor rail */
-    pushP([v3(-16, 0.5, -34), v3(-10, 0.5, -34), v3(-10, 0.5, 34), v3(-16, 0.5, 34)], "rgba(201,162,39,.5)", null);
-    pushP([v3(10, 0.5, -34), v3(16, 0.5, -34), v3(16, 0.5, 34), v3(10, 0.5, 34)], "rgba(201,162,39,.5)", null);
-    /* pedestal (fixed) */
-    box(0, cb, 0, 15, 4, -16, "#1a202f", "#141a26", 0);
-    pushP([v3(-16, cb - 6, -16), v3(16, cb - 6, -16), v3(16, cb - 6, -12), v3(-16, cb - 6, -12)], "rgba(230,200,90,.45)", null);
-    /* rotates with seat */
-    function L(x, y, z) { return rotY(v3(x, y, z), yawDeg, 0, -6); }
-    /* swivel disc */
+    var sl = seatSlide();
+    /* floor rail tracks (static) with brushed gold inlay */
+    pushP([v3(-16, 0.5, -36), v3(-10, 0.5, -36), v3(-10, 0.5, 36), v3(-16, 0.5, 36)], "rgba(201,162,39,.55)", null);
+    pushP([v3(10, 0.5, -36), v3(16, 0.5, -36), v3(16, 0.5, 36), v3(10, 0.5, 36)], "rgba(201,162,39,.55)", null);
+    pushP([v3(-14, 0.9, -34), v3(14, 0.9, -34), v3(14, 0.9, -18), v3(-14, 0.9, -18)], "rgba(10,12,16,.9)", null);
+    pushP([v3(-14, 0.9, 18), v3(14, 0.9, 18), v3(14, 0.9, 34), v3(-14, 0.9, 34)], "rgba(10,12,16,.9)", null);
+    /* pedestal base slides on the rail as height rises, keeping the seat
+       plane level while the carriage runs forward */
+    box(0, cb, 0, 15, 4 + sl, -16 + sl, "#1a202f", "#141a26", 0);
+    pushP([v3(-16, cb - 6, -16 + sl), v3(16, cb - 6, -16 + sl), v3(16, cb - 6, -12 + sl), v3(-16, cb - 6, -12 + sl)], "rgba(230,200,90,.5)", null);
+    /* swivel hub disc (turns with the seat, rides on the sliding carriage) */
+    var hubC = v3(0, cb + 0.6, -6 + sl);
+    function L(x, y, z) {
+      var p = rotY(v3(x, y, z), yawDeg, 0, -6);
+      return { x: p.x, y: p.y, z: p.z + sl };
+    }
     var disc = [];
-    for (var a = 0; a < 12; a++) {
-      var an = a / 12 * 6.2832;
+    for (var a = 0; a < 14; a++) {
+      var an = a / 14 * 6.2832;
       disc.push(L(Math.sin(an) * 20, cb + 0.6, -6 + Math.cos(an) * 20));
     }
     pushP(disc, "#0e1119", null);
+    pushP([hubC, L(-5, cb + 0.7, -6), L(5, cb + 0.7, -6)], "rgba(20,24,34,.9)", null);
+    pushSph(hubC, 5, "#1a2130", { stroke: "rgba(230,200,90,.7)", lw: 1.2 });
+    pushSph(L(0, cb + 0.8, -6), 1.1, "rgba(230,200,90,.6)", null);
     var wn = yawDeg * Math.PI / 180;
-    pushP([v3(0, cb + 0.7, -6), L(Math.sin(wn) * 20, cb + 0.7, -6 + Math.cos(wn) * 20), L(Math.sin(wn + 0.28) * 20, cb + 0.7, -6 + Math.cos(wn + 0.28) * 20)], "rgba(230,200,90,.9)", null);
+    pushP([hubC, L(Math.sin(wn) * 20, cb + 0.7, -6 + Math.cos(wn) * 20), L(Math.sin(wn + 0.28) * 20, cb + 0.7, -6 + Math.cos(wn + 0.28) * 20)], "rgba(230,200,90,.9)", null);
     /* cushion */
     var cTop = [
       [L(-22, ct, -12), L(22, ct, -12), L(22, ct, 8), L(-22, ct, 8)],
@@ -934,8 +1021,12 @@
     var hgt = S.hgt;
     var hipY = hgt + 2;
     var yawDeg = ((S.rot % 360) + 360) % 360;
+    var sl = seatSlide();
     var H = v3(0, hipY, -6);
-    function L(p) { return rotY(p, yawDeg, 0, -6); }
+    function L(p) {
+      var q = rotY(p, yawDeg, 0, -6);
+      return { x: q.x, y: q.y, z: q.z + sl };
+    }
     function fwd() { return rotY(v3(0, 0, 1), yawDeg, 0, -6); }
     var FV = fwd();
     var shX = v3(0, 46, -4), shL = v3(-18, 47, -3), shR = v3(18, 47, -3);
@@ -949,11 +1040,15 @@
     pushCap(torsoA, torsoB, 12.5, "#3b4356", null);
     var sLw = L(shift(shX, -18, 2, 1)), sRw = L(shift(shX, 18, 2, 1));
     pushCap(sLw, sRw, 9, "#414a60", null);
-    /* belt buckled strap when facing forward */
+    /* belt buckled strap — retracts from the B-pillar when facing forward */
     var nrm = ((S.rot % 360) + 360) % 360;
     if (nrm < 14 || nrm > 346) {
-      pushCap(L(v3(0, 40, 6)), L(v3(0, hipY - 6, -3)), 2.3, "#C9A227", null);
-      pushSph(L(v3(0, hipY - 8, 0)), 2.2, "#E6C85A", null);
+      var beltA = v3(-52, 56, -58 - sl * 0.2);
+      var beltB = v3(2, hipY - 5, -4 + sl);
+      pushCap(beltA, beltB, 2.3, "#C9A227", null);
+      pushCap(L(v3(0, 40, 6)), beltB, 1.7, "rgba(230,200,90,.85)", null);
+      pushSph(beltB, 2.1, "#E6C85A", null);
+      pushSph(beltA, 2.6, "#1b2334", { stroke: "rgba(230,200,90,.6)", lw: 1 });
     }
     /* neck + head */
     var neckB = L(v3(0, 52, -5)), headC = L(v3(0, 60, -6));
@@ -1065,6 +1160,19 @@
       GX.fillStyle = "rgba(200,195,160,.25)";
       GX.beginPath(); GX.arc(roofM.x, roofM.y, 7, 0, 6.2832); GX.fill();
     }
+    /* heading ribbon — which way Phill is facing in the cabin */
+    var headDeg = ((S.rot % 360) + 360) % 360;
+    GX.fillStyle = "rgba(11,10,7,.72)";
+    GX.fillRect(14, 14, 148, 24);
+    GX.strokeStyle = "rgba(201,162,39,.55)"; GX.lineWidth = 1;
+    GX.strokeRect(14, 14, 148, 24);
+    GX.fillStyle = "#E6C85A";
+    GX.font = "10px Consolas, monospace";
+    GX.textAlign = "left";
+    GX.fillText("SEAT FWD · " + (Math.round(headDeg) < 100 ? "0" : "") + (Math.round(headDeg) < 10 ? "0" : "") + Math.round(headDeg) + "°", 24, 30);
+    GX.strokeStyle = "rgba(230,200,90,.5)";
+    GX.beginPath(); GX.moveTo(150, 30); GX.lineTo(150 - Math.sin(headDeg * Math.PI / 180) * 6, 30 - Math.cos(headDeg * Math.PI / 180) * 6);
+    GX.stroke();
     /* vignette */
     var vg = GX.createRadialGradient(CVW / 2, CVH / 2, 150, CVW / 2, CVH / 2, 560);
     vg.addColorStop(0, "rgba(0,0,0,0)");
@@ -1117,12 +1225,14 @@
     $("sfHgt").textContent = S.hgt + " cm";
     $("sfRot").textContent = Math.round((((S.rot % 360) + 360) % 360)) + "°";
     if (!GX) return;
-    CamB = camAt(S.t);
+    CamBase = camAt(S.t);
+    CamB = camAt(S.t, 1);
     DLS.length = 0;
     var shX = 0, shY = 0;
     if (S.joltNow > 0.2) { shX = S.joltNow * 6 * Math.sin(S.t * 91 + 1.3); shY = S.joltNow * 5 * Math.sin(S.t * 77 + 4.1); }
     addExterior3D();
     addGlass3D();
+    CamB = CamBase;
     addFloor();
     addCabin();
     addDash();
@@ -1288,6 +1398,9 @@
     S.mood.comfort += (ct - S.mood.comfort) * Math.min(1, dt * 0.06);
     S.gNow *= Math.exp(-dt * 0.3);
     S.joltNow *= Math.exp(-dt * 0.35);
+    /* env-side weather: rain beads while the drizzle event is live */
+    if (S.t > 540 && S.t < 570) S.rain = Math.min(1, S.rain + dt * 0.08);
+    else S.rain *= Math.exp(-dt * 0.18);
     S.mood.energy = Math.max(0.05, S.mood.energy - dt * 0.00018);
     var bs = PHILL.suspicionBase;
     if (S.mood.suspicion > bs) S.mood.suspicion = Math.max(bs, S.mood.suspicion - dt * 0.004);
