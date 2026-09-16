@@ -49,6 +49,11 @@
   /* ---- scene ---- */
   #scene{position:relative;}
   #scene svg{width:100%; height:auto; display:block; border-radius:8px; background:#0C0B08;}
+  #sceneCv{width:100%; height:auto; display:block; border-radius:8px; background:#0C0B08;}
+  .topctl{display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    border-bottom:1px solid var(--line); background:var(--panel); padding:9px 22px;}
+  .topctl .btn{padding:7px 13px;}
+  .topctl .tc-lbl{font-size:10px; letter-spacing:.2em; color:var(--faint); margin:0 2px;}
   .scene-foot{display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-top:10px;
     font-size:12px; color:var(--muted);}
   .scene-foot b{color:var(--gold-hi); font-weight:600;}
@@ -213,344 +218,30 @@
     <span class="mono t" id="clockVal">00:00</span>
   </div>
 </header>
+<div class="topctl">
+  <button class="btn primary" id="topPlay">▶ Play</button>
+  <button class="btn" id="topRestart">↻ Restart</button>
+  <button class="btn" id="topSkip">⏭ Skip</button>
+  <span class="tc-sep" style="width:1px;height:20px;background:var(--line);margin:0 2px;"></span>
+  <span class="tc-lbl">SPEED</span>
+  <div class="speed-group" id="topSpeed">
+    <button class="btn" data-s="0.5">½×</button>
+    <button class="btn on" data-s="1">1×</button>
+    <button class="btn" data-s="2">2×</button>
+    <button class="btn" data-s="4">4×</button>
+    <button class="btn" data-s="8">8×</button>
+  </div>
+</div>
 
 <div class="wrap">
   <div class="grid">
     <!-- LEFT -->
     <div>
       <div class="card" id="scene">
-        <h3>vehicle — EQS-class autonomous cabin <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
+<h3>vehicle — EQS-class autonomous cabin <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
         <div id="sceneWrap">
-        <svg id="sceneSvg" viewBox="0 0 980 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EQS-class autonomous SUV interior close-up">
-          <defs>
-            <linearGradient id="skyGInt" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#0d1420"/>
-              <stop offset="62%" stop-color="#1a2436"/>
-              <stop offset="100%" stop-color="#2b3340"/>
-            </linearGradient>
-            <linearGradient id="cavG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#161a26"/>
-              <stop offset="100%" stop-color="#0a0b0d"/>
-            </linearGradient>
-            <linearGradient id="dashG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#241f14"/>
-              <stop offset="100%" stop-color="#141006"/>
-            </linearGradient>
-            <linearGradient id="screenG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#0e1626"/>
-              <stop offset="55%" stop-color="#101c30"/>
-              <stop offset="100%" stop-color="#0a101c"/>
-            </linearGradient>
-            <linearGradient id="sunroofG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#060a14"/>
-              <stop offset="60%" stop-color="#101a2c"/>
-              <stop offset="100%" stop-color="#1c2740"/>
-            </linearGradient>
-            <radialGradient id="glareG" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#dbe3ff" stop-opacity=".10"/>
-              <stop offset="100%" stop-color="#dbe3ff" stop-opacity="0"/>
-            </radialGradient>
-            <radialGradient id="moonG" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#eef0da" stop-opacity=".85"/>
-              <stop offset="55%" stop-color="#c9c29a" stop-opacity=".22"/>
-              <stop offset="100%" stop-color="#c9c29a" stop-opacity="0"/>
-            </radialGradient>
-            <pattern id="quilt" x="0" y="0" width="13" height="13" patternUnits="userSpaceOnUse">
-              <path d="M6.5,0 L13,6.5 L6.5,13 L0,6.5 Z" fill="none" stroke="#3f4a68" stroke-width="0.7" opacity=".9"/>
-            </pattern>
-            <pattern id="perf" x="0" y="0" width="7" height="7" patternUnits="userSpaceOnUse">
-              <circle cx="3.5" cy="3.5" r="0.9" fill="#0d0f14" opacity=".55"/>
-            </pattern>
-            <clipPath id="wndClip"><polygon points="560,110 922,60 900,300 560,300"/></clipPath>
-            <clipPath id="rearClip"><rect x="96" y="96" width="464" height="150" rx="8"/></clipPath>
-          </defs>
-
-          <!-- cutaway chrome -->
-          <rect x="20" y="12" width="940" height="470" rx="14" fill="#0B0A07" stroke="#2a2416" stroke-width="2.5"/>
-
-          <!-- interior cavity -->
-          <rect x="30" y="18" width="920" height="446" rx="8" fill="url(#cavG)"/>
-
-          <!-- B-pillar (rear-most cabin frame) -->
-          <path d="M44,68 L92,68 L92,452 L44,452 Z" fill="#10121a" stroke="#2a3346" stroke-width="2"/>
-          <path d="M48,68 L88,68 L88,120 L48,120 Z" fill="#1c2230" stroke="#3a435e" stroke-width="1.5"/>
-          <rect x="56" y="80" width="24" height="6" rx="3" fill="#2c3350"/>
-          <rect x="72" y="330" width="12" height="34" rx="3" fill="#2c3350"/>
-          <circle cx="68" cy="412" r="7" fill="#C9A227" opacity=".4"/>
-          <text x="68" y="302" font-family="Consolas, monospace" font-size="8" fill="#465070" text-anchor="middle" letter-spacing="1">B</text>
-
-          <!-- panoramic sunroof + headliner -->
-          <rect x="30" y="18" width="920" height="78" fill="url(#sunroofG)" stroke="#22293c" stroke-width="1.5"/>
-          <g fill="#cfd8ff">
-            <circle cx="120" cy="42" r="1"/><circle cx="200" cy="30" r="0.7"/><circle cx="310" cy="52" r="0.8"/>
-            <circle cx="420" cy="34" r="0.7"/><circle cx="520" cy="48" r="1"/><circle cx="640" cy="26" r="0.7"/>
-            <circle cx="740" cy="44" r="0.8"/><circle cx="840" cy="30" r="0.7"/><circle cx="900" cy="50" r="0.8"/>
-            <circle cx="160" cy="58" r="0.6"/><circle cx="470" cy="62" r="0.6"/><circle cx="810" cy="60" r="0.6"/>
-          </g>
-          <circle cx="640" cy="30" r="26" fill="url(#moonG)"/>
-          <line x1="30" y1="78" x2="950" y2="78" stroke="#C9A227" stroke-width="1.4" opacity=".5"/>
-          <rect x="30" y="80" width="920" height="16" fill="#171c2a"/>
-          <line x1="30" y1="80" x2="950" y2="80" stroke="#8a90a8" stroke-width="1" opacity=".3"/>
-          <!-- overhead console -->
-          <rect x="640" y="22" width="150" height="20" rx="6" fill="#0e1118" stroke="#2c3350" stroke-width="1.5"/>
-          <rect x="652" y="27" width="34" height="9" rx="4.5" fill="#1a2030"/>
-          <rect x="692" y="27" width="34" height="9" rx="4.5" fill="#1a2030"/>
-          <circle cx="742" cy="31" r="3.5" fill="#C9A227" opacity=".8"/>
-          <circle cx="754" cy="31" r="3.5" fill="#C9A227" opacity=".45"/>
-          <rect x="772" y="27" width="10" height="9" rx="2" fill="#1f2738"/>
-          <!-- ambient light channel along headliner -->
-          <rect x="30" y="96" width="920" height="2.5" fill="#E6C85A" opacity=".55"/>
-
-          <!-- front side glass (world scroll) -->
-          <rect x="96" y="96" width="464" height="150" rx="8" fill="#060a14" stroke="#2a3346" stroke-width="2"/>
-          <g clip-path="url(#rearClip)">
-            <g id="rearWnd">
-              <rect x="-1200" y="60" width="2660" height="200" fill="url(#skyGInt)"/>
-              <g fill="#181b10">
-                <rect x="-1140" y="150" width="40" height="26"/><rect x="-980" y="146" width="26" height="30"/>
-                <rect x="-780" y="152" width="40" height="24"/><rect x="-580" y="146" width="26" height="30"/>
-                <rect x="-380" y="150" width="40" height="26"/><rect x="-180" y="146" width="26" height="30"/>
-                <rect x="20" y="152" width="40" height="24"/><rect x="220" y="146" width="26" height="30"/>
-                <rect x="420" y="150" width="40" height="26"/><rect x="620" y="146" width="26" height="30"/>
-                <rect x="820" y="152" width="40" height="24"/><rect x="1020" y="146" width="26" height="30"/>
-                <rect x="1220" y="150" width="40" height="26"/><rect x="1420" y="146" width="26" height="30"/>
-              </g>
-              <rect x="-1200" y="214" width="2660" height="46" fill="#0d0e0c"/>
-              <g stroke="#3d3a22" stroke-width="2">
-                <line x1="-1200" y1="230" x2="-1040" y2="230"/><line x1="-920" y1="230" x2="-760" y2="230"/>
-                <line x1="-640" y1="230" x2="-480" y2="230"/><line x1="-360" y1="230" x2="-200" y2="230"/>
-                <line x1="-80" y1="230" x2="80" y2="230"/><line x1="200" y1="230" x2="360" y2="230"/>
-                <line x1="480" y1="230" x2="640" y2="230"/><line x1="760" y1="230" x2="920" y2="230"/>
-                <line x1="1040" y1="230" x2="1200" y2="230"/><line x1="1320" y1="230" x2="1480" y2="230"/>
-              </g>
-              <g fill="#e8e3c0" opacity=".5">
-                <circle cx="-1060" cy="120" r="7"/><circle cx="-560" cy="132" r="6"/>
-                <circle cx="-60" cy="118" r="7"/><circle cx="440" cy="130" r="6"/>
-                <circle cx="940" cy="118" r="7"/><circle cx="1440" cy="130" r="6"/>
-              </g>
-            </g>
-            <rect x="96" y="96" width="464" height="150" rx="8" fill="url(#glareG)"/>
-            <path d="M150,120 L300,108 L306,220 L162,232 Z" fill="#ffffff" opacity=".04"/>
-          </g>
-          <!-- chrome beltline under the side glass -->
-          <rect x="96" y="246" width="464" height="4" fill="#3a435e"/>
-          <rect x="96" y="250" width="464" height="1.5" fill="#E6C85A" opacity=".4"/>
-
-          <!-- door card : quilted leather -->
-          <path d="M96,252 L560,252 L560,452 L96,452 Z" fill="#1b202e" stroke="#2a3346" stroke-width="2"/>
-          <path d="M120,258 L536,258 L536,306 L120,306 Z" fill="#232a3c" stroke="#3a435e" stroke-width="1.5"/>
-          <rect x="120" y="258" width="416" height="48" fill="url(#quilt)"/>
-          <line x1="120" y1="308" x2="536" y2="308" stroke="#C9A227" stroke-width="1" opacity=".6"/>
-          <!-- armrest -->
-          <path d="M104,330 Q104,318 118,318 L300,318 Q314,318 314,330 L314,346 L104,346 Z" fill="#222a3c" stroke="#3a435e" stroke-width="1.5"/>
-          <path d="M112,326 Q112,322 122,322 L292,322 Q302,322 302,326 L302,340 L112,340 Z" fill="url(#quilt)"/>
-          <line x1="112" y1="324" x2="302" y2="324" stroke="#E6C85A" stroke-width="0.8" opacity=".5"/>
-          <!-- grab handle + seat memory -->
-          <rect x="428" y="276" width="30" height="18" rx="9" fill="#2a3146" stroke="#465070" stroke-width="1.5"/>
-          <rect x="434" y="282" width="4" height="6" rx="2" fill="#0e1118"/>
-          <rect x="444" y="282" width="4" height="6" rx="2" fill="#0e1118"/>
-          <rect x="454" y="282" width="4" height="6" rx="2" fill="#0e1118"/>
-          <!-- switch cluster -->
-          <rect x="250" y="358" width="150" height="18" rx="6" fill="#14171f" stroke="#2c3350" stroke-width="1.5"/>
-          <rect x="258" y="363" width="26" height="8" rx="4" fill="#2c3350"/>
-          <rect x="294" y="363" width="26" height="8" rx="4" fill="#2c3350"/>
-          <circle cx="344" cy="367" r="4.5" fill="#2c3350" stroke="#465070" stroke-width="1"/>
-          <rect x="356" y="365" width="10" height="5" rx="2.5" fill="#2c3350"/>
-          <rect x="372" y="363" width="18" height="8" rx="3" fill="#2c3350"/>
-          <text x="250" y="372" font-size="6.5" fill="#465070">M1</text>
-          <text x="288" y="372" font-size="6.5" fill="#465070">M2</text>
-          <!-- speaker grille -->
-          <circle cx="498" cy="382" r="25" fill="#0e1118" stroke="#465070" stroke-width="1.5"/>
-          <circle cx="498" cy="382" r="18" fill="none" stroke="#2c3350" stroke-width="1"/>
-          <circle cx="498" cy="382" r="11" fill="none" stroke="#2c3350" stroke-width="1"/>
-          <circle cx="498" cy="382" r="4" fill="#465070"/>
-          <g stroke="#C9A227" stroke-width="0.9" opacity=".65">
-            <line x1="498" y1="357" x2="498" y2="362"/><line x1="498" y1="402" x2="498" y2="407"/>
-            <line x1="473" y1="382" x2="478" y2="382"/><line x1="518" y1="382" x2="523" y2="382"/>
-            <line x1="480" y1="364" x2="484" y2="368"/><line x1="512" y1="396" x2="516" y2="400"/>
-            <line x1="516" y1="364" x2="512" y2="368"/><line x1="484" y1="396" x2="480" y2="400"/>
-          </g>
-          <text x="498" y="424" font-family="Consolas, monospace" font-size="7" fill="#5c6a94" text-anchor="middle" letter-spacing="3">EQ·S</text>
-          <!-- wood trim strip -->
-          <rect x="96" y="402" width="440" height="5" fill="#0a0c10" stroke="#E6C85A" stroke-width="0.8" opacity=".8"/>
-          <rect x="96" y="409" width="440" height="9" fill="#151209" stroke="#2f2a17" stroke-width="1"/>
-          <path d="M120,413 L200,411 Q240,410 280,413 L560,413" fill="none" stroke="#5a4a22" stroke-width="1" opacity=".6"/>
-          <!-- lower pocket -->
-          <path d="M122,428 L360,428 L360,444 L122,444 Z" fill="#10131b" stroke="#2a3346" stroke-width="1.2"/>
-          <!-- kick plate -->
-          <rect x="470" y="452" width="66" height="10" rx="3" fill="#2c2a1a" stroke="#E6C85A" stroke-width="1"/>
-          <text x="503" y="460" font-family="Consolas, monospace" font-size="8" fill="#C9A227" text-anchor="middle" letter-spacing="2">S</text>
-
-          <!-- A-pillar + tweeter -->
-          <path d="M900,60 L954,54 L954,452 L886,240 Z" fill="#11131c" stroke="#2a3346" stroke-width="2"/>
-          <circle cx="930" cy="196" r="12" fill="#0e1118" stroke="#465070" stroke-width="1.5"/>
-          <circle cx="930" cy="196" r="6" fill="#2c3350"/>
-          <rect x="906" y="216" width="48" height="6" rx="3" fill="#2c3350"/>
-
-          <!-- windshield world scroll -->
-          <g clip-path="url(#wndClip)">
-            <g id="worldWnd">
-              <rect x="-1200" y="30" width="2660" height="280" fill="url(#skyGInt)"/>
-              <circle cx="1620" cy="110" r="18" fill="#e8e3c0" opacity=".8"/>
-              <circle cx="1620" cy="110" r="34" fill="#c9c29a" opacity=".12"/>
-              <path d="M-1200,262 Q-800,236 -200,252 L1200,248 L1460,246 L1460,310 L-1200,310 Z" fill="#0d0e0c"/>
-              <g stroke="#3d3a22" stroke-width="2.5">
-                <line x1="-1260" y1="268" x2="-1100" y2="268"/><line x1="-980" y1="268" x2="-820" y2="268"/>
-                <line x1="-700" y1="268" x2="-540" y2="268"/><line x1="-420" y1="268" x2="-260" y2="268"/>
-                <line x1="-140" y1="268" x2="20" y2="268"/><line x1="140" y1="268" x2="300" y2="268"/>
-                <line x1="420" y1="268" x2="580" y2="268"/><line x1="700" y1="268" x2="860" y2="268"/>
-                <line x1="980" y1="268" x2="1140" y2="268"/><line x1="1260" y1="268" x2="1420" y2="268"/>
-              </g>
-              <g stroke="#0f1114" stroke-width="5">
-                <line x1="-1220" y1="254" x2="-1080" y2="254"/><line x1="-1020" y1="254" x2="-880" y2="254"/>
-                <line x1="-760" y1="254" x2="-620" y2="254"/><line x1="-560" y1="254" x2="-420" y2="254"/>
-                <line x1="-300" y1="254" x2="-160" y2="254"/><line x1="-100" y1="254" x2="40" y2="254"/>
-                <line x1="220" y1="254" x2="360" y2="254"/><line x1="420" y1="254" x2="560" y2="254"/>
-                <line x1="680" y1="254" x2="820" y2="254"/><line x1="880" y1="254" x2="1020" y2="254"/>
-                <line x1="1140" y1="254" x2="1280" y2="254"/><line x1="1340" y1="254" x2="1480" y2="254"/>
-              </g>
-              <g fill="#23281c">
-                <rect x="-1160" y="192" width="34" height="44"/><rect x="-1000" y="200" width="26" height="36"/>
-                <rect x="-820" y="188" width="34" height="48"/><rect x="-660" y="200" width="26" height="36"/>
-                <rect x="-480" y="192" width="34" height="44"/><rect x="-320" y="200" width="26" height="36"/>
-                <rect x="-140" y="188" width="34" height="48"/><rect x="20" y="200" width="26" height="36"/>
-                <rect x="200" y="192" width="34" height="44"/><rect x="360" y="200" width="26" height="36"/>
-                <rect x="540" y="188" width="34" height="48"/><rect x="700" y="200" width="26" height="36"/>
-                <rect x="880" y="192" width="34" height="44"/><rect x="1040" y="200" width="26" height="36"/>
-                <rect x="1220" y="188" width="34" height="48"/><rect x="1380" y="200" width="26" height="36"/>
-              </g>
-            </g>
-            <!-- HUD nav overlay -->
-            <path d="M700,176 Q760,146 830,162 Q780,196 704,212 Z" fill="rgba(201,162,39,.10)"/>
-            <path d="M780,178 L812,170 L806,182 Z" fill="#E6C85A" opacity=".9"/>
-            <path d="M770,206 C790,196 810,196 828,204" fill="none" stroke="#E6C85A" stroke-width="1.4" stroke-dasharray="3 5" opacity=".7"/>
-            <text x="640" y="132" font-family="Consolas, monospace" font-size="10" fill="#C9A227" letter-spacing="3">AUTO · L3 READY</text>
-            <path d="M700,120 L780,112 L786,140 L706,148 Z" fill="#ffffff" opacity=".05"/>
-            <path d="M760,150 L848,140 L854,220 L764,230 Z" fill="#ffffff" opacity=".04"/>
-          </g>
-
-          <!-- dashboard : leather deck behind the screen -->
-          <path d="M430,300 Q560,308 700,308 L884,246 L900,300 L900,452 L430,452 Z" fill="url(#dashG)" stroke="#2f2a17" stroke-width="2"/>
-          <path d="M430,300 Q560,308 700,308 L884,246" fill="none" stroke="#C9A227" stroke-width="1.2" opacity=".55"/>
-          <path d="M444,452 L470,322 Q560,330 690,330" fill="none" stroke="#E6C85A" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/>
-          <path d="M562,452 L588,338 Q660,342 740,342" fill="none" stroke="#E6C85A" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/>
-
-          <!-- hyperscreen : one curved slab, three zones -->
-          <path d="M470,262 L918,236 L918,300 L470,300 Z" fill="url(#screenG)" stroke="#3a435e" stroke-width="1.5"/>
-          <path d="M470,262 L918,236 L918,238 L470,264 Z" fill="#ffffff" opacity=".09"/>
-          <line x1="648" y1="250" x2="648" y2="298" stroke="#1f2738" stroke-width="1.5"/>
-          <line x1="806" y1="242" x2="806" y2="298" stroke="#1f2738" stroke-width="1.5"/>
-          <!-- left zone : driver cluster -->
-          <circle cx="540" cy="276" r="10" fill="none" stroke="#C9A227" stroke-width="1"/>
-          <line x1="540" y1="268" x2="540" y2="284" stroke="#C9A227" stroke-width="1.2"/>
-          <line x1="532" y1="276" x2="548" y2="276" stroke="#C9A227" stroke-width="1.2"/>
-          <text x="612" y="276" font-family="Consolas, monospace" font-size="8" fill="#C9A227" letter-spacing="1">138</text>
-          <text x="612" y="286" font-family="Consolas, monospace" font-size="6" fill="#5c6a94">KM/H</text>
-          <!-- mid zone : navigation -->
-          <path d="M662,292 L690,270 L700,284 L730,262 L740,284 L770,258" fill="none" stroke="#3f7bd9" stroke-width="1.6" opacity=".9"/>
-          <path d="M776,258 L784,256 L780,264 Z" fill="#3f7bd9" opacity=".9"/>
-          <circle cx="726" cy="292" r="3" fill="#E6C85A" opacity=".8"/>
-          <rect x="668" y="254" width="52" height="8" rx="4" fill="#3f7bd9" opacity=".25"/>
-          <text x="846" y="270" font-family="Consolas, monospace" font-size="6" fill="#5c6a94">EQS SUV</text>
-          <!-- right zone : media waves -->
-          <g stroke="#E6C85A" stroke-width="2" opacity=".8">
-            <line x1="830" y1="286" x2="830" y2="292"/><line x1="840" y1="282" x2="840" y2="292"/>
-            <line x1="850" y1="285" x2="850" y2="292"/><line x1="860" y1="279" x2="860" y2="292"/>
-            <line x1="870" y1="288" x2="870" y2="292"/><line x1="880" y1="283" x2="880" y2="292"/>
-          </g>
-          <path d="M470,262 L918,236 L918,300 L470,300 Z" fill="url(#glareG)"/>
-          <!-- screen under-glow -->
-          <path d="M470,300 L918,300 L918,306 L470,306 Z" fill="#E6C85A" opacity=".5"/>
-
-          <!-- stowed steering column -->
-          <rect x="384" y="214" width="112" height="86" rx="14" fill="#0d0f16" stroke="#3a435e" stroke-width="1.5"/>
-          <rect x="398" y="228" width="76" height="58" rx="8" fill="#070807" stroke="#465070" stroke-width="1"/>
-          <path d="M404,270 Q404,236 440,236 Q474,236 474,270 Q474,274 468,274 L414,274 Q408,274 408,270 Q408,240 440,240 L444,240 Q452,240 446,272" fill="none" stroke="#C9A227" stroke-width="2" opacity=".9"/>
-          <rect x="414" y="244" width="24" height="10" rx="5" fill="#0e1118" stroke="#465070" stroke-width="1"/>
-          <text x="440" y="316" font-family="Segoe UI" font-size="7.5" fill="#8a93a8" text-anchor="middle">steering column &amp; yoke — stowed</text>
-          <circle cx="440" cy="322" r="9" fill="none" stroke="#E6C85A" stroke-width="1.2" opacity=".6"/>
-          <text x="440" y="326" font-family="Consolas, monospace" font-size="6.5" fill="#C9A227" text-anchor="middle">L3</text>
-
-          <!-- centre console forward of the seat -->
-          <path d="M300,330 Q300,316 318,314 L352,310 Q360,310 362,318 L362,452 L300,452 Z" fill="#161a26" stroke="#2a3346" stroke-width="1.5"/>
-          <rect x="310" y="326" width="40" height="10" rx="5" fill="#1f2738" stroke="#3a435e" stroke-width="1"/>
-          <rect x="312" y="346" width="36" height="16" rx="6" fill="#0e1118" stroke="#2c3350" stroke-width="1"/>
-          <rect x="312" y="370" width="36" height="5" rx="2.5" fill="#2c3350"/>
-          <path d="M306,452 Q306,392 318,392" fill="none" stroke="#E6C85A" stroke-width="1" opacity=".35"/>
-
-          <!-- floor + carpet + sill -->
-          <rect x="30" y="452" width="920" height="12" fill="#0c0d10" stroke="#2a3346" stroke-width="1.5"/>
-          <rect x="30" y="452" width="920" height="3" fill="#3a435e"/>
-          <line x1="30" y1="452" x2="950" y2="452" stroke="#C9A227" stroke-width="1" opacity=".3"/>
-          <rect x="420" y="434" width="96" height="15" rx="5" fill="#20242f" stroke="#2c3350" stroke-width="2"/>
-          <rect x="434" y="442" width="30" height="5" rx="2.5" fill="#0d0f16"/>
-          <rect x="484" y="442" width="30" height="5" rx="2.5" fill="#0d0f16"/>
-          <ellipse cx="620" cy="452" rx="60" ry="5" fill="#0a0b0d" opacity=".6"/>
-
-          <!-- telescoping pedestal -->
-          <rect id="ped" x="430" y="340" width="72" height="100" rx="6" fill="#161a26" stroke="#3a435e" stroke-width="1.5"/>
-          <line x1="452" y1="344" x2="452" y2="436" stroke="#2c3350" stroke-width="1.5"/>
-          <line x1="480" y1="344" x2="480" y2="436" stroke="#2c3350" stroke-width="1.5"/>
-          <rect x="446" y="428" width="40" height="7" rx="3.5" fill="#2c3350"/>
-
-          <!-- seat assembly : quilted leather, two-tone -->
-          <g id="figGroup">
-            <g id="backG">
-              <line x1="500" y1="321" x2="432" y2="152" stroke="#171a28" stroke-width="32" stroke-linecap="round"/>
-              <line x1="502" y1="321" x2="434" y2="152" stroke="#232a3c" stroke-width="26" stroke-linecap="round"/>
-              <path d="M502,321 L434,152" stroke="url(#quilt)" stroke-width="26" stroke-linecap="round" opacity=".7"/>
-              <path d="M500,312 L446,196" stroke="#E6C85A" stroke-width="1" opacity=".4"/>
-              <path d="M484,296 L438,190" stroke="#E6C85A" stroke-width="0.8" stroke-dasharray="3 4" opacity=".5"/>
-              <line x1="398" y1="150" x2="390" y2="112" stroke="#10131b" stroke-width="7"/>
-              <line x1="428" y1="152" x2="420" y2="114" stroke="#10131b" stroke-width="7"/>
-              <rect x="376" y="82" width="62" height="34" rx="16" fill="#232a3c" stroke="#3a435e" stroke-width="2"/>
-              <rect x="376" y="82" width="62" height="34" rx="16" fill="url(#perf)"/>
-              <text x="407" y="104" font-family="Segoe UI" font-size="7" fill="#8a93a8" text-anchor="middle" letter-spacing="2">S</text>
-              <circle cx="440" cy="318" r="6" fill="#3a435e" stroke="#C9A227" stroke-width="1" opacity=".9"/>
-            </g>
-            <path d="M404,300 Q404,280 430,282 L514,284 Q542,286 542,306 L542,329 Q542,339 526,339 L418,339 Q404,339 404,327 Z" fill="#232a3c" stroke="#3a435e" stroke-width="2"/>
-            <path d="M404,284 L542,300 L542,329 Q542,339 526,339 L404,327 Z" fill="url(#quilt)" opacity=".8"/>
-            <path d="M452,288 L448,336" stroke="#3a435e" stroke-width="1.2"/>
-            <path d="M404,300 Q404,282 430,284 L480,287" stroke="#C9A227" stroke-width="1.1" opacity=".4" fill="none"/>
-            <rect x="478" y="316" width="62" height="16" rx="8" fill="#20273a" stroke="#3a435e" stroke-width="1.5"/>
-            <rect x="420" y="336" width="108" height="14" rx="5" fill="#12151f" stroke="#2c3350" stroke-width="2"/>
-            <rect x="428" y="340" width="30" height="8" rx="4" fill="#0d0f16"/>
-            <rect x="490" y="340" width="30" height="8" rx="4" fill="#0d0f16"/>
-          </g>
-
-          <!-- occupant -->
-          <g id="torsoG"></g>
-          <g id="legOut"></g>
-          <g id="beltG"></g>
-
-          <!-- seat ambient light pool -->
-          <ellipse cx="470" cy="456" rx="96" ry="7" fill="#C9A227" opacity=".14"/>
-          <ellipse cx="470" cy="456" rx="44" ry="4" fill="#C9A227" opacity=".22"/>
-
-          <!-- cabin cam : top-down swivel -->
-          <g transform="translate(168 150)">
-            <circle r="72" fill="rgba(11,10,7,.85)" stroke="#465070" stroke-width="1.5"/>
-            <circle r="64" fill="none" stroke="#2a3346" stroke-width="1"/>
-            <g stroke="#465070" stroke-width="1.2">
-              <line x1="0" y1="-72" x2="0" y2="-64"/><line x1="0" y1="64" x2="0" y2="72"/>
-              <line x1="-72" y1="0" x2="-64" y2="0"/><line x1="64" y1="0" x2="72" y2="0"/>
-            </g>
-            <path d="M-50,-72 L50,-72" stroke="#C9A227" stroke-width="1.4"/>
-            <path d="M-44,72 L44,72" stroke="#465070" stroke-width="2"/>
-            <path id="planNeedle"><line x1="0" y1="0" x2="0" y2="-56" stroke="#E6C85A" stroke-width="1.6"/></path>
-            <path id="planCone" fill="rgba(201,162,39,.14)" stroke="rgba(201,162,39,.5)" stroke-width="1" d="M0,0 L0,0 A0,0 0 0 1 0,0 Z"/>
-            <g id="planSeat">
-              <rect x="-13" y="-17" width="26" height="38" rx="5" fill="#3a3220" stroke="#C9A227" stroke-width="1.4"/>
-              <rect x="-6" y="-7" width="12" height="20" rx="3" fill="#232a3c" stroke="#C9A227" stroke-width="1"/>
-            </g>
-            <circle r="3.4" fill="#E6C85A"/>
-            <text x="0" y="86" font-size="8" text-anchor="middle" fill="#5c6a94" letter-spacing="1.8">SWIVEL</text>
-            <text x="88" y="3" font-size="8" fill="#C9A227" text-anchor="middle">F</text>
-            <text x="-88" y="3" font-size="8" fill="#C9A227" text-anchor="middle">R</text>
-            <text x="0" y="-77" font-size="7" fill="#8a93a8" text-anchor="middle" letter-spacing="1.4">EXIT DOOR</text>
-          </g>
-          <text x="470" y="78" font-family="Segoe UI" font-size="9" fill="#5c6a94" text-anchor="middle" letter-spacing="2.5">EQS-S CLASS · AUTONOMOUS CABIN</text>
-        </svg>
+        <canvas id="sceneCv" width="980" height="540" role="img" aria-label="3D interior of the EQS-class autonomous cabin"></canvas>
+        </div>
         </div>
         <div class="event-banner" id="eventBanner"></div>
         <div class="speed-streaks" id="streaks">
@@ -820,6 +511,7 @@
     samples: [], log: []
   };
   var fired = {};
+  var lastSampleT = -1;
   var lastRot = 0, rotChanged = false;
 
   function logLine(kind, text) {
@@ -947,83 +639,503 @@
     renderMemory(); renderSceneFx();
   }
 
-  function renderSeatScene() {
-    var dy = -(S.hgt - 38) * 11;
-    $("figGroup").setAttribute("transform", "translate(0," + dy + ")");
-    var fbY = 334 + dy;
-    var ped = $("ped");
-    ped.setAttribute("y", fbY + 8);
-    ped.setAttribute("height", Math.max(24, 436 - (fbY + 8)));
-    $("sfHgt").textContent = S.hgt + " cm";
-    $("sfRot").textContent = S.rot + "°";
-    var world = S.t;
-    var scroll = (S.speed) * 0.45;
-    $("worldWnd").setAttribute("transform", "translate(" + (-((world * scroll) % 2660)) + ",0)");
-    $("rearWnd").setAttribute("transform", "translate(" + (-(((world * scroll) + 480) % 2660)) + ",0)");
-    var lean = ((S.rot % 360) + 360) % 360 >= 180 ? 8 : -2;
-    $("backG").setAttribute("transform", "rotate(" + lean + " 440 318)");
-    drawFigure();
-    drawPlan();
+/* ================= 3D cabin renderer (canvas) ================= */
+  var CVW = 980, CVH = 540, CVF = 560, CVN = 16;
+  var GLIGHT = { x: -0.5, y: 0.72, z: 0.42 };
+  var CamB = { p: { x: 78, y: 68, z: -112 }, f: { x: 0, y: 0, z: 1 }, r: { x: 1, y: 0, z: 0 }, u: { x: 0, y: 1, z: 0 } };
+  var DLS = [];
+  var GX = null;
+  (function () {
+    var cv = document.getElementById("sceneCv");
+    if (cv && cv.getContext) GX = cv.getContext("2d");
+  })();
+
+  function v3(x, y, z) { return { x: x, y: y, z: z }; }
+  function sub3(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+  function n3(a) { var l = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; }
+  function d3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+  function cr3(a, b) { return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }
+  function lookAt(pos, tgt) {
+    var f = n3(sub3(tgt, pos)), r = n3(cr3(f, { x: 0, y: 1, z: 0 })), u = cr3(r, f);
+    return { p: pos, f: f, r: r, u: u };
   }
-  function drawFigure() {
-    var r = ((S.rot % 360) + 360) % 360;
-    var dy = -(S.hgt - 38) * 11;
-    var rear = r >= 180;
-    var sway = Math.abs(Math.sin(r * Math.PI / 180));
-    var m = rear ? -1 : 1;
-    var hipX = 472, hipY = 306 + dy;
-    var hipR = 306 + dy;
-    var shX = hipX + m * 28, shY = 196 + dy;
-    var neckX = hipX + m * 34, neckY = 190 + dy;
-    var hx = hipX + m * 50, hy = 152 + dy;
-    var sx = 1 + 0.42 * sway;
-    var tilt = sway * (rear ? -4 : 4);
-    $("torsoG").setAttribute("transform", "translate(" + hipX + "," + hipY + ") rotate(" + tilt + ") scale(" + sx + ") translate(" + (-hipX) + "," + (-hipY) + ")");
-    var L1 = 96, L2 = 78;
-    var th = (40 + (S.hgt - 38) * 1.8) * Math.PI / 180;
-    var kx = hipX + m * Math.cos(th) * L1, ky = hipY + Math.sin(th) * L1;
-    var fx = rear ? 330 : 592, fy = 424;
-    var dx = fx - kx, dyv = fy - ky;
-    var d = Math.sqrt(dx * dx + dyv * dyv) || 1;
-    var l = Math.min(d, L2);
-    var fxn = kx + dx / d * l, fyn = ky + dyv / d * l;
-    var leg = "";
-    leg += '<path d="M' + hipX + ',' + hipR + ' Q' + kx + ',' + ky + ' ' + fxn + ',' + fyn + '" fill="none" stroke="#3d4658" stroke-width="21" stroke-linecap="round"/>';
-    leg += '<path d="M' + (hipX - m * 8) + ',' + (hipR + 4) + ' Q' + (kx - m * 8) + ',' + (ky + 4) + ' ' + (fxn - m * 6) + ',' + (fyn + 2) + '" fill="none" stroke="#313a49" stroke-width="13" stroke-linecap="round"/>';
-    leg += '<path d="M' + fxn + ',' + fyn + ' L' + (fxn + m * 26) + ',' + (fyn + 2) + ' Q' + (fxn + m * 30) + ',' + (fyn + 6) + ' ' + (fxn + m * 27) + ',' + (fyn + 10) + ' L' + fxn + ',' + (fyn + 14) + ' Z" fill="#1e2333" stroke="#0F0D08" stroke-width="1.5"/>';
-    $("legOut").innerHTML = leg;
-    var tb = [];
-    tb.push('<path d="M' + (hipX - 14) + ',' + (hipR + 4) + ' L' + (neckX - 18) + ',' + (shY - 6) + ' L' + (neckX + 12) + ',' + (shY + 10) + ' L' + (hipX + 10) + ',' + (hipR - 2) + ' Z" fill="#3b4356" stroke="#0F0D08" stroke-width="1.5"/>');
-    tb.push('<path d="M' + (hipX + 2) + ',' + (hipR - 6) + ' L' + (neckX + 2) + ',' + (shY + 14) + '" stroke="#6c7691" stroke-width="1.4" fill="none"/>');
-    tb.push('<path d="M' + shX + ',' + shY + ' Q' + (shX + m * 34) + ',' + (shY + 34) + ' ' + (shX + m * 26) + ',' + (hipR - 8) + '" fill="none" stroke="#3b4356" stroke-width="9" stroke-linecap="round"/>');
-    tb.push('<circle cx="' + (shX + m * 24) + '" cy="' + (hipR - 12) + '" r="5" fill="#d9c7a2" stroke="#0F0D08" stroke-width="1"/>');
-    tb.push('<path d="M' + (neckX - 6) + ',' + (shY + 6) + ' L' + (neckX + 6) + ',' + (shY + 6) + ' L' + (neckX + 4) + ',' + (hy + 8) + ' L' + (neckX - 4) + ',' + (hy + 8) + ' Z" fill="#d9c7a2" stroke="#0F0D08" stroke-width="1"/>');
-    if (sway > 0.45) {
-      tb.push('<ellipse cx="' + hx + '" cy="' + hy + '" rx="' + (13 + 9 * sway) + '" ry="15" fill="#d9c7a2" stroke="#0F0D08" stroke-width="2"/>');
-      tb.push('<circle cx="' + (hx + m * 6) + '" cy="' + (hy - 1) + '" r="2" fill="#0F0D08"/>');
-      tb.push('<circle cx="' + (hx - m * 6) + '" cy="' + (hy - 1) + '" r="2" fill="#0F0D08"/>');
-      tb.push('<path d="M' + (hx - 12) + ',' + (hy - 8) + ' Q' + hx + ',' + (hy - 19) + ' ' + (hx + 12) + ',' + (hy - 7) + ' Q' + hx + ',' + (hy - 15) + ' ' + (hx - 12) + ',' + (hy - 8) + ' Z" fill="#2b2113"/>');
-      tb.push('<path d="M' + (hx + m * 2) + ',' + (hy + 6) + ' Q' + (hx + m * 7) + ',' + (hy + 3) + ' ' + (hx + m * 3) + ',' + (hy - 1) + '" stroke="#0F0D08" stroke-width="1.2" fill="none"/>');
-    } else {
-      tb.push('<circle cx="' + hx + '" cy="' + hy + '" r="16" fill="#d9c7a2" stroke="#0F0D08" stroke-width="2"/>');
-      tb.push('<path d="M' + (hx - m * 15) + ',' + (hy - 8) + ' Q' + (hx + m * 10) + ',' + (hy - 18) + ' ' + (hx + m * 15) + ',' + (hy - 4) + ' Q' + (hx + m * 12) + ',' + (hy + 2) + ' ' + (hx - m * 14) + ',' + (hy - 3) + ' Z" fill="#2b2113"/>');
-      tb.push('<circle cx="' + (hx + m * 11) + '" cy="' + (hy - 2) + '" r="2.1" fill="#0F0D08"/>');
-      tb.push('<path d="M' + (hx + m * 14) + ',' + (hy + 3) + ' L' + (hx + m * 19) + ',' + (hy + 4) + ' L' + (hx + m * 15) + ',' + (hy + 5) + '" fill="none" stroke="#0F0D08" stroke-width="1.1"/>');
-      tb.push('<circle cx="' + (hx + m * 3) + '" cy="' + (hy + 4) + '" r="4" fill="#e8dcc0" stroke="#0F0D08" stroke-width="0.8"/>');
+  function camAt(t) {
+    return lookAt(
+      { x: 78 + Math.sin(t * 1.1) * 0.7, y: 68 + Math.sin(t * 1.6) * 0.5, z: -112 + Math.sin(t * 0.9) * 0.4 },
+      { x: 16, y: 44, z: 34 });
+  }
+  function proj(p) {
+    var d = sub3(p, CamB.p), D = d3(d, CamB.f);
+    if (D < CVN) return null;
+    return { x: CVW / 2 + d3(d, CamB.r) * CVF / D, y: CVH / 2 - d3(d, CamB.u) * CVF / D, z: D };
+  }
+  function faceN(a, b, c) { return cr3(sub3(b, a), sub3(c, a)); }
+  function shift(p, dx, dy, dz) { return { x: p.x + dx, y: p.y + dy, z: p.z + dz }; }
+  function rotY(p, deg, axX, axZ) {
+    var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    var x = p.x - axX, z = p.z - axZ;
+    return { x: axX + x * c + z * s, y: p.y, z: axZ - x * s + z * c };
+  }
+  function col(hex) {
+    var h = hex.replace("#", "");
+    return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+  }
+  function rgb(c, f) {
+    var r = Math.round(c[0] * f), g = Math.round(c[1] * f), b = Math.round(c[2] * f);
+    return "rgb(" + r + "," + g + "," + b + ")";
+  }
+  function shade(hex, n, k) {
+    var f = 0.42 + 0.58 * Math.max(0, d3(n3(n), n3(GLIGHT))) + (k || 0);
+    if (f > 1.06) f = 1.06; if (f < 0.28) f = 0.28;
+    return rgb(col(hex), f);
+  }
+
+  function pushP(pts, color, o) {
+    if (!GX) return;
+    o = o || {};
+    var sp = [], z = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var q = proj(pts[i]);
+      if (!q) return;
+      sp.push(q); z += q.z;
     }
-    $("torsoG").innerHTML = tb.join("");
-    var bel = $("beltG");
-    if (rear) { bel.innerHTML = ""; return; }
-    bel.innerHTML = '<path d="M566,140 L' + shX + ',' + (shY + 6) + ' L' + (hipX + m * 6) + ',' + (hipR - 10) + '" fill="none" stroke="#98a1ba" stroke-width="6" stroke-linecap="round"/>' +
-      '<path d="M566,140 L' + shX + ',' + (shY + 6) + ' L' + (hipX + m * 6) + ',' + (hipR - 10) + '" fill="none" stroke="#ffffff" stroke-width="1.5" opacity=".35"/>' +
-      '<rect x="' + (hipX + m * 1) + '" y="' + (hipR - 18) + '" width="12" height="17" rx="3" fill="#C9A227" stroke="#6B5520" stroke-width="1"/>';
+    z /= pts.length;
+    var c = color, a = o.alpha != null ? o.alpha : 1, st = o.stroke || null, lw = o.lw || 1;
+    DLS.push({ z: z, d: function () {
+      GX.beginPath(); GX.moveTo(sp[0].x, sp[0].y);
+      for (var i = 1; i < sp.length; i++) GX.lineTo(sp[i].x, sp[i].y);
+      GX.closePath();
+      GX.globalAlpha = a; GX.fillStyle = c; GX.fill();
+      if (st) { GX.strokeStyle = st; GX.lineWidth = lw; GX.stroke(); }
+      GX.globalAlpha = 1;
+    } });
   }
+  function pushCap(a, b, rw, color, o) {
+    if (!GX) return;
+    var A = proj(a), B = proj(b);
+    if (!A || !B) return;
+    var cz = (A.z + B.z) / 2, r = rw * CVF / cz;
+    o = o || {};
+    var sh = o.shadow || null, al = o.alpha != null ? o.alpha : 1;
+    DLS.push({ z: cz, d: function () {
+      GX.lineCap = "round";
+      if (sh) { GX.strokeStyle = sh; GX.lineWidth = r * 2 + 4.5;
+        GX.beginPath(); GX.moveTo(A.x, A.y); GX.lineTo(B.x, B.y); GX.stroke(); }
+      GX.globalAlpha = al; GX.strokeStyle = color; GX.lineWidth = r * 2;
+      GX.beginPath(); GX.moveTo(A.x, A.y); GX.lineTo(B.x, B.y); GX.stroke();
+      GX.globalAlpha = 1;
+    } });
+  }
+  function pushSph(p, r, color, o) {
+    if (!GX) return;
+    var q = proj(p);
+    if (!q) return;
+    var rr = r * CVF / q.z;
+    o = o || {};
+    var st = o.stroke || null, lw = o.lw || 1, al = o.alpha != null ? o.alpha : 1;
+    DLS.push({ z: q.z, d: function () {
+      GX.globalAlpha = al; GX.fillStyle = color;
+      GX.beginPath(); GX.arc(q.x, q.y, rr, 0, 6.2832); GX.fill();
+      if (st) { GX.strokeStyle = st; GX.lineWidth = lw; GX.stroke(); }
+      GX.globalAlpha = 1;
+    } });
+  }
+  function box(cx, yTop, yBot, hx, zF, zB, topC, sideC, yaw) {
+    var yawDeg = yaw ? yaw : 0;
+    function L(x, y, z) { return rotY(v3(x, y, z), yawDeg, 0, -6); }
+    var F = [
+      [L(-hx, yTop, zB), L(hx, yTop, zB), L(hx, yBot, zB), L(-hx, yBot, zB)],
+      [L(-hx, yTop, zF), L(hx, yTop, zF), L(hx, yBot, zF), L(-hx, yBot, zF)],
+      [L(hx, yTop, zF), L(hx, yTop, zB), L(hx, yBot, zB), L(hx, yBot, zF)],
+      [L(-hx, yTop, zF), L(-hx, yTop, zB), L(-hx, yBot, zB), L(-hx, yBot, zF)],
+      [L(-hx, yTop, zB), L(hx, yTop, zB), L(hx, yTop, zF), L(-hx, yTop, zF)]
+    ];
+    pushP(F[0], shade(sideC, faceN(F[0][0], F[0][1], F[0][2])), null);
+    pushP(F[1], shade(sideC, faceN(F[1][0], F[1][1], F[1][2])), null);
+    pushP(F[2], shade(sideC, faceN(F[2][0], F[2][1], F[2][2])), null);
+    pushP(F[3], shade(sideC, faceN(F[3][0], F[3][1], F[3][2])), null);
+    pushP(F[4], shade(topC, faceN(F[4][0], F[4][1], F[4][2]), 0.06), null);
+  }
+
+  function addExterior3D() {
+    var spd = S.speed, m = (S.t * spd * 0.45);
+    /* sky */
+    pushP([v3(-1700, 320, 2500), v3(1700, 320, 2500), v3(1700, -160, 2500), v3(-1700, -160, 2500)], "rgb(7,11,22)", null);
+    pushP([v3(-1700, 26, 2500), v3(1700, 26, 2500), v3(1700, -160, 2500), v3(-1700, -160, 2500)], "rgb(16,25,45)", null);
+    pushP([v3(-1700, 34, 2500), v3(1700, 34, 2500), v3(1700, -18, 2500), v3(-1700, -18, 2500)], "rgb(30,42,66)", { alpha: 0.9 });
+    /* city strip at horizon */
+    pushP([v3(-1500, 8, 2600), v3(1500, 8, 2600), v3(1500, -16, 2600), v3(-1500, -16, 2600)], "#05070c", null);
+    var ci = 0;
+    for (ci = 0; ci < 16; ci++) {
+      pushSph(v3(-900 + ci * 130, 2, 2620), 3.4 + (ci % 3), "#0a0e18", { alpha: 0.9 });
+    }
+    for (ci = 0; ci < 12; ci++) {
+      pushSph(v3(-1100 + ci * 170, (ci % 3) * 5 + 12, 2620), 0.9, "rgba(230,200,90,.5)", { alpha: 0.7 });
+    }
+    /* moon + stars */
+    pushSph(v3(-280, 210, 2350), 58, "rgba(200,195,160,.10)", null);
+    pushSph(v3(-280, 210, 2350), 20, "#e9e2c4", { alpha: 0.85 });
+    var st = [[-90, 240, 2280, 1.5], [60, 230, 2400, 1.1], [150, 258, 2320, 1.3], [-240, 270, 2380, 1.0],
+      [320, 240, 2360, 1.2], [-400, 250, 2440, 1.1], [420, 266, 2420, 0.9], [-160, 232, 2500, 0.8],
+      [500, 214, 2400, 1.0], [-520, 226, 2460, 1.2]];
+    for (var si = 0; si < st.length; si++) {
+      pushSph(v3(st[si][0], st[si][1], st[si][2]), st[si][3], "rgba(210,220,255,.8)", { alpha: 0.8 });
+    }
+    /* road sheet */
+    pushP([v3(-1700, 0, 210), v3(1700, 0, 210), v3(1700, -140, 2600), v3(-1700, -140, 2600)], "rgb(12,14,12)", null);
+    pushP([v3(-240, 0, 210), v3(240, 0, 210), v3(240, -140, 2600), v3(-240, -140, 2600)], "rgb(16,18,15)", { alpha: 0.85 });
+    /* moving lane dashes */
+    for (var k = 0; k < 40; k++) {
+      var zz = 260 + k * 26 - (m % 26);
+      if (zz < 244) zz += 40 * 26;
+      pushP([v3(-163, 0.12, zz), v3(-157, 0.12, zz), v3(-157, 0.12, zz + 9), v3(-163, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
+      pushP([v3(157, 0.12, zz), v3(163, 0.12, zz), v3(163, 0.12, zz + 9), v3(157, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
+    }
+    /* lamp posts + guardrail */
+    pushP([v3(-588, -1, 180), v3(-532, -1, 180), v3(-532, 1.4, 2600), v3(-588, 1.4, 2600)], "#22282f", null);
+    pushP([v3(532, -1, 180), v3(588, -1, 180), v3(588, 1.4, 2600), v3(532, 1.4, 2600)], "#22282f", null);
+    for (var p = 0; p < 46; p++) {
+      var pz = 250 + p * 30 - (m % 30);
+      if (pz < 235) pz += 46 * 30;
+      pushP([v3(-564, 0, pz), v3(-556, 0, pz), v3(-556, 12, pz), v3(-564, 12, pz)], "rgb(12,15,20)", null);
+      pushP([v3(556, 0, pz), v3(564, 0, pz), v3(564, 12, pz), v3(556, 12, pz)], "rgb(12,15,20)", null);
+      pushSph(v3(-560, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
+      pushSph(v3(-560, 14, pz), 7, "rgba(240,226,166,.14)", null);
+      pushSph(v3(560, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
+      pushSph(v3(560, 14, pz), 7, "rgba(240,226,166,.14)", null);
+    }
+    /* oncoming traffic glow */
+    for (var c2 = 0; c2 < 3; c2++) {
+      var cz = 900 + (((m * 1.7 + c2 * 380) % 1400));
+      pushSph(v3(-330 + c2 * 30, 3.5, cz), 3.2, "rgba(240,238,214,.6)", { alpha: 0.55 });
+      pushSph(v3(-318 + c2 * 30, 3.5, cz), 1.6, "rgba(255,255,240,.9)", { alpha: 0.7 });
+    }
+  }
+
+  function addGlass3D() {
+    var gi = [
+      [v3(-78, 46, 118), v3(78, 48, 122), v3(78, 76, 160), v3(-78, 74, 156)],
+      [v3(-84, 46, -38), v3(-84, 46, 110), v3(-84, 74, 112), v3(-84, 74, -36)],
+      [v3(84, 46, -38), v3(84, 46, 110), v3(84, 74, 112), v3(84, 74, -36)]
+    ];
+    for (var i = 0; i < gi.length; i++) {
+      pushP(gi[i], "rgba(9,16,30,.30)", null);
+      pushP(gi[i], "rgba(190,210,255,.045)", null);
+    }
+    pushP(gi[0], null, { stroke: "rgba(160,170,190,.5)", lw: 2.5 });
+  }
+
+  function addFloor() {
+    pushP([v3(-95, 0, -70), v3(95, 0, -70), v3(95, 0, 122), v3(-95, 0, 122)], "rgb(11,12,15)", null);
+    pushP([v3(-95, 0.4, 70), v3(95, 0.4, 70), v3(95, 0.4, 122), v3(-95, 0.4, 122)], "rgba(0,0,0,.4)", { alpha: 0.55 });
+    pushP([v3(-30, 0.2, -55), v3(-25, 0.2, -55), v3(-25, 0.2, 105), v3(-30, 0.2, 105)], "rgb(26,30,40)", { alpha: 0.6 });
+    pushP([v3(25, 0.2, -55), v3(30, 0.2, -55), v3(30, 0.2, 105), v3(25, 0.2, 105)], "rgb(26,30,40)", { alpha: 0.6 });
+    pushSph(v3(0, 0.6, -6), 34, "rgba(0,0,0,.45)", { alpha: 0.6 });
+  }
+
+  function addCabin() {
+    /* rear B pillars (cutaway frame) */
+    pushP([v3(-86, 0, -60), v3(-80, 0, -60), v3(-80, 79, -60), v3(-86, 79, -60)], shade("#10131b", faceN(v3(-86, 0, -60), v3(-80, 0, -60), v3(-80, 79, -60))), null);
+    pushP([v3(80, 0, -60), v3(86, 0, -60), v3(86, 79, -60), v3(80, 79, -60)], shade("#10131b", faceN(v3(80, 0, -60), v3(86, 0, -60), v3(86, 79, -60))), null);
+    /* left door card */
+    pushP([v3(-84, 0, -58), v3(-84, 0, 112), v3(-84, 46, 114), v3(-84, 46, -56)], shade("#1b2231", faceN(v3(-84, 0, -58), v3(-84, 0, 112), v3(-84, 46, 114))), null);
+    pushP([v3(-86, 26, -14), v3(-86, 26, 96), v3(-86, 29, 96), v3(-86, 29, -14)], shade("#2b2415", faceN(v3(-86, 26, -14), v3(-86, 26, 96), v3(-86, 29, 96))), null);
+    pushP([v3(-88, 12, -34), v3(-80, 12, -34), v3(-80, 19, -34), v3(-88, 19, -34)], shade("#2a3146", faceN(v3(-88, 12, -34), v3(-80, 12, -34), v3(-80, 19, -34))), null);
+    pushP([v3(-88, 12, -34), v3(-88, 12, 2), v3(-88, 19, 2), v3(-88, 19, -34)], shade("#252b3f", faceN(v3(-88, 12, -34), v3(-88, 12, 2), v3(-88, 19, 2))), null);
+    pushP([v3(-88, 12, 2), v3(-80, 12, 2), v3(-80, 19, 2), v3(-88, 19, 2)], shade("#2a3146", faceN(v3(-88, 12, 2), v3(-80, 12, 2), v3(-80, 19, 2))), null);
+    pushP([v3(-87, 40, -2), v3(-84, 40, -2), v3(-84, 40, 46), v3(-87, 40, 46)], "rgba(201,162,39,.25)", null);
+    /* right door card (near camera edge) */
+    pushP([v3(84, 0, -58), v3(84, 0, 96), v3(84, 46, 98), v3(84, 46, -56)], shade("#161c2a", faceN(v3(84, 0, -58), v3(84, 0, 96), v3(84, 46, 98))), null);
+    /* roof + panoroof */
+    pushP([v3(-98, 77, -80), v3(98, 77, -80), v3(98, 77, 150), v3(-98, 77, 150)], shade("#0e1119", v3(0, 1, 0)), null);
+    pushP([v3(-64, 76.2, -48), v3(64, 76.2, -48), v3(64, 76.2, 112), v3(-64, 76.2, 112)], "rgb(17,26,44)", { alpha: 0.82 });
+    pushP([v3(-90, 74.6, -60), v3(90, 74.6, -60), v3(90, 75.4, -60), v3(-90, 75.4, -60)], "rgba(230,200,90,.35)", null);
+  }
+
+  function addDash() {
+    var dF = [v3(-82, 44, 116), v3(82, 46, 120), v3(82, 30, 117), v3(-82, 28, 113)];
+    pushP(dF, shade("#2a2416", faceN(dF[0], dF[1], dF[2])), null);
+    pushP(dF, null, { stroke: "rgba(201,162,39,.4)", lw: 1 });
+    var dT = [v3(-82, 44, 116), v3(82, 46, 120), v3(82, 47, 124), v3(-82, 45, 120)];
+    pushP(dT, shade("#332a16", faceN(dT[0], dT[1], dT[2])), null);
+    /* hyperscreen */
+    var sc = [v3(-80, 50, 120), v3(80, 52, 124), v3(80, 51, 128), v3(-80, 49, 124)];
+    pushP(sc, "#142a4a", null);
+    pushP(sc, "rgba(74,157,238,.16)", null);
+    pushP([v3(-80, 49.6, 122), v3(80, 51.6, 124), v3(80, 51.4, 123), v3(-80, 49.4, 121)], "rgba(160,200,255,.10)", null);
+    pushP([v3(16, 51.8, 125.6), v3(18, 51.8, 125.6), v3(18, 52.6, 127.4), v3(16, 52.6, 127.4)], "rgba(230,200,90,.5)", null);
+    pushP([v3(52, 51.8, 125.6), v3(54, 51.8, 125.6), v3(54, 52.6, 127.4), v3(52, 52.6, 127.4)], "rgba(74,157,238,.55)", null);
+    pushP([v3(-82, 47, 122), v3(82, 49, 124), v3(82, 49.4, 122), v3(-82, 47.4, 120)], "rgba(230,200,90,.4)", null);
+    /* center console */
+    box(0, 34, 0, 10, 96, 44, "#1a2030", "#131826", 0);
+    pushP([v3(-6, 34, 94), v3(6, 34, 96), v3(6, 35, 102), v3(-6, 35, 100)], "#1c3250", null);
+    /* stowed column + folded yoke (left / driver side) */
+    box(-62, 30, 16, 7, 116, 110, "#1c222f", "#151a26", 0);
+    pushP([v3(-69, 26, 114), v3(-55, 26, 114), v3(-55, 26.4, 116), v3(-69, 26.4, 116)], "rgba(201,162,39,.5)", null);
+  }
+
+  function addSeat() {
+    var hgt = S.hgt, ct = hgt, cb = hgt - 12, yawI = S.rot;
+    var SHIFT_ROT = ((S.rot % 360) + 360) % 360;
+    var yawDeg = SHIFT_ROT;
+    /* floor rail */
+    pushP([v3(-16, 0.5, -34), v3(-10, 0.5, -34), v3(-10, 0.5, 34), v3(-16, 0.5, 34)], "rgba(201,162,39,.5)", null);
+    pushP([v3(10, 0.5, -34), v3(16, 0.5, -34), v3(16, 0.5, 34), v3(10, 0.5, 34)], "rgba(201,162,39,.5)", null);
+    /* pedestal (fixed) */
+    box(0, cb, 0, 15, 4, -16, "#1a202f", "#141a26", 0);
+    pushP([v3(-16, cb - 6, -16), v3(16, cb - 6, -16), v3(16, cb - 6, -12), v3(-16, cb - 6, -12)], "rgba(230,200,90,.45)", null);
+    /* rotates with seat */
+    function L(x, y, z) { return rotY(v3(x, y, z), yawDeg, 0, -6); }
+    /* swivel disc */
+    var disc = [];
+    for (var a = 0; a < 12; a++) {
+      var an = a / 12 * 6.2832;
+      disc.push(L(Math.sin(an) * 20, cb + 0.6, -6 + Math.cos(an) * 20));
+    }
+    pushP(disc, "#0e1119", null);
+    var wn = yawDeg * Math.PI / 180;
+    pushP([v3(0, cb + 0.7, -6), L(Math.sin(wn) * 20, cb + 0.7, -6 + Math.cos(wn) * 20), L(Math.sin(wn + 0.28) * 20, cb + 0.7, -6 + Math.cos(wn + 0.28) * 20)], "rgba(230,200,90,.9)", null);
+    /* cushion */
+    var cTop = [
+      [L(-22, ct, -12), L(22, ct, -12), L(22, ct, 8), L(-22, ct, 8)],
+      [L(-22, cb, -12), L(22, cb, -12), L(22, cb, 8), L(-22, cb, 8)]
+    ];
+    var cSide = [
+      [L(-22, ct, 8), L(22, ct, 8), L(22, cb, 8), L(-22, cb, 8)],
+      [L(-22, ct, -12), L(22, ct, -12), L(22, cb, -12), L(-22, cb, -12)],
+      [L(22, ct, -12), L(22, ct, 8), L(22, cb, 8), L(22, cb, -12)],
+      [L(-22, ct, -12), L(-22, ct, 8), L(-22, cb, 8), L(-22, cb, -12)]
+    ];
+    pushP(cTop[0], shade("#39445e", faceN(cTop[0][0], cTop[0][1], cTop[0][2]), 0.06), null);
+    pushP(cTop[0], "rgba(60,70,100,.22)", null);
+    for (var si = 0; si < cSide.length; si++) {
+      pushP(cSide[si], shade(si === 0 ? "#2b334a" : "#1e2434", faceN(cSide[si][0], cSide[si][1], cSide[si][2])), null);
+    }
+    /* backrest (tilted box) */
+    var ctV = 20 * Math.PI / 180, dyB = Math.cos(ctV) * 50, szB = Math.sin(ctV) * 50;
+    var bRear = [L(-22, ct, -23), L(22, ct, -23), L(22, ct + dyB, -23 - szB), L(-22, ct + dyB, -23 - szB)];
+    var bFront = [L(-22, ct, -12), L(22, ct, -12), L(22, ct + dyB, -12 - szB), L(-22, ct + dyB, -12 - szB)];
+    var bLef = [L(-22, ct, -23), L(-22, ct, -12), L(-22, ct + dyB, -12 - szB), L(-22, ct + dyB, -23 - szB)];
+    var bRig = [L(22, ct, -23), L(22, ct, -12), L(22, ct + dyB, -12 - szB), L(22, ct + dyB, -23 - szB)];
+    pushP(bRear, shade("#171c2a", faceN(bRear[0], bRear[1], bRear[2])), null);
+    pushP(bFront, shade("#2b3346", faceN(bFront[0], bFront[1], bFront[2]), 0.05), null);
+    pushP(bLef, shade("#1a2030", faceN(bLef[0], bLef[1], bLef[2])), null);
+    pushP(bRig, shade("#1a2030", faceN(bRig[0], bRig[1], bRig[2])), null);
+    var seed = [L(-16, ct + 8, -13), L(0, ct + 10, -13), L(0, ct + dyB - 8, -13 - szB)];
+    pushCap(seed[0], seed[2], 1.4, "rgba(230,200,90,.5)", null);
+    /* headrest */
+    var hrF = [L(-13, ct + 50, -33), L(13, ct + 50, -33), L(13, ct + 60, -27), L(-13, ct + 60, -27)];
+    var hrT = [L(-13, ct + 60, -27), L(13, ct + 60, -27), L(13, ct + 64, -29), L(-13, ct + 64, -29)];
+    pushP(hrF, shade("#2b3346", faceN(hrF[0], hrF[1], hrF[2])), null);
+    pushP(hrT, shade("#39445e", faceN(hrT[0], hrT[1], hrT[2])), null);
+  }
+
+  function drawFigure() {
+    var hgt = S.hgt;
+    var hipY = hgt + 2;
+    var yawDeg = ((S.rot % 360) + 360) % 360;
+    var H = v3(0, hipY, -6);
+    function L(p) { return rotY(p, yawDeg, 0, -6); }
+    function fwd() { return rotY(v3(0, 0, 1), yawDeg, 0, -6); }
+    var FV = fwd();
+    var shX = v3(0, 46, -4), shL = v3(-18, 47, -3), shR = v3(18, 47, -3);
+    var hipT = L(H), sL = L(shift(shX, -18, 1, 1)), sR = L(shift(shX, 18, 1, 1));
+    /* torso */
+    var bk = L(shift(v3(0, hipY, -6), -FV.x * 2.2, -1.5, -FV.z * 2.2));
+    var hipF = L(v3(0, hipY - 3, -6));
+    pushCap(bk, hipF, 13.5, "rgba(20,22,30,.85)", null);
+    var torsoA = L(v3(0, hipY - 2, -6));
+    var torsoB = L(shift(shX, 0, 1, -1));
+    pushCap(torsoA, torsoB, 12.5, "#3b4356", null);
+    var sLw = L(shift(shX, -18, 2, 1)), sRw = L(shift(shX, 18, 2, 1));
+    pushCap(sLw, sRw, 9, "#414a60", null);
+    /* belt buckled strap when facing forward */
+    var nrm = ((S.rot % 360) + 360) % 360;
+    if (nrm < 14 || nrm > 346) {
+      pushCap(L(v3(0, 40, 6)), L(v3(0, hipY - 6, -3)), 2.3, "#C9A227", null);
+      pushSph(L(v3(0, hipY - 8, 0)), 2.2, "#E6C85A", null);
+    }
+    /* neck + head */
+    var neckB = L(v3(0, 52, -5)), headC = L(v3(0, 60, -6));
+    pushCap(neckB, headC, 4.6, "#d9c7a2", null);
+    /* arms */
+    var elL = L(v3(-16, 30, 7)), haL = L(v3(-11, 20, 15));
+    var elR = L(v3(16, 30, 7)), haR = L(v3(11, 20, 15));
+    pushCap(sL, elL, 5.6, "#4a5470", { shadow: "rgba(0,0,0,.5)" });
+    pushCap(elL, haL, 4.4, "#3f4860", { shadow: "rgba(0,0,0,.5)" });
+    pushCap(sR, elR, 5.6, "#4a5470", { shadow: "rgba(0,0,0,.5)" });
+    pushCap(elR, haR, 4.4, "#3f4860", { shadow: "rgba(0,0,0,.5)" });
+    pushSph(haL, 3.3, "#d9c7a2", null);
+    pushSph(haR, 3.3, "#d9c7a2", null);
+    /* legs */
+    var L1 = 52, th = (40 + (hgt - 38) * 1.8) * Math.PI / 180;
+    var legLat = [[-7.5, -5], [7.5, 5]];
+    for (var li = 0; li < 2; li++) {
+      var lat = legLat[li][0], toe = legLat[li][1];
+      var kneel = { x: lat, y: -Math.sin(th) * L1, z: Math.cos(th) * L1 };
+      var footT = { x: lat + toe, y: 3 - hipY, z: 40 };
+      var kv = L(v3(kneel.x, hipY + kneel.y, -6 + kneel.z));
+      var fv3 = L(v3(footT.x, hipY + footT.y, -6 + footT.z));
+      var ddx = fv3.x - kv.x, ddy = fv3.y - kv.y, ddz = fv3.z - kv.z;
+      var dl = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz) || 1;
+      var L2 = 50, cl = Math.min(dl, L2) / dl;
+      pushCap(L(v3(0, hipY, -6)), kv, 7.6, "#333c4f", { shadow: "rgba(0,0,0,.5)" });
+      var footW = v3(kv.x + ddx * cl, kv.y + ddy * cl, kv.z + ddz * cl);
+      pushCap(kv, footW, 5.6, "#2b3344", { shadow: "rgba(0,0,0,.5)" });
+      pushSph(v3(footW.x + FV.x * 4, footW.y + 2.5, footW.z + FV.z * 4), 4.4, "#14192a", null);
+    }
+    pushSph(L(v3(0, 3.5, 40)), 13, "rgba(0,0,0,.35)", { alpha: 0.5 });
+    /* head + face/hair */
+    var headW = L(v3(0, 60, -6));
+    pushSph(headW, 9, "#d9c7a2", null);
+    var hn = n3(sub3(CamB.p, headW));
+    var face = d3(hn, FV);
+    var hairC = v3(headW.x - FV.x * 3.4, headW.y + 0.6, headW.z - FV.z * 3.4);
+    pushSph(hairC, 9.6, "#1c1710", null);
+    pushSph(v3(headW.x + FV.x * 2, headW.y + 7.3, headW.z + FV.z * 2), 9.2, "#221b12", null);
+    if (face > 0.5) {
+      var eyeOf = v3(headW.x + FV.x * 5.5, headW.y + 2.4, headW.z + FV.z * 5.5);
+      var ri = n3(cr3(FV, v3(0, 1, 0)));
+      pushSph(v3(eyeOf.x + ri.x * 3.2, eyeOf.y, eyeOf.z + ri.z * 3.2), 1.2, "#10130e", null);
+      pushSph(v3(eyeOf.x - ri.x * 3.2, eyeOf.y, eyeOf.z - ri.z * 3.2), 1.2, "#10130e", null);
+      pushSph(v3(headW.x + FV.x * 7, headW.y - 1.4, headW.z + FV.z * 7), 2.4, "rgba(210,180,150,.6)", null);
+    }
+  }
+
+  function overlays() {
+    /* dashed nav lane + HUD on windshield */
+    var h1 = proj(v3(-46, 57, 130));
+    if (h1) {
+      GX.save();
+      GX.setLineDash([6, 7]);
+      GX.strokeStyle = "rgba(230,200,90,.55)";
+      GX.lineWidth = 1.6;
+      GX.beginPath();
+      GX.moveTo(h1.x - 30, h1.y + 4);
+      GX.quadraticCurveTo(h1.x, h1.y - 26, h1.x + 34, h1.y - 2);
+      GX.stroke();
+      GX.restore();
+      GX.fillStyle = "#E6C85A";
+      GX.font = "11px Consolas, monospace";
+      GX.textAlign = "left";
+      GX.fillText("AUTO · L3 READY", h1.x - 34, h1.y - 14);
+      GX.textAlign = "left";
+    }
+    /* cluster decal on screen */
+    var sp9 = proj(v3(-50, 51, 125));
+    if (sp9) {
+      GX.strokeStyle = "rgba(230,200,90,.9)";
+      GX.lineWidth = 1.4;
+      GX.beginPath(); GX.arc(sp9.x, sp9.y, 6, 0, 6.2832); GX.stroke();
+      GX.strokeStyle = "rgba(74,157,238,.95)";
+      GX.beginPath(); GX.arc(sp9.x + 60, sp9.y, 19, 0, 6.2832); GX.stroke();
+      GX.fillStyle = "rgba(120,180,255,.9)";
+      GX.font = "8px Consolas, monospace";
+      GX.fillText("KM/H", sp9.x - 6, sp9.y + 12);
+      GX.fillText("EQS SUV", sp9.x + 38, sp9.y + 12);
+      var wav = 0;
+      for (wav = 0; wav < 4; wav++) {
+        var hgtW = 3 + ((wav * 7 + Math.floor(S.t * 3)) % 4);
+        GX.fillRect(sp9.x + 86 + wav * 5, sp9.y + 4 - hgtW, 2, hgtW + 3);
+      }
+    }
+    /* stowed yoke label + vents */
+    var yk = proj(v3(-62, 26, 116));
+    if (yk) {
+      GX.strokeStyle = "#C9A227"; GX.lineWidth = 2;
+      GX.beginPath(); GX.arc(yk.x, yk.y, 7, 0, 6.2832); GX.stroke();
+      GX.strokeStyle = "rgba(120,130,160,.5)";
+      GX.beginPath(); GX.arc(yk.x, yk.y, 12, 0, 6.2832); GX.stroke();
+      GX.fillStyle = "#8a93a8"; GX.font = "7.5px Segoe UI";
+      GX.fillText("stowed", yk.x - 14, yk.y - 18);
+    }
+    var vR = proj(v3(30, 36, 116));
+    if (vR) {
+      GX.strokeStyle = "rgba(120,130,160,.55)"; GX.lineWidth = 1.2;
+      GX.beginPath(); GX.arc(vR.x, vR.y, 4, 0, 6.2832); GX.stroke();
+    }
+    var vL = proj(v3(-30, 36, 115));
+    if (vL) {
+      GX.strokeStyle = "rgba(120,130,160,.55)"; GX.lineWidth = 1.2;
+      GX.beginPath(); GX.arc(vL.x, vL.y, 4, 0, 6.2832); GX.stroke();
+    }
+    /* moon reflection on panoroof + roof stars */
+    var roofM = proj(v3(20, 76.4, 20));
+    if (roofM) {
+      GX.fillStyle = "rgba(200,195,160,.25)";
+      GX.beginPath(); GX.arc(roofM.x, roofM.y, 7, 0, 6.2832); GX.fill();
+    }
+    /* vignette */
+    var vg = GX.createRadialGradient(CVW / 2, CVH / 2, 150, CVW / 2, CVH / 2, 560);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,0,.5)");
+    GX.fillStyle = vg;
+    GX.fillRect(0, 0, CVW, CVH);
+    /* speed streaks */
+    if (S.phase === "ride" && !S.done && S.speed > 8) {
+      var off = (S.t * 160) % 240;
+      GX.fillStyle = "rgba(230,200,90,.16)";
+      GX.fillRect(-off, 96, 130, 2);
+      GX.fillRect(-140 - ((S.t * 90) % 200), 300, 130, 2);
+      GX.fillRect(CVW + off - 130, 430, 130, 2);
+    }
+  }
+
   function drawPlan() {
     var r = ((S.rot % 360) + 360) % 360;
-    var a = r + 90;
-    $("planSeat").setAttribute("transform", "rotate(" + a + " 0 0)");
-    $("planNeedle").setAttribute("transform", "rotate(" + a + " 0 0)");
-    $("planCone").setAttribute("d", conePath(0, 0, 52, a));
+    var cx = CVW - 86, cy = 72;
+    GX.save();
+    GX.strokeStyle = "rgba(86,96,120,.9)"; GX.lineWidth = 1;
+    GX.beginPath(); GX.arc(cx, cy, 44, 0, 6.2832); GX.stroke();
+    GX.strokeStyle = "rgba(42,51,70,.9)"; GX.lineWidth = 1;
+    GX.beginPath(); GX.arc(cx, cy, 37, 0, 6.2832); GX.stroke();
+    GX.translate(cx, cy);
+    GX.rotate(r * Math.PI / 180);
+    GX.fillStyle = "rgba(230,200,90,.16)";
+    GX.strokeStyle = "rgba(230,200,90,.55)";
+    GX.lineWidth = 1;
+    GX.beginPath(); GX.moveTo(0, 0); GX.lineTo(-38 * Math.sin(1.0472), -38 * Math.cos(1.0472));
+    GX.arc(0, 0, 38, -1.0472 - Math.PI / 2, 1.0472 - Math.PI / 2); GX.closePath(); GX.fill(); GX.stroke();
+    GX.fillStyle = "#3a3220";
+    GX.fillRect(-11, -15, 22, 30);
+    GX.strokeStyle = "#E6C85A"; GX.lineWidth = 1.4;
+    GX.strokeRect(-11, -15, 22, 30);
+    GX.setLineDash([3, 3]);
+    GX.strokeStyle = "rgba(230,200,90,.8)"; GX.lineWidth = 1.2;
+    GX.beginPath(); GX.moveTo(0, 0); GX.lineTo(0, -38); GX.stroke();
+    GX.setLineDash([]);
+    GX.restore();
+    GX.fillStyle = "#C9A227"; GX.font = "8px Consolas, monospace";
+    GX.textAlign = "center";
+    GX.fillText("F", cx, cy - 46);
+    GX.fillText("R", cx, cy + 52);
+    GX.fillText("SWIVEL", cx, cy + 62);
+    GX.textAlign = "left";
+  }
+
+  function renderSeatScene() {
+    $("sfHgt").textContent = S.hgt + " cm";
+    $("sfRot").textContent = Math.round((((S.rot % 360) + 360) % 360)) + "°";
+    if (!GX) return;
+    CamB = camAt(S.t);
+    DLS.length = 0;
+    var shX = 0, shY = 0;
+    if (S.joltNow > 0.2) { shX = S.joltNow * 6 * Math.sin(S.t * 91 + 1.3); shY = S.joltNow * 5 * Math.sin(S.t * 77 + 4.1); }
+    addExterior3D();
+    addGlass3D();
+    addFloor();
+    addCabin();
+    addDash();
+    addSeat();
+    drawFigure();
+    DLS.sort(function (a, b) { return b.z - a.z; });
+    GX.clearRect(0, 0, CVW, CVH);
+    GX.save();
+    GX.translate(shX, shY);
+    for (var i = 0; i < DLS.length; i++) DLS[i].d();
+    GX.restore();
+    overlays();
+    drawPlan();
   }
   function banner(text, cls) {
     var b = $("eventBanner");
@@ -1135,7 +1247,8 @@
     }).join("");
   }
   function sample() {
-    if (S.t % 3 < 0.02 || S.t < 3) {
+    if (S.t - lastSampleT >= 3 || S.t < 3) {
+      lastSampleT = S.t;
       S.samples.push({ t: S.t, c: S.mood.comfort, s: S.mood.suspicion });
     }
   }
@@ -1258,22 +1371,29 @@
   });
 
   /* ================= transport ================= */
-  function togglePlay() {
-    S.running = !S.running;
-    $("btnPlay").textContent = S.running ? "❚❚ Pause" : "▶ Play";
+  function syncPlay() {
+    var lbl = S.running ? "❚❚ Pause" : "▶ Play";
+    $("btnPlay").textContent = lbl;
+    $("topPlay").textContent = lbl;
+  }
+  function togglePlay() { S.running = !S.running; syncPlay(); }
+  function setSpeed(sp) {
+    S.timeScale = sp;
+    document.querySelectorAll(".speed-group .btn").forEach(function (x) {
+      x.classList.toggle("on", +x.getAttribute("data-s") === sp);
+    });
+  }
+  function skipSetup() {
+    if (S.phase === "setup") { S.t = RIDE_START + 0.01; logLine("sys", "setup skipped"); }
   }
   $("btnPlay").addEventListener("click", togglePlay);
   $("btnRestart").addEventListener("click", function () { location.reload(); });
-  $("btnSkip").addEventListener("click", function () {
-    if (S.phase === "setup") { S.t = RIDE_START + 0.01; logLine("sys", "setup skipped"); }
-  });
-  document.querySelectorAll("#speedGroup .btn").forEach(function (b) {
-    b.addEventListener("click", function () {
-      S.timeScale = +b.getAttribute("data-s");
-      document.querySelectorAll("#speedGroup .btn").forEach(function (x) {
-        x.classList.toggle("on", x === b);
-      });
-    });
+  $("btnSkip").addEventListener("click", skipSetup);
+  $("topPlay").addEventListener("click", togglePlay);
+  $("topRestart").addEventListener("click", function () { location.reload(); });
+  $("topSkip").addEventListener("click", skipSetup);
+  document.querySelectorAll(".speed-group .btn").forEach(function (b) {
+    b.addEventListener("click", function () { setSpeed(+b.getAttribute("data-s")); });
   });
   $("btnReplay").addEventListener("click", function () { location.reload(); });
 
@@ -1296,7 +1416,8 @@
     }).join("") || "<li>—</li>";
     $("summary").classList.add("show");
     $("btnPlay").disabled = true;
-    logLine("sys", "— ride complete —");
+
+    $("topPlay").disabled = true;    logLine("sys", "— ride complete —");
   }
   function drawSeries(cv, kx, ky, x0, x1, y0, y1) {
     var g = cv.getContext("2d");
