@@ -348,6 +348,7 @@
         </div>
         <div class="modules" id="modules">
           <span class="mod" data-m="perceive">PERCEIVE</span>
+          <span class="mod" data-m="intend">INTEND</span>
           <span class="mod" data-m="think">THINK</span>
           <span class="mod" data-m="memorize">MEMORIZE</span>
           <span class="mod" data-m="forget">FORGET</span>
@@ -424,6 +425,22 @@
   </div>
 </div>
 
+<!-- ================= trust questionnaire · cognitive agent ================= -->
+<div id="trustQ" role="dialog" aria-label="End-of-ride trust questionnaire" style="display:none; position:fixed; inset:0; background:rgba(6,5,3,.92); backdrop-filter:blur(3px); align-items:center; justify-content:center; z-index:60; padding:20px;">
+  <div style="background:#13100A; border:1px solid #C9A227; border-radius:14px; max-width:560px; width:100%; padding:22px 24px;">
+    <h2 style="margin:0 0 4px; font-size:17px; letter-spacing:.06em; color:#FAF6EE;">Ride over — how did it feel?</h2>
+    <div style="font-size:12px; color:#8A8578; margin-bottom:12px;">Phill's trust questionnaire · 1–5 · fills itself from the ride, adjust honestly.</div>
+    <div id="tqItems"></div>
+    <div id="tqScore" style="margin-top:12px; font-size:14px; color:#E6C85A;"></div>
+    <div id="tqNote" style="margin-top:6px; font-size:12.5px; color:#C7C2B4; font-style:italic;"></div>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button type="button" id="tqSubmit" style="background:#C9A227; border:0; color:#0B0A07; font-weight:700; padding:9px 18px; border-radius:8px; cursor:pointer; font-size:13px;">✎ Confirm &amp; queue remark</button>
+      <button type="button" id="tqClose" style="background:transparent; border:1px solid #2A2416; color:#8A8578; padding:9px 14px; border-radius:8px; cursor:pointer; font-size:13px;">Close</button>
+    </div>
+    <div style="margin-top:10px; font-size:10px; color:#5C5749; line-height:1.5;">Privacy boundary · aggregates only (trust / comfort / suspicion) → next-ride priors. If an LLM hook (window.lavish) is present, Phill's remark is queued there; no keys are stored and no personal data leaves this page. Without a hook, speech falls back to Phill's own lines.</div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -450,7 +467,10 @@
   var PHILL = {
     name: "Phill", targetRot: 0, targetHgt: 44,
     tolRot: 20, tolHgt: 2,
-    talkativeness: 0.55, suspicionBase: 0.5, memoryLambda: 0.004
+    talkativeness: 0.55, suspicionBase: 0.5, memoryLambda: 0.004,
+    assertiveness: 0.6,        /* how strongly his own comfort pulls on the seat */
+    settleThresh: 0.22,        /* fit-gap at which he starts to self-settle     */
+    settleStep: 1              /* cm / ° steps while adjusting himself          */
   };
 
   /* ================= ride script (sim seconds) ================= */
@@ -491,7 +511,15 @@
     rotOther: ["A bit turned from the road.", "Tilted off true, that."],
     idleC:    ["Not bad, honestly.", "I could get used to this.", "It rides smoothly at least.", "Plenty of room now."],
     idleS:    ["It decides things before I've even looked.", "Right… it moves by itself. Taking my time.", "No wheel. Of course."],
-    idleN:    ["Weekend commute.", "Home in about an hour, probably.", "Hope the week stays quiet.", "A bit of quiet before the week starts."]
+    idleN:    ["Weekend commute.", "Home in about an hour, probably.", "Hope the week stays quiet.", "A bit of quiet before the week starts."],
+    settle:   ["Let me settle that properly.", "There — a seat to sit tall in.", "Give it a nudge, that's it."],
+    request:  ["I'd sit a touch taller, if it's being adjusted anyway.", "A little more upright and I'm comfortable.", "Could it raise me an inch? I build my own height in."],
+    trustOk:  ["The car earns trust, mile by mile.", "It reads the road and I read it back. Alright.", "Starting to relax into this."],
+    trustLow: ["I'm not sure it sees everything.", "The more it twitches, the less I trust it.", "It handles things, but I stay awake."],
+    settleLow:["Lower again. Maybe I came back wrong.", "I keep wanting to sit up straighter."],
+    endGood:  ["I'd take another ride.", "That's a keeper, honestly."],
+    endMid:   ["Mostly fine. A few minutes were iffy.", "Decent enough ride."],
+    endBad:   ["I'd rather drive myself next time.", "Got out a little wary."]
   };
   function pick(arr, exclude) {
     var c = arr.filter(function (s) { return s !== exclude; });
@@ -509,11 +537,17 @@
     memory: [], forgot: [], forgotCount: 0,
     thoughts: [], speech: "", lastModule: "",
     nextSpeak: 14, lastThink: 0,
-    samples: [], log: []
+    samples: [], log: [],
+    belief: { fitGap: 0, fitRot: 0, fitHgt: 0, userHands: false },
+    bdi: { intention: null, since: 0, last: {} },
+    trust: { score: 0.5, items: {}, trail: [] },
+    priors: null,
+    selfAct: 0
   };
   var fired = {};
   var lastSampleT = -1;
   var lastRot = 0, rotChanged = false;
+  var lastUserInput = -99;   /* sim-time of the last dial/rail grab */
 
   function logLine(kind, text) {
     var t = fmtTime(S.t);
@@ -569,17 +603,19 @@
     if (!S.memory.length) return null;
     return S.memory.reduce(function (a, b) { return (b.act > a.act ? b : a); });
   }
-  function think() {
+  function think(inPhrase) {
     var m = pickMemory();
-    var phrase = null;
-    if (rotChanged) {
-      var sec = viewSector();
-      phrase = pick(THOUGHTS[sec === "FORWARD" ? "rotFwd" : sec === "CABIN" ? "rotCabin" : "rotSide"]);
-      rotChanged = false;
-    } else if (m) {
-      phrase = pick(THOUGHTS[m.id]);
-      m.rehearsed++;
-      m.act = Math.min(1, m.act + 0.22);
+    var phrase = inPhrase || null;
+    if (!phrase) {
+      if (rotChanged) {
+        var sec = viewSector();
+        phrase = pick(THOUGHTS[sec === "FORWARD" ? "rotFwd" : sec === "CABIN" ? "rotCabin" : "rotSide"]);
+        rotChanged = false;
+      } else if (m) {
+        phrase = pick(THOUGHTS[m.id]);
+        m.rehearsed++;
+        m.act = Math.min(1, m.act + 0.22);
+      }
     }
     if (!phrase) phrase = pick(THOUGHTS[ambientMood()]);
     S.thoughts.unshift({ time: fmtTime(S.t), text: phrase });
@@ -613,6 +649,228 @@
     logLine("say", "“" + text + "”");
   }
   function eventSpeak(text) { speak(text, true); }
+
+  /* ================= BDI reasoning (mind-owned) ================= */
+  function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+  function angDist(a, b) { return Math.abs((((a - b) % 360) + 540) % 360 - 180); }
+
+  /* beliefs: the fit between the cabin his body tells him and the seat's real state */
+  function perceiveFit() {
+    var f = seatFit();
+    S.belief.fitRot = 1 - f.rot;
+    S.belief.fitHgt = 1 - f.hgt;
+    S.belief.fitGap = 1 - f.overall;
+    S.belief.userHands = (S.t - lastUserInput) < 3;
+  }
+
+  /* a live latent construct: how much he trusts the machine car right now */
+  function trustValue() {
+    var s = 1 - S.mood.suspicion;
+    var ev = clamp01(1 - S.joltNow / 0.6);
+    return clamp01(0.34 * S.mood.comfort + 0.40 * s + 0.16 * ev + 0.10 * (1 - S.belief.fitGap));
+  }
+
+  /* desires → intentions. each goal: strength of desire, precondition, cooldown */
+  var BDI_GOALS = {
+    settle: {
+      label: "settle the seat",
+      desire: function () {
+        var g = S.belief.fitGap;
+        if (g < 0.18) return 0;
+        var ph = S.phase === "setup" ? 1.3 : 0.9;
+        return Math.min(2, ph * g * (S.belief.userHands ? 0.15 : 1));
+      },
+      pre: function () { return S.belief.fitGap >= PHILL.settleThresh && !S.belief.userHands; },
+      cd: 9
+    },
+    attend: {
+      label: "attend to the road",
+      desire: function () {
+        var m = pickMemory();
+        return (m ? 0.3 + m.act * 0.7 : 0.15) + (S.mood.suspicion > 0.6 ? 0.4 : 0);
+      },
+      pre: function () { return true; },
+      cd: 3.2
+    },
+    calibrate: {
+      label: "calibrate trust in the cabin",
+      desire: function () {
+        if (S.phase !== "ride") return 0;
+        var k = (S.mood.suspicion > 0.62 || S.belief.fitGap > 0.35) ? 0.85 : 0.5;
+        return 0.35 + Math.min(0.6, (S.t - RIDE_START) / (RIDE_END - RIDE_START)) * k;
+      },
+      pre: function () { return S.phase === "ride"; },
+      cd: 10
+    }
+  };
+
+  /* action: pull his own seat toward where his body says it goes */
+  function selfAdjust() {
+    var changed = false;
+    if (S.belief.fitHgt > 0.22 && S.hgt < PHILL.targetHgt) {
+      S.hgt = Math.max(38, Math.min(46, S.hgt + PHILL.settleStep));
+      changed = true;
+    } else if (S.belief.fitHgt > 0.22 && S.hgt > PHILL.targetHgt) {
+      S.hgt = Math.max(38, Math.min(46, S.hgt - PHILL.settleStep));
+      changed = true;
+    }
+    if (S.belief.fitRot > 0.22) {
+      var dRot = angDist(S.rot, PHILL.targetRot);
+      if (dRot > PHILL.tolRot + 2) {
+        var dir = ((PHILL.targetRot - S.rot + 540) % 360) - 180;
+        S.rot = Math.round((((S.rot + (dir > 0 ? 10 : -10)) % 360) + 360) % 360);
+        rotChanged = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      S.selfAct++;
+      logLine("adj", "self-settle → " + (((S.rot % 360) + 360) % 360) + "° / " + S.hgt + " cm");
+      renderAll();
+    }
+    return changed;
+  }
+
+  function bdiActSettle() {
+    if (selfAdjust()) {
+      if (S.selfAct % 2 === 0) speak(pick(THOUGHTS.settle), true);
+      else think(pick(THOUGHTS.settle));
+    } else {
+      think(pick(THOUGHTS.settleLow));
+      setModule("intend");
+    }
+  }
+  function bdiActAttend() {
+    var phrase = think();
+    maybeSpeak(phrase);
+  }
+  function bdiActCalibrate() {
+    var tw = trustValue();
+    if (tw >= 0.6) think(pick(THOUGHTS.trustOk));
+    else if (tw <= 0.38) { var ln = pick(THOUGHTS.trustLow); think(ln); maybeSpeak(ln); }
+    else setModule("intend");
+  }
+
+  /* the reasoning loop: perceive beliefs, grow desires, fire the best intention */
+  function bdiReason(dt) {
+    perceiveFit();
+
+    /* fit-gap persistence erodes trust: the cabin ignores his body's preferred sitting */
+    var gb = S.belief.fitGap > 0.3 ? (S.belief.fitGap - 0.3) * 2.4 : 0;
+    if (gb > 0) {
+      S.mood.suspicion = Math.min(1, S.mood.suspicion + dt * 0.006 * gb * (S.belief.userHands ? 1.6 : 1));
+    }
+
+    var best = null, bestV = 0;
+    Object.keys(BDI_GOALS).forEach(function (k) {
+      var go = BDI_GOALS[k];
+      if (S.t - (S.bdi.last[k] || -99) < go.cd) return;
+      if (!go.pre()) return;
+      var v = go.desire();
+      if (v > 0 && v > bestV) { best = k; bestV = v; }
+    });
+
+    if (best) {
+      S.bdi.intention = best;
+      S.bdi.since = S.t;
+      S.bdi.last[best] = S.t;
+    } else {
+      S.bdi.intention = null;
+    }
+
+    if (best === "settle") bdiActSettle();
+    else if (best === "attend") bdiActAttend();
+    else if (best === "calibrate") bdiActCalibrate();
+  }
+
+  /* ================= trust questionnaire (privacy-guarded) ================= */
+  var TRUST_ITEMS = [
+    { id: "q1", txt: "I would trust this cabin for another ride." },
+    { id: "q2", txt: "I felt safe while it drove." },
+    { id: "q3", txt: "The seating and cabin suited me." },
+    { id: "q4", txt: "I stayed aware — it earned that attention." },
+    { id: "q5", txt: "Overall, it makes trustworthy decisions." }
+  ];
+  function evidenceAnswers() {
+    var t = trustValue(), f = seatFit();
+    return {
+      q1: 1 + Math.round(clamp01(0.5 * t + 0.5 * S.mood.comfort) * 4),
+      q2: 1 + Math.round(clamp01(0.55 * (1 - S.mood.suspicion) + 0.45 * t) * 4),
+      q3: 1 + Math.round(clamp01(0.4 * f.overall + 0.6 * S.mood.comfort) * 4),
+      q4: 1 + Math.round(clamp01(0.5 * S.mood.energy + 0.5 * (1 - S.mood.suspicion)) * 4),
+      q5: 1 + Math.round(clamp01(t) * 4)
+    };
+  }
+  function finalRemark() {
+    if (S.trust.score >= 0.65) return pick(THOUGHTS.endGood);
+    if (S.trust.score >= 0.45) return pick(THOUGHTS.endMid);
+    return pick(THOUGHTS.endBad);
+  }
+  /* optional LLM commentary: mirrors the existing window.lavish queue pattern.
+     No keys are stored or sent; the prompt carries only aggregate ride telemetry.
+     If no LLM hook is configured, the canned remark stands. */
+  function llmCommentary(text, context) {
+    if (typeof window.lavish !== "undefined" && window.lavish.queuePrompt && window.lavish.sendQueuedPrompts) {
+      try {
+        window.lavish.queuePrompt("Cabin agent Phill (" + context + ") — “" + text +
+          "” | ride telemetry only: comfort " + S.mood.comfort.toFixed(2) + ", suspicion " +
+          S.mood.suspicion.toFixed(2) + ", trust " + S.trust.score.toFixed(2) + " — no personal data.");
+        window.lavish.sendQueuedPrompts();
+      } catch (e) { /* canned fallback stands */ }
+    }
+    return text;
+  }
+  function submitTrust() {
+    var vals = TRUST_ITEMS.map(function (it) { return S.trust.items[it.id] || 3; });
+    S.trust.score = clamp01(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length / 5);
+    var remark = llmCommentary(finalRemark(), "end-of-ride");
+    var avgT = S.trust.trail.length ? S.trust.trail[S.trust.trail.length - 1].v : S.trust.score;
+    var tq = $("tqScore"), tn = $("tqNote");
+    if (tq) tq.textContent = "trust " + (S.trust.score * 100).toFixed(0) + "/100 · ride trend " + (avgT * 100).toFixed(0);
+    if (tn) tn.textContent = (S.trust.score >= 0.65 ? "Phill trusts this cabin." : S.trust.score >= 0.45 ? "Cautious, but willing." : "He got out wary.") + " “" + remark + "”";
+  }
+  function renderTrustItems() {
+    S.trust.items = evidenceAnswers();
+    var el = $("tqItems");
+    if (!el) return;
+    el.innerHTML = TRUST_ITEMS.map(function (it) {
+      return '<div style="margin:8px 0;"><span style="font-size:12.5px; color:#C7C2B4;">' + it.txt + "</span>" +
+        '<input type="range" min="1" max="5" step="1" value="' + (S.trust.items[it.id] || 3) + '" id="tq_' + it.id +
+        '" style="width:100%; accent-color:#C9A227; margin-top:4px;" aria-label="' + it.txt +
+        '"> <span class="tqlabel" style="font-size:10px; color:#8A8578;">1–5</span></div>';
+    }).join("");
+    TRUST_ITEMS.forEach(function (it) {
+      var el2 = document.getElementById("tq_" + it.id);
+      if (el2) el2.addEventListener("input", function (e) {
+        S.trust.items[it.id] = Math.max(1, Math.min(5, +e.target.value || 3));
+      });
+    });
+  }
+  function openTrustQ() {
+    renderTrustItems();
+    var q = $("trustQ");
+    if (q) q.style.display = "flex";
+  }
+  /* priors persist only as aggregated scores for the NEXT ride's baseline —
+     no personal data, no locations, no identities. Memory: localStorage. */
+  function ridePriors(avgC, avgS) {
+    var p = S.priors || { rides: 0 };
+    S.priors = { rides: (p.rides || 0) + 1, trust: S.trust.score, comfort: avgC, suspicion: avgS };
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem("cabinSimPriors", JSON.stringify(S.priors));
+    } catch (e) { /* storage unavailable — in-memory priors only */ }
+  }
+  function loadPriors() {
+    try {
+      if (typeof localStorage !== "undefined") {
+        var raw = localStorage.getItem("cabinSimPriors");
+        if (raw) S.priors = JSON.parse(raw);
+      }
+    } catch (e) { S.priors = null; }
+    if (S.priors && typeof S.priors.trust === "number") {
+      PHILL.suspicionBase = clamp01(0.5 + (0.5 - S.priors.trust) * 0.35);
+    }
+  }
 
   /* ================= event firing ================= */
   function perceive(ev) {
@@ -1346,7 +1604,13 @@
         : (S.forgotCount ? "…and " + S.forgotCount + " more" : "nothing yet"));
   }
   function renderThoughts() {
-    $("thoughts").innerHTML = S.thoughts.map(function (th) {
+    var pre = "";
+    if (S.bdi && S.bdi.intention) {
+      var go = BDI_GOALS[S.bdi.intention];
+      pre = '<div class="thought"><span class="tt">intent</span><span>' +
+        (go ? go.label : S.bdi.intention) + " · " + Math.round(S.t - S.bdi.since) + "s</span></div>";
+    }
+    $("thoughts").innerHTML = pre + S.thoughts.map(function (th) {
       return '<div class="thought"><span class="tt">' + th.time + "</span><span>" + th.text + "</span></div>";
     }).join("");
   }
@@ -1359,7 +1623,9 @@
   function sample() {
     if (S.t - lastSampleT >= 3 || S.t < 3) {
       lastSampleT = S.t;
-      S.samples.push({ t: S.t, c: S.mood.comfort, s: S.mood.suspicion });
+      var tw = trustValue();
+      S.samples.push({ t: S.t, c: S.mood.comfort, s: S.mood.suspicion, e: S.mood.energy, trust: tw });
+      S.trust.trail.push({ t: S.t, v: tw });
     }
   }
 
@@ -1406,17 +1672,9 @@
     if (S.mood.suspicion > bs) S.mood.suspicion = Math.max(bs, S.mood.suspicion - dt * 0.004);
     else S.mood.suspicion = Math.min(bs, S.mood.suspicion + dt * 0.003);
 
-    // cognition
+    // cognition — BDI loop: perceive → desire → intention → act
     decayMemory(dt);
-    if (S.t - S.lastThink > 3.2 + Math.random() * 3) {
-      S.lastThink = S.t;
-      var phrase = think();
-      maybeSpeak(phrase);
-    }
-    if (S.t >= S.nextSpeak) {
-      S.nextSpeak = S.t + 9 + Math.random() * 16;
-      if (Math.random() < 0.6) speak(pick(THOUGHTS[ambientMood()]));
-    }
+    bdiReason(dt);
     sample();
   }
   function renderAll() {
@@ -1428,6 +1686,7 @@
   function setRot(r) {
     r = Math.round((((r % 360) + 360) % 360));
     if (r === S.rot) return;
+    lastUserInput = S.t;
     S.rot = r; rotChanged = true;
     renderAll();
     logLine("adj", "rotation → " + r + "°");
@@ -1438,6 +1697,7 @@
   function setHgt(h) {
     h = Math.max(38, Math.min(46, Math.round(h)));
     if (h === S.hgt) return;
+    lastUserInput = S.t;
     S.hgt = h;
     renderAll();
     logLine("adj", "height → " + h + " cm");
@@ -1516,11 +1776,17 @@
     S.phase = "done";
     var avgC = S.samples.reduce(function (a, c) { return a + c.c; }, 0) / Math.max(1, S.samples.length);
     var avgS = S.samples.reduce(function (a, c) { return a + c.s; }, 0) / Math.max(1, S.samples.length);
-    var grade = avgC >= 0.55 && avgS < 0.62 ? "Phill would take this ride again." :
-      avgC >= 0.45 ? "Acceptable — some minutes were iffy." : "He got out a little wary.";
-    $("sumGrade").textContent = "avg comfort " + avgC.toFixed(2) + " · avg suspicion " + avgS.toFixed(2) + " — " + grade;
-    drawSeries($("cvComfort"), "t", "c", 0, RIDE_END, 0, 1);
-    drawSeries($("cvSusp"), "t", "s", 0, RIDE_END, 0, 1);
+    var grade = S.trust.score >= 0.62 ? "Phill would take this ride again." :
+      S.trust.score >= 0.45 ? "Acceptable — some minutes were iffy." : "He got out a little wary.";
+    S.trust.items = evidenceAnswers();
+    submitTrust();
+    ridePriors(avgC, avgS);
+    openTrustQ();
+    $("sumGrade").textContent = "avg comfort " + avgC.toFixed(2) + " · avg suspicion " + avgS.toFixed(2) +
+      " · trust " + S.trust.score.toFixed(2) + " — " + grade;
+    drawSeries($("cvComfort"), "t", "c", 0, RIDE_END, 0, 1, "#C9A227", S.samples);
+    drawSeries($("cvSusp"), "t", "s", 0, RIDE_END, 0, 1, "#C9A227", S.samples);
+    drawSeries($("cvSusp"), "t", "v", 0, RIDE_END, 0, 1, "#6BD5C0", S.trust.trail, false);
     $("sumMem").innerHTML = S.memory.map(function (m) {
       return '<li><span class="cap">' + m.label + "</span> · activation " + m.act.toFixed(2) + "</li>";
     }).join("") || "<li>—</li>";
@@ -1531,17 +1797,21 @@
     $("btnPlay").disabled = true;
 
     $("topPlay").disabled = true;    logLine("sys", "— ride complete —");
+    logLine("trust", "questionnaire · trust " + S.trust.score.toFixed(2) + " · priors saved for next ride");
   }
-  function drawSeries(cv, kx, ky, x0, x1, y0, y1) {
+  function drawSeries(cv, kx, ky, x0, x1, y0, y1, st, data, clear) {
     var g = cv.getContext("2d");
     var W = cv.width, H = cv.height;
-    g.clearRect(0, 0, W, H);
-    g.strokeStyle = "rgba(201,162,39,.35)"; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(0, 2); g.lineTo(0, H - 2); g.lineTo(W - 2, H - 2); g.stroke();
-    if (!S.samples.length) return;
-    g.strokeStyle = "#C9A227"; g.lineWidth = 2;
+    var src = data || S.samples;
+    if (clear !== false) {
+      g.clearRect(0, 0, W, H);
+      g.strokeStyle = "rgba(201,162,39,.35)"; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0, 2); g.lineTo(0, H - 2); g.lineTo(W - 2, H - 2); g.stroke();
+    }
+    if (!src.length) return;
+    g.strokeStyle = st || "#C9A227"; g.lineWidth = 2;
     g.beginPath();
-    S.samples.forEach(function (s, i) {
+    src.forEach(function (s, i) {
       var px = (s[kx] - x0) / (x1 - x0) * (W - 4) + 2;
       var py = H - 2 - (s[ky] - y0) / (y1 - y0) * (H - 4);
       i ? g.lineTo(px, py) : g.moveTo(px, py);
@@ -1605,14 +1875,32 @@
   }
 
   /* ================= boot ================= */
+  loadPriors();
   buildDialTicks(); buildRailTicks();
-  // initial setup dialogue
-  speak("Evening. No wheel in front of me — right. Give me a moment to sit right.", true);
+  // initial setup dialogue — "Evening again…" if last ride left priors behind
+  if (S.priors && S.priors.rides) {
+    speak("Evening again. Last ride shaped me a little — " +
+      (S.priors.trust >= 0.6 ? "the cabin earned some trust." : S.priors.trust >= 0.45 ? "still cautious, but willing." : "I left wary. Let's see what changes."),
+      true);
+  } else {
+    speak("Evening. No wheel in front of me — right. Give me a moment to sit right.", true);
+  }
   setTimeout(function () {
     speak("Fresh out of the factory feel. Raise the seat a touch if you like, I sit tall.", true);
   }, 2600);
   S.nextSpeak = 22 + Math.random() * 10;
   renderAll(); renderMemory(); renderThoughts(); renderLog();
+  // trust questionnaire wiring (mind-owned; env markup kept additive)
+  $("tqSubmit").addEventListener("click", function () {
+    submitTrust();
+    var q = $("trustQ");
+    if (q) q.style.display = "none";
+    speak($("tqNote").textContent ? String($("tqNote").textContent).replace(/^[^“]*“/, "“") : finalRemark(), true);
+  });
+  $("tqClose").addEventListener("click", function () {
+    var q = $("trustQ");
+    if (q) q.style.display = "none";
+  });
   setupLavish();
   window.addEventListener("resize", buildTlEvents);
   setTimeout(buildTlEvents, 60);
