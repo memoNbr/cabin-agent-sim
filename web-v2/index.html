@@ -219,9 +219,9 @@
     <!-- LEFT -->
     <div>
       <div class="card" id="scene">
-        <h3>vehicle — interior <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
+        <h3>vehicle — EQS-class autonomous cabin <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
         <div id="sceneWrap">
-        <svg id="sceneSvg" viewBox="0 0 980 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="autonomous SUV interior cutaway">
+        <svg id="sceneSvg" viewBox="0 0 980 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EQS-class autonomous SUV interior close-up">
           <defs>
             <linearGradient id="skyGInt" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#0d1420"/>
@@ -229,196 +229,327 @@
               <stop offset="100%" stop-color="#2b3340"/>
             </linearGradient>
             <linearGradient id="cavG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#12141d"/>
-              <stop offset="100%" stop-color="#070807"/>
+              <stop offset="0%" stop-color="#161a26"/>
+              <stop offset="100%" stop-color="#0a0b0d"/>
             </linearGradient>
             <linearGradient id="dashG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#1d2130"/>
-              <stop offset="100%" stop-color="#0d0f16"/>
+              <stop offset="0%" stop-color="#241f14"/>
+              <stop offset="100%" stop-color="#141006"/>
+            </linearGradient>
+            <linearGradient id="screenG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0e1626"/>
+              <stop offset="55%" stop-color="#101c30"/>
+              <stop offset="100%" stop-color="#0a101c"/>
+            </linearGradient>
+            <linearGradient id="sunroofG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#060a14"/>
+              <stop offset="60%" stop-color="#101a2c"/>
+              <stop offset="100%" stop-color="#1c2740"/>
             </linearGradient>
             <radialGradient id="glareG" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#dbe3ff" stop-opacity=".09"/>
+              <stop offset="0%" stop-color="#dbe3ff" stop-opacity=".10"/>
               <stop offset="100%" stop-color="#dbe3ff" stop-opacity="0"/>
             </radialGradient>
-            <clipPath id="wndClip"><polygon points="606,96 916,58 860,298 600,298"/></clipPath>
-            <clipPath id="rearClip"><rect x="70" y="96" width="216" height="150" rx="8"/></clipPath>
+            <radialGradient id="moonG" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#eef0da" stop-opacity=".85"/>
+              <stop offset="55%" stop-color="#c9c29a" stop-opacity=".22"/>
+              <stop offset="100%" stop-color="#c9c29a" stop-opacity="0"/>
+            </radialGradient>
+            <pattern id="quilt" x="0" y="0" width="13" height="13" patternUnits="userSpaceOnUse">
+              <path d="M6.5,0 L13,6.5 L6.5,13 L0,6.5 Z" fill="none" stroke="#3f4a68" stroke-width="0.7" opacity=".9"/>
+            </pattern>
+            <pattern id="perf" x="0" y="0" width="7" height="7" patternUnits="userSpaceOnUse">
+              <circle cx="3.5" cy="3.5" r="0.9" fill="#0d0f14" opacity=".55"/>
+            </pattern>
+            <clipPath id="wndClip"><polygon points="560,110 922,60 900,300 560,300"/></clipPath>
+            <clipPath id="rearClip"><rect x="96" y="96" width="464" height="150" rx="8"/></clipPath>
           </defs>
 
           <!-- cutaway chrome -->
-          <rect x="26" y="14" width="928" height="466" rx="14" fill="#0B0A07" stroke="#2a2416" stroke-width="2.5"/>
+          <rect x="20" y="12" width="940" height="470" rx="14" fill="#0B0A07" stroke="#2a2416" stroke-width="2.5"/>
 
           <!-- interior cavity -->
-          <rect x="34" y="22" width="912" height="450" rx="8" fill="url(#cavG)"/>
+          <rect x="30" y="18" width="920" height="446" rx="8" fill="url(#cavG)"/>
 
-          <!-- rear door zone : glass -->
-          <rect x="60" y="96" width="226" height="150" rx="8" fill="#0A0F14" stroke="#2a2416" stroke-width="2"/>
+          <!-- B-pillar (rear-most cabin frame) -->
+          <path d="M44,68 L92,68 L92,452 L44,452 Z" fill="#10121a" stroke="#2a3346" stroke-width="2"/>
+          <path d="M48,68 L88,68 L88,120 L48,120 Z" fill="#1c2230" stroke="#3a435e" stroke-width="1.5"/>
+          <rect x="56" y="80" width="24" height="6" rx="3" fill="#2c3350"/>
+          <rect x="72" y="330" width="12" height="34" rx="3" fill="#2c3350"/>
+          <circle cx="68" cy="412" r="7" fill="#C9A227" opacity=".4"/>
+          <text x="68" y="302" font-family="Consolas, monospace" font-size="8" fill="#465070" text-anchor="middle" letter-spacing="1">B</text>
+
+          <!-- panoramic sunroof + headliner -->
+          <rect x="30" y="18" width="920" height="78" fill="url(#sunroofG)" stroke="#22293c" stroke-width="1.5"/>
+          <g fill="#cfd8ff">
+            <circle cx="120" cy="42" r="1"/><circle cx="200" cy="30" r="0.7"/><circle cx="310" cy="52" r="0.8"/>
+            <circle cx="420" cy="34" r="0.7"/><circle cx="520" cy="48" r="1"/><circle cx="640" cy="26" r="0.7"/>
+            <circle cx="740" cy="44" r="0.8"/><circle cx="840" cy="30" r="0.7"/><circle cx="900" cy="50" r="0.8"/>
+            <circle cx="160" cy="58" r="0.6"/><circle cx="470" cy="62" r="0.6"/><circle cx="810" cy="60" r="0.6"/>
+          </g>
+          <circle cx="640" cy="30" r="26" fill="url(#moonG)"/>
+          <line x1="30" y1="78" x2="950" y2="78" stroke="#C9A227" stroke-width="1.4" opacity=".5"/>
+          <rect x="30" y="80" width="920" height="16" fill="#171c2a"/>
+          <line x1="30" y1="80" x2="950" y2="80" stroke="#8a90a8" stroke-width="1" opacity=".3"/>
+          <!-- overhead console -->
+          <rect x="640" y="22" width="150" height="20" rx="6" fill="#0e1118" stroke="#2c3350" stroke-width="1.5"/>
+          <rect x="652" y="27" width="34" height="9" rx="4.5" fill="#1a2030"/>
+          <rect x="692" y="27" width="34" height="9" rx="4.5" fill="#1a2030"/>
+          <circle cx="742" cy="31" r="3.5" fill="#C9A227" opacity=".8"/>
+          <circle cx="754" cy="31" r="3.5" fill="#C9A227" opacity=".45"/>
+          <rect x="772" y="27" width="10" height="9" rx="2" fill="#1f2738"/>
+          <!-- ambient light channel along headliner -->
+          <rect x="30" y="96" width="920" height="2.5" fill="#E6C85A" opacity=".55"/>
+
+          <!-- front side glass (world scroll) -->
+          <rect x="96" y="96" width="464" height="150" rx="8" fill="#060a14" stroke="#2a3346" stroke-width="2"/>
           <g clip-path="url(#rearClip)">
             <g id="rearWnd">
-              <rect x="-600" y="60" width="1660" height="200" fill="url(#skyGInt)"/>
-              <g fill="#1b1e13">
-                <rect x="40" y="150" width="40" height="26"/><rect x="180" y="146" width="26" height="30"/>
-                <rect x="360" y="152" width="40" height="24"/><rect x="560" y="146" width="26" height="30"/>
-                <rect x="760" y="150" width="40" height="26"/><rect x="980" y="146" width="26" height="30"/>
-                <rect x="1180" y="152" width="40" height="24"/><rect x="1380" y="146" width="26" height="30"/>
+              <rect x="-1200" y="60" width="2660" height="200" fill="url(#skyGInt)"/>
+              <g fill="#181b10">
+                <rect x="-1140" y="150" width="40" height="26"/><rect x="-980" y="146" width="26" height="30"/>
+                <rect x="-780" y="152" width="40" height="24"/><rect x="-580" y="146" width="26" height="30"/>
+                <rect x="-380" y="150" width="40" height="26"/><rect x="-180" y="146" width="26" height="30"/>
+                <rect x="20" y="152" width="40" height="24"/><rect x="220" y="146" width="26" height="30"/>
+                <rect x="420" y="150" width="40" height="26"/><rect x="620" y="146" width="26" height="30"/>
+                <rect x="820" y="152" width="40" height="24"/><rect x="1020" y="146" width="26" height="30"/>
+                <rect x="1220" y="150" width="40" height="26"/><rect x="1420" y="146" width="26" height="30"/>
               </g>
+              <rect x="-1200" y="214" width="2660" height="46" fill="#0d0e0c"/>
               <g stroke="#3d3a22" stroke-width="2">
-                <line x1="-40" y1="200" x2="120" y2="200"/><line x1="220" y1="200" x2="380" y2="200"/>
-                <line x1="480" y1="200" x2="640" y2="200"/><line x1="740" y1="200" x2="900" y2="200"/>
-                <line x1="1000" y1="200" x2="1160" y2="200"/><line x1="1260" y1="200" x2="1420" y2="200"/>
+                <line x1="-1200" y1="230" x2="-1040" y2="230"/><line x1="-920" y1="230" x2="-760" y2="230"/>
+                <line x1="-640" y1="230" x2="-480" y2="230"/><line x1="-360" y1="230" x2="-200" y2="230"/>
+                <line x1="-80" y1="230" x2="80" y2="230"/><line x1="200" y1="230" x2="360" y2="230"/>
+                <line x1="480" y1="230" x2="640" y2="230"/><line x1="760" y1="230" x2="920" y2="230"/>
+                <line x1="1040" y1="230" x2="1200" y2="230"/><line x1="1320" y1="230" x2="1480" y2="230"/>
+              </g>
+              <g fill="#e8e3c0" opacity=".5">
+                <circle cx="-1060" cy="120" r="7"/><circle cx="-560" cy="132" r="6"/>
+                <circle cx="-60" cy="118" r="7"/><circle cx="440" cy="130" r="6"/>
+                <circle cx="940" cy="118" r="7"/><circle cx="1440" cy="130" r="6"/>
               </g>
             </g>
-            <rect x="60" y="96" width="226" height="150" rx="8" fill="url(#glareG)"/>
+            <rect x="96" y="96" width="464" height="150" rx="8" fill="url(#glareG)"/>
+            <path d="M150,120 L300,108 L306,220 L162,232 Z" fill="#ffffff" opacity=".04"/>
           </g>
-          <!-- rear door panel -->
-          <path d="M60,250 L286,250 L286,452 L60,452 Z" fill="#151722" stroke="#232838" stroke-width="2"/>
-          <rect x="92" y="286" width="60" height="26" rx="6" fill="#1d2130" stroke="#3a435e" stroke-width="1.5"/>
-          <rect x="166" y="296" width="52" height="12" rx="6" fill="#0d0f16" stroke="#2c3350" stroke-width="1.5"/>
-          <circle cx="124" cy="364" r="16" fill="#12141d" stroke="#232838" stroke-width="2"/>
-          <circle cx="124" cy="364" r="8" fill="#0d0f16" stroke="#2c3350" stroke-width="1.5"/>
-          <rect x="140" y="394" width="70" height="14" rx="7" fill="#1d2130" stroke="#3a435e" stroke-width="1.5"/>
-          <path d="M96,272 L128,272 Q138,272 138,264" fill="none" stroke="#C9A227" stroke-width="1.4" opacity=".6"/>
-          <text x="250" y="442" font-family="Consolas, monospace" font-size="10" fill="#2c3350" text-anchor="end">SUV · MAESTRO</text>
-          <!-- rear seat glimpse -->
-          <path d="M330,300 Q330,268 360,258 L400,258 L400,452 L330,452 Z" fill="#1b1e2c" stroke="#232838" stroke-width="2"/>
-          <path d="M348,302 Q348,282 366,276" fill="none" stroke="#3a435e" stroke-width="1.5"/>
+          <!-- chrome beltline under the side glass -->
+          <rect x="96" y="246" width="464" height="4" fill="#3a435e"/>
+          <rect x="96" y="250" width="464" height="1.5" fill="#E6C85A" opacity=".4"/>
 
-          <!-- roof headliner -->
-          <rect x="34" y="22" width="912" height="46" fill="#131620" stroke="#232838" stroke-width="1.5"/>
-          <line x1="34" y1="48" x2="946" y2="48" stroke="#C9A227" stroke-width="1" opacity=".3"/>
-          <rect x="150" y="31" width="90" height="8" rx="4" fill="#1d2130"/>
-          <rect x="470" y="31" width="180" height="9" rx="4.5" fill="#1d2130" stroke="#C9A227" stroke-width="1" opacity=".75"/>
-          <rect x="860" y="31" width="66" height="8" rx="4" fill="#1d2130"/>
-          <circle cx="560" cy="58" r="7" fill="#C9A227" opacity=".22"/>
-          <circle cx="560" cy="58" r="3" fill="#C9A227" opacity=".4"/>
+          <!-- door card : quilted leather -->
+          <path d="M96,252 L560,252 L560,452 L96,452 Z" fill="#1b202e" stroke="#2a3346" stroke-width="2"/>
+          <path d="M120,258 L536,258 L536,306 L120,306 Z" fill="#232a3c" stroke="#3a435e" stroke-width="1.5"/>
+          <rect x="120" y="258" width="416" height="48" fill="url(#quilt)"/>
+          <line x1="120" y1="308" x2="536" y2="308" stroke="#C9A227" stroke-width="1" opacity=".6"/>
+          <!-- armrest -->
+          <path d="M104,330 Q104,318 118,318 L300,318 Q314,318 314,330 L314,346 L104,346 Z" fill="#222a3c" stroke="#3a435e" stroke-width="1.5"/>
+          <path d="M112,326 Q112,322 122,322 L292,322 Q302,322 302,326 L302,340 L112,340 Z" fill="url(#quilt)"/>
+          <line x1="112" y1="324" x2="302" y2="324" stroke="#E6C85A" stroke-width="0.8" opacity=".5"/>
+          <!-- grab handle + seat memory -->
+          <rect x="428" y="276" width="30" height="18" rx="9" fill="#2a3146" stroke="#465070" stroke-width="1.5"/>
+          <rect x="434" y="282" width="4" height="6" rx="2" fill="#0e1118"/>
+          <rect x="444" y="282" width="4" height="6" rx="2" fill="#0e1118"/>
+          <rect x="454" y="282" width="4" height="6" rx="2" fill="#0e1118"/>
+          <!-- switch cluster -->
+          <rect x="250" y="358" width="150" height="18" rx="6" fill="#14171f" stroke="#2c3350" stroke-width="1.5"/>
+          <rect x="258" y="363" width="26" height="8" rx="4" fill="#2c3350"/>
+          <rect x="294" y="363" width="26" height="8" rx="4" fill="#2c3350"/>
+          <circle cx="344" cy="367" r="4.5" fill="#2c3350" stroke="#465070" stroke-width="1"/>
+          <rect x="356" y="365" width="10" height="5" rx="2.5" fill="#2c3350"/>
+          <rect x="372" y="363" width="18" height="8" rx="3" fill="#2c3350"/>
+          <text x="250" y="372" font-size="6.5" fill="#465070">M1</text>
+          <text x="288" y="372" font-size="6.5" fill="#465070">M2</text>
+          <!-- speaker grille -->
+          <circle cx="498" cy="382" r="25" fill="#0e1118" stroke="#465070" stroke-width="1.5"/>
+          <circle cx="498" cy="382" r="18" fill="none" stroke="#2c3350" stroke-width="1"/>
+          <circle cx="498" cy="382" r="11" fill="none" stroke="#2c3350" stroke-width="1"/>
+          <circle cx="498" cy="382" r="4" fill="#465070"/>
+          <g stroke="#C9A227" stroke-width="0.9" opacity=".65">
+            <line x1="498" y1="357" x2="498" y2="362"/><line x1="498" y1="402" x2="498" y2="407"/>
+            <line x1="473" y1="382" x2="478" y2="382"/><line x1="518" y1="382" x2="523" y2="382"/>
+            <line x1="480" y1="364" x2="484" y2="368"/><line x1="512" y1="396" x2="516" y2="400"/>
+            <line x1="516" y1="364" x2="512" y2="368"/><line x1="484" y1="396" x2="480" y2="400"/>
+          </g>
+          <text x="498" y="424" font-family="Consolas, monospace" font-size="7" fill="#5c6a94" text-anchor="middle" letter-spacing="3">EQ·S</text>
+          <!-- wood trim strip -->
+          <rect x="96" y="402" width="440" height="5" fill="#0a0c10" stroke="#E6C85A" stroke-width="0.8" opacity=".8"/>
+          <rect x="96" y="409" width="440" height="9" fill="#151209" stroke="#2f2a17" stroke-width="1"/>
+          <path d="M120,413 L200,411 Q240,410 280,413 L560,413" fill="none" stroke="#5a4a22" stroke-width="1" opacity=".6"/>
+          <!-- lower pocket -->
+          <path d="M122,428 L360,428 L360,444 L122,444 Z" fill="#10131b" stroke="#2a3346" stroke-width="1.2"/>
+          <!-- kick plate -->
+          <rect x="470" y="452" width="66" height="10" rx="3" fill="#2c2a1a" stroke="#E6C85A" stroke-width="1"/>
+          <text x="503" y="460" font-family="Consolas, monospace" font-size="8" fill="#C9A227" text-anchor="middle" letter-spacing="2">S</text>
 
-          <!-- B-pillar -->
-          <path d="M560,68 L596,68 L596,452 L560,452 Z" fill="#11131c" stroke="#232838" stroke-width="2"/>
-          <line x1="584" y1="110" x2="584" y2="252" stroke="#2c3350" stroke-width="2"/>
-          <rect x="576" y="398" width="8" height="16" rx="4" fill="#C9A227" opacity=".5"/>
-
-          <!-- A-pillar / front header -->
-          <path d="M920,58 L954,58 L954,452 L884,236 L900,120 Z" fill="#11131c" stroke="#232838" stroke-width="2"/>
+          <!-- A-pillar + tweeter -->
+          <path d="M900,60 L954,54 L954,452 L886,240 Z" fill="#11131c" stroke="#2a3346" stroke-width="2"/>
+          <circle cx="930" cy="196" r="12" fill="#0e1118" stroke="#465070" stroke-width="1.5"/>
+          <circle cx="930" cy="196" r="6" fill="#2c3350"/>
+          <rect x="906" y="216" width="48" height="6" rx="3" fill="#2c3350"/>
 
           <!-- windshield world scroll -->
           <g clip-path="url(#wndClip)">
             <g id="worldWnd">
-              <rect x="-1200" y="40" width="2660" height="270" fill="url(#skyGInt)"/>
-              <circle cx="1620" cy="105" r="18" fill="#e8e3c0" opacity=".8"/>
-              <circle cx="1620" cy="105" r="34" fill="#c9c29a" opacity=".12"/>
-              <path d="M-1200,266 Q-800,240 -200,256 L1200,252 L1460,250 L1460,310 L-1200,310 Z" fill="#0d0e0c"/>
+              <rect x="-1200" y="30" width="2660" height="280" fill="url(#skyGInt)"/>
+              <circle cx="1620" cy="110" r="18" fill="#e8e3c0" opacity=".8"/>
+              <circle cx="1620" cy="110" r="34" fill="#c9c29a" opacity=".12"/>
+              <path d="M-1200,262 Q-800,236 -200,252 L1200,248 L1460,246 L1460,310 L-1200,310 Z" fill="#0d0e0c"/>
               <g stroke="#3d3a22" stroke-width="2.5">
-                <line x1="-1260" y1="272" x2="-1100" y2="272"/><line x1="-980" y1="272" x2="-820" y2="272"/>
-                <line x1="-700" y1="272" x2="-540" y2="272"/><line x1="-420" y1="272" x2="-260" y2="272"/>
-                <line x1="-140" y1="272" x2="20" y2="272"/><line x1="140" y1="272" x2="300" y2="272"/>
-                <line x1="420" y1="272" x2="580" y2="272"/><line x1="700" y1="272" x2="860" y2="272"/>
-                <line x1="980" y1="272" x2="1140" y2="272"/><line x1="1260" y1="272" x2="1420" y2="272"/>
+                <line x1="-1260" y1="268" x2="-1100" y2="268"/><line x1="-980" y1="268" x2="-820" y2="268"/>
+                <line x1="-700" y1="268" x2="-540" y2="268"/><line x1="-420" y1="268" x2="-260" y2="268"/>
+                <line x1="-140" y1="268" x2="20" y2="268"/><line x1="140" y1="268" x2="300" y2="268"/>
+                <line x1="420" y1="268" x2="580" y2="268"/><line x1="700" y1="268" x2="860" y2="268"/>
+                <line x1="980" y1="268" x2="1140" y2="268"/><line x1="1260" y1="268" x2="1420" y2="268"/>
               </g>
               <g stroke="#0f1114" stroke-width="5">
-                <line x1="-1220" y1="258" x2="-1080" y2="258"/><line x1="-1020" y1="258" x2="-880" y2="258"/>
-                <line x1="-760" y1="258" x2="-620" y2="258"/><line x1="-560" y1="258" x2="-420" y2="258"/>
-                <line x1="-300" y1="258" x2="-160" y2="258"/><line x1="-100" y1="258" x2="40" y2="258"/>
-                <line x1="220" y1="258" x2="360" y2="258"/><line x1="420" y1="258" x2="560" y2="258"/>
-                <line x1="680" y1="258" x2="820" y2="258"/><line x1="880" y1="258" x2="1020" y2="258"/>
-                <line x1="1140" y1="258" x2="1280" y2="258"/><line x1="1340" y1="258" x2="1480" y2="258"/>
+                <line x1="-1220" y1="254" x2="-1080" y2="254"/><line x1="-1020" y1="254" x2="-880" y2="254"/>
+                <line x1="-760" y1="254" x2="-620" y2="254"/><line x1="-560" y1="254" x2="-420" y2="254"/>
+                <line x1="-300" y1="254" x2="-160" y2="254"/><line x1="-100" y1="254" x2="40" y2="254"/>
+                <line x1="220" y1="254" x2="360" y2="254"/><line x1="420" y1="254" x2="560" y2="254"/>
+                <line x1="680" y1="254" x2="820" y2="254"/><line x1="880" y1="254" x2="1020" y2="254"/>
+                <line x1="1140" y1="254" x2="1280" y2="254"/><line x1="1340" y1="254" x2="1480" y2="254"/>
               </g>
               <g fill="#23281c">
-                <rect x="-1160" y="196" width="34" height="44"/><rect x="-1000" y="204" width="26" height="36"/>
-                <rect x="-820" y="192" width="34" height="48"/><rect x="-660" y="204" width="26" height="36"/>
-                <rect x="-480" y="196" width="34" height="44"/><rect x="-320" y="204" width="26" height="36"/>
-                <rect x="-140" y="192" width="34" height="48"/><rect x="20" y="204" width="26" height="36"/>
-                <rect x="200" y="196" width="34" height="44"/><rect x="360" y="204" width="26" height="36"/>
-                <rect x="540" y="192" width="34" height="48"/><rect x="700" y="204" width="26" height="36"/>
-                <rect x="880" y="196" width="34" height="44"/><rect x="1040" y="204" width="26" height="36"/>
-                <rect x="1220" y="192" width="34" height="48"/><rect x="1380" y="204" width="26" height="36"/>
+                <rect x="-1160" y="192" width="34" height="44"/><rect x="-1000" y="200" width="26" height="36"/>
+                <rect x="-820" y="188" width="34" height="48"/><rect x="-660" y="200" width="26" height="36"/>
+                <rect x="-480" y="192" width="34" height="44"/><rect x="-320" y="200" width="26" height="36"/>
+                <rect x="-140" y="188" width="34" height="48"/><rect x="20" y="200" width="26" height="36"/>
+                <rect x="200" y="192" width="34" height="44"/><rect x="360" y="200" width="26" height="36"/>
+                <rect x="540" y="188" width="34" height="48"/><rect x="700" y="200" width="26" height="36"/>
+                <rect x="880" y="192" width="34" height="44"/><rect x="1040" y="200" width="26" height="36"/>
+                <rect x="1220" y="188" width="34" height="48"/><rect x="1380" y="200" width="26" height="36"/>
               </g>
             </g>
-            <path d="M640,120 L746,110 L752,198 L652,208 Z" fill="#ffffff" opacity=".05"/>
-            <path d="M700,198 L824,188 L830,262 L710,272 Z" fill="#ffffff" opacity=".045"/>
+            <!-- HUD nav overlay -->
+            <path d="M700,176 Q760,146 830,162 Q780,196 704,212 Z" fill="rgba(201,162,39,.10)"/>
+            <path d="M780,178 L812,170 L806,182 Z" fill="#E6C85A" opacity=".9"/>
+            <path d="M770,206 C790,196 810,196 828,204" fill="none" stroke="#E6C85A" stroke-width="1.4" stroke-dasharray="3 5" opacity=".7"/>
+            <text x="640" y="132" font-family="Consolas, monospace" font-size="10" fill="#C9A227" letter-spacing="3">AUTO · L3 READY</text>
+            <path d="M700,120 L780,112 L786,140 L706,148 Z" fill="#ffffff" opacity=".05"/>
+            <path d="M760,150 L848,140 L854,220 L764,230 Z" fill="#ffffff" opacity=".04"/>
           </g>
 
-          <!-- dashboard -->
-          <path d="M596,298 L858,238 L884,452 L596,452 Z" fill="url(#dashG)" stroke="#232838" stroke-width="2"/>
-          <line x1="598" y1="296" x2="856" y2="240" stroke="#C9A227" stroke-width="1.2" opacity=".55"/>
-          <rect x="640" y="300" width="176" height="40" rx="8" fill="#0c0e14" stroke="#C9A227" stroke-width="1" opacity=".9"/>
-          <text x="728" y="325" font-family="Consolas, monospace" font-size="13" fill="#C9A227" text-anchor="middle" letter-spacing="2">AUTO · DRIVE</text>
-          <text x="728" y="334" font-family="Consolas, monospace" font-size="0" fill="none"></text>
-          <rect x="662" y="352" width="132" height="4" rx="2" fill="#C9A227" opacity=".5"/>
-          <rect x="836" y="262" width="34" height="8" rx="4" fill="#3a435e"/>
-          <rect x="836" y="286" width="34" height="8" rx="4" fill="#2c3350"/>
-          <circle cx="740" cy="420" r="9" fill="#232838" opacity=".8"/>
-          <circle cx="740" cy="420" r="4" fill="#C9A227" opacity=".5"/>
+          <!-- dashboard : leather deck behind the screen -->
+          <path d="M430,300 Q560,308 700,308 L884,246 L900,300 L900,452 L430,452 Z" fill="url(#dashG)" stroke="#2f2a17" stroke-width="2"/>
+          <path d="M430,300 Q560,308 700,308 L884,246" fill="none" stroke="#C9A227" stroke-width="1.2" opacity=".55"/>
+          <path d="M444,452 L470,322 Q560,330 690,330" fill="none" stroke="#E6C85A" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/>
+          <path d="M562,452 L588,338 Q660,342 740,342" fill="none" stroke="#E6C85A" stroke-width="1" stroke-dasharray="4 4" opacity=".5"/>
+
+          <!-- hyperscreen : one curved slab, three zones -->
+          <path d="M470,262 L918,236 L918,300 L470,300 Z" fill="url(#screenG)" stroke="#3a435e" stroke-width="1.5"/>
+          <path d="M470,262 L918,236 L918,238 L470,264 Z" fill="#ffffff" opacity=".09"/>
+          <line x1="648" y1="250" x2="648" y2="298" stroke="#1f2738" stroke-width="1.5"/>
+          <line x1="806" y1="242" x2="806" y2="298" stroke="#1f2738" stroke-width="1.5"/>
+          <!-- left zone : driver cluster -->
+          <circle cx="540" cy="276" r="10" fill="none" stroke="#C9A227" stroke-width="1"/>
+          <line x1="540" y1="268" x2="540" y2="284" stroke="#C9A227" stroke-width="1.2"/>
+          <line x1="532" y1="276" x2="548" y2="276" stroke="#C9A227" stroke-width="1.2"/>
+          <text x="612" y="276" font-family="Consolas, monospace" font-size="8" fill="#C9A227" letter-spacing="1">138</text>
+          <text x="612" y="286" font-family="Consolas, monospace" font-size="6" fill="#5c6a94">KM/H</text>
+          <!-- mid zone : navigation -->
+          <path d="M662,292 L690,270 L700,284 L730,262 L740,284 L770,258" fill="none" stroke="#3f7bd9" stroke-width="1.6" opacity=".9"/>
+          <path d="M776,258 L784,256 L780,264 Z" fill="#3f7bd9" opacity=".9"/>
+          <circle cx="726" cy="292" r="3" fill="#E6C85A" opacity=".8"/>
+          <rect x="668" y="254" width="52" height="8" rx="4" fill="#3f7bd9" opacity=".25"/>
+          <text x="846" y="270" font-family="Consolas, monospace" font-size="6" fill="#5c6a94">EQS SUV</text>
+          <!-- right zone : media waves -->
+          <g stroke="#E6C85A" stroke-width="2" opacity=".8">
+            <line x1="830" y1="286" x2="830" y2="292"/><line x1="840" y1="282" x2="840" y2="292"/>
+            <line x1="850" y1="285" x2="850" y2="292"/><line x1="860" y1="279" x2="860" y2="292"/>
+            <line x1="870" y1="288" x2="870" y2="292"/><line x1="880" y1="283" x2="880" y2="292"/>
+          </g>
+          <path d="M470,262 L918,236 L918,300 L470,300 Z" fill="url(#glareG)"/>
+          <!-- screen under-glow -->
+          <path d="M470,300 L918,300 L918,306 L470,306 Z" fill="#E6C85A" opacity=".5"/>
+
           <!-- stowed steering column -->
-          <rect x="512" y="236" width="84" height="118" rx="12" fill="#0d0f16" stroke="#2c3350" stroke-width="2"/>
-          <rect x="532" y="282" width="44" height="40" rx="6" fill="#070807" stroke="#3a435e" stroke-width="1.5"/>
-          <text x="554" y="244" font-family="Segoe UI" font-size="8" fill="#5C5749" text-anchor="middle">steering column — stowed</text>
-          <!-- footwell -->
-          <path d="M596,452 L700,452 L700,400 Q700,392 708,390 L760,374 Q790,368 806,336 L858,300 L884,452 Z" fill="#0c0d12" stroke="#232838" stroke-width="1.5"/>
-          <ellipse cx="700" cy="448" rx="48" ry="8" fill="#060707" opacity=".6"/>
+          <rect x="384" y="214" width="112" height="86" rx="14" fill="#0d0f16" stroke="#3a435e" stroke-width="1.5"/>
+          <rect x="398" y="228" width="76" height="58" rx="8" fill="#070807" stroke="#465070" stroke-width="1"/>
+          <path d="M404,270 Q404,236 440,236 Q474,236 474,270 Q474,274 468,274 L414,274 Q408,274 408,270 Q408,240 440,240 L444,240 Q452,240 446,272" fill="none" stroke="#C9A227" stroke-width="2" opacity=".9"/>
+          <rect x="414" y="244" width="24" height="10" rx="5" fill="#0e1118" stroke="#465070" stroke-width="1"/>
+          <text x="440" y="316" font-family="Segoe UI" font-size="7.5" fill="#8a93a8" text-anchor="middle">steering column &amp; yoke — stowed</text>
+          <circle cx="440" cy="322" r="9" fill="none" stroke="#E6C85A" stroke-width="1.2" opacity=".6"/>
+          <text x="440" y="326" font-family="Consolas, monospace" font-size="6.5" fill="#C9A227" text-anchor="middle">L3</text>
 
-          <!-- cabin cam : top-down swivel -->
-          <g transform="translate(148 140)">
-            <circle r="74" fill="rgba(11,10,7,.84)" stroke="#3a3220" stroke-width="1.5"/>
-            <circle r="66" fill="none" stroke="#2a2416" stroke-width="1"/>
-            <g stroke="#4a4230" stroke-width="1.2">
-              <line x1="0" y1="-74" x2="0" y2="-66"/><line x1="0" y1="66" x2="0" y2="74"/>
-              <line x1="-74" y1="0" x2="-66" y2="0"/><line x1="66" y1="0" x2="74" y2="0"/>
-            </g>
-            <path d="M-52,-74 L52,-74" stroke="#C9A227" stroke-width="1.4"/>
-            <path d="M-46,74 L46,74" stroke="#4a4230" stroke-width="2"/>
-            <path id="planNeedle"><line x1="0" y1="0" x2="0" y2="-58" stroke="#E6C85A" stroke-width="1.6"/></path>
-            <path id="planCone" fill="rgba(201,162,39,.14)" stroke="rgba(201,162,39,.5)" stroke-width="1" d="M0,0 L0,0 A0,0 0 0 1 0,0 Z"/>
-            <g id="planSeat">
-              <rect x="-13" y="-17" width="26" height="38" rx="5" fill="#3a3220" stroke="#C9A227" stroke-width="1.4"/>
-              <rect x="-6" y="-7" width="12" height="20" rx="3" fill="#252b3e" stroke="#C9A227" stroke-width="1"/>
-            </g>
-            <circle r="3.4" fill="#E6C85A"/>
-            <text x="0" y="90" font-size="8" text-anchor="middle" fill="#5C5749" letter-spacing="1.8">SWIVEL</text>
-            <text x="92" y="3" font-size="8" fill="#6B5520" text-anchor="middle">F</text>
-            <text x="-92" y="3" font-size="8" fill="#6B5520" text-anchor="middle">R</text>
-            <text x="0" y="-80" font-size="7" fill="#6B5520" text-anchor="middle" letter-spacing="1.4">EXIT DOOR</text>
-          </g>
+          <!-- centre console forward of the seat -->
+          <path d="M300,330 Q300,316 318,314 L352,310 Q360,310 362,318 L362,452 L300,452 Z" fill="#161a26" stroke="#2a3346" stroke-width="1.5"/>
+          <rect x="310" y="326" width="40" height="10" rx="5" fill="#1f2738" stroke="#3a435e" stroke-width="1"/>
+          <rect x="312" y="346" width="36" height="16" rx="6" fill="#0e1118" stroke="#2c3350" stroke-width="1"/>
+          <rect x="312" y="370" width="36" height="5" rx="2.5" fill="#2c3350"/>
+          <path d="M306,452 Q306,392 318,392" fill="none" stroke="#E6C85A" stroke-width="1" opacity=".35"/>
 
-          <!-- floor + motor rail -->
-          <rect x="34" y="452" width="912" height="20" fill="#0c0d10" stroke="#232838" stroke-width="1.5"/>
-          <line x1="34" y1="452" x2="946" y2="452" stroke="#C9A227" stroke-width="1" opacity=".22"/>
-          <rect x="420" y="436" width="96" height="14" rx="5" fill="#20242f" stroke="#2c3350" stroke-width="2"/>
-          <rect x="434" y="444" width="30" height="5" rx="2.5" fill="#0d0f16"/>
-          <rect x="484" y="444" width="30" height="5" rx="2.5" fill="#0d0f16"/>
+          <!-- floor + carpet + sill -->
+          <rect x="30" y="452" width="920" height="12" fill="#0c0d10" stroke="#2a3346" stroke-width="1.5"/>
+          <rect x="30" y="452" width="920" height="3" fill="#3a435e"/>
+          <line x1="30" y1="452" x2="950" y2="452" stroke="#C9A227" stroke-width="1" opacity=".3"/>
+          <rect x="420" y="434" width="96" height="15" rx="5" fill="#20242f" stroke="#2c3350" stroke-width="2"/>
+          <rect x="434" y="442" width="30" height="5" rx="2.5" fill="#0d0f16"/>
+          <rect x="484" y="442" width="30" height="5" rx="2.5" fill="#0d0f16"/>
+          <ellipse cx="620" cy="452" rx="60" ry="5" fill="#0a0b0d" opacity=".6"/>
 
-          <!-- telescoping pedestal (height) -->
-          <rect id="ped" x="430" y="340" width="72" height="100" rx="6" fill="#1c202c" stroke="#2c3350" stroke-width="2"/>
+          <!-- telescoping pedestal -->
+          <rect id="ped" x="430" y="340" width="72" height="100" rx="6" fill="#161a26" stroke="#3a435e" stroke-width="1.5"/>
           <line x1="452" y1="344" x2="452" y2="436" stroke="#2c3350" stroke-width="1.5"/>
           <line x1="480" y1="344" x2="480" y2="436" stroke="#2c3350" stroke-width="1.5"/>
-          <rect x="446" y="430" width="40" height="6" rx="3" fill="#2c3350"/>
+          <rect x="446" y="428" width="40" height="7" rx="3.5" fill="#2c3350"/>
 
-          <!-- seat assembly (moves with height) -->
+          <!-- seat assembly : quilted leather, two-tone -->
           <g id="figGroup">
             <g id="backG">
-              <line x1="500" y1="321" x2="432" y2="152" stroke="#151827" stroke-width="30" stroke-linecap="round"/>
-              <line x1="502" y1="321" x2="434" y2="152" stroke="#2b3146" stroke-width="24" stroke-linecap="round"/>
-              <line x1="492" y1="300" x2="444" y2="190" stroke="#C9A227" stroke-width="1.3" opacity=".4"/>
-              <line x1="398" y1="152" x2="394" y2="112" stroke="#1c202c" stroke-width="6"/>
-              <line x1="424" y1="154" x2="420" y2="112" stroke="#1c202c" stroke-width="6"/>
-              <rect x="382" y="88" width="58" height="28" rx="12" fill="#2c3350" stroke="#3a435e" stroke-width="2"/>
-              <circle cx="440" cy="320" r="6" fill="#3a435e" stroke="#C9A227" stroke-width="1" opacity=".8"/>
+              <line x1="500" y1="321" x2="432" y2="152" stroke="#171a28" stroke-width="32" stroke-linecap="round"/>
+              <line x1="502" y1="321" x2="434" y2="152" stroke="#232a3c" stroke-width="26" stroke-linecap="round"/>
+              <path d="M502,321 L434,152" stroke="url(#quilt)" stroke-width="26" stroke-linecap="round" opacity=".7"/>
+              <path d="M500,312 L446,196" stroke="#E6C85A" stroke-width="1" opacity=".4"/>
+              <path d="M484,296 L438,190" stroke="#E6C85A" stroke-width="0.8" stroke-dasharray="3 4" opacity=".5"/>
+              <line x1="398" y1="150" x2="390" y2="112" stroke="#10131b" stroke-width="7"/>
+              <line x1="428" y1="152" x2="420" y2="114" stroke="#10131b" stroke-width="7"/>
+              <rect x="376" y="82" width="62" height="34" rx="16" fill="#232a3c" stroke="#3a435e" stroke-width="2"/>
+              <rect x="376" y="82" width="62" height="34" rx="16" fill="url(#perf)"/>
+              <text x="407" y="104" font-family="Segoe UI" font-size="7" fill="#8a93a8" text-anchor="middle" letter-spacing="2">S</text>
+              <circle cx="440" cy="318" r="6" fill="#3a435e" stroke="#C9A227" stroke-width="1" opacity=".9"/>
             </g>
-            <path d="M404,300 Q404,282 428,284 L516,286 Q542,288 542,306 L542,328 Q542,338 526,338 L418,338 Q404,338 404,326 Z" fill="#252b3e" stroke="#3a435e" stroke-width="2"/>
-            <path d="M430,287 L428,336" stroke="#3a435e" stroke-width="1.2"/>
-            <path d="M404,300 Q404,282 428,284 L470,286" stroke="#C9A227" stroke-width="1.1" opacity=".35" fill="none"/>
-            <rect x="478" y="318" width="62" height="16" rx="8" fill="#262c40" stroke="#3a435e" stroke-width="1.5"/>
-            <rect x="420" y="336" width="108" height="14" rx="5" fill="#171a28" stroke="#2c3350" stroke-width="2"/>
+            <path d="M404,300 Q404,280 430,282 L514,284 Q542,286 542,306 L542,329 Q542,339 526,339 L418,339 Q404,339 404,327 Z" fill="#232a3c" stroke="#3a435e" stroke-width="2"/>
+            <path d="M404,284 L542,300 L542,329 Q542,339 526,339 L404,327 Z" fill="url(#quilt)" opacity=".8"/>
+            <path d="M452,288 L448,336" stroke="#3a435e" stroke-width="1.2"/>
+            <path d="M404,300 Q404,282 430,284 L480,287" stroke="#C9A227" stroke-width="1.1" opacity=".4" fill="none"/>
+            <rect x="478" y="316" width="62" height="16" rx="8" fill="#20273a" stroke="#3a435e" stroke-width="1.5"/>
+            <rect x="420" y="336" width="108" height="14" rx="5" fill="#12151f" stroke="#2c3350" stroke-width="2"/>
             <rect x="428" y="340" width="30" height="8" rx="4" fill="#0d0f16"/>
             <rect x="490" y="340" width="30" height="8" rx="4" fill="#0d0f16"/>
           </g>
 
-          <!-- occupant (rebuilt every frame) -->
+          <!-- occupant -->
           <g id="torsoG"></g>
           <g id="legOut"></g>
           <g id="beltG"></g>
 
-          <!-- ambient annvan light pool over seat -->
-          <ellipse cx="470" cy="456" rx="92" ry="9" fill="#060707" opacity=".55"/>
-          <text x="470" y="88" font-family="Segoe UI" font-size="9" fill="#5C5749" text-anchor="middle" letter-spacing="2.5">DRIVER POSITION — PHILL</text>
+          <!-- seat ambient light pool -->
+          <ellipse cx="470" cy="456" rx="96" ry="7" fill="#C9A227" opacity=".14"/>
+          <ellipse cx="470" cy="456" rx="44" ry="4" fill="#C9A227" opacity=".22"/>
+
+          <!-- cabin cam : top-down swivel -->
+          <g transform="translate(168 150)">
+            <circle r="72" fill="rgba(11,10,7,.85)" stroke="#465070" stroke-width="1.5"/>
+            <circle r="64" fill="none" stroke="#2a3346" stroke-width="1"/>
+            <g stroke="#465070" stroke-width="1.2">
+              <line x1="0" y1="-72" x2="0" y2="-64"/><line x1="0" y1="64" x2="0" y2="72"/>
+              <line x1="-72" y1="0" x2="-64" y2="0"/><line x1="64" y1="0" x2="72" y2="0"/>
+            </g>
+            <path d="M-50,-72 L50,-72" stroke="#C9A227" stroke-width="1.4"/>
+            <path d="M-44,72 L44,72" stroke="#465070" stroke-width="2"/>
+            <path id="planNeedle"><line x1="0" y1="0" x2="0" y2="-56" stroke="#E6C85A" stroke-width="1.6"/></path>
+            <path id="planCone" fill="rgba(201,162,39,.14)" stroke="rgba(201,162,39,.5)" stroke-width="1" d="M0,0 L0,0 A0,0 0 0 1 0,0 Z"/>
+            <g id="planSeat">
+              <rect x="-13" y="-17" width="26" height="38" rx="5" fill="#3a3220" stroke="#C9A227" stroke-width="1.4"/>
+              <rect x="-6" y="-7" width="12" height="20" rx="3" fill="#232a3c" stroke="#C9A227" stroke-width="1"/>
+            </g>
+            <circle r="3.4" fill="#E6C85A"/>
+            <text x="0" y="86" font-size="8" text-anchor="middle" fill="#5c6a94" letter-spacing="1.8">SWIVEL</text>
+            <text x="88" y="3" font-size="8" fill="#C9A227" text-anchor="middle">F</text>
+            <text x="-88" y="3" font-size="8" fill="#C9A227" text-anchor="middle">R</text>
+            <text x="0" y="-77" font-size="7" fill="#8a93a8" text-anchor="middle" letter-spacing="1.4">EXIT DOOR</text>
+          </g>
+          <text x="470" y="78" font-family="Segoe UI" font-size="9" fill="#5c6a94" text-anchor="middle" letter-spacing="2.5">EQS-S CLASS · AUTONOMOUS CABIN</text>
         </svg>
         </div>
         <div class="event-banner" id="eventBanner"></div>
