@@ -50,16 +50,38 @@
   .scene-band{position:relative; max-width:1680px; margin:0 auto; padding:16px 22px 0;}
   .scene-card{position:relative; height:clamp(400px, 64vh, 660px); overflow:hidden;
     border:1px solid var(--line); border-radius:14px; background:#0B0A07;}
-  #photoInterior{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-    object-position:center; display:block;}
-  .photo-credit{position:absolute; top:12px; right:14px; z-index:6; font-size:10px; letter-spacing:.18em;
-    text-transform:uppercase; color:rgba(230,220,190,.82); background:rgba(8,7,4,.5);
-    border:1px solid rgba(201,162,39,.35); padding:4px 10px; border-radius:999px; backdrop-filter:blur(3px);}
+  #cabin3d{position:absolute; inset:0; width:100%; height:100%; display:block; z-index:1;
+    cursor:grab; touch-action:none; background:#0B0A07;}
+  #cabin3d.grabbing{cursor:grabbing;}
+  .viewer-hint{position:absolute; left:16px; bottom:14px; z-index:6; font-size:10.5px; line-height:1.7;
+    letter-spacing:.05em; color:rgba(224,218,200,.82); background:rgba(8,7,4,.55);
+    border:1px solid rgba(201,162,39,.28); padding:6px 11px; border-radius:9px; backdrop-filter:blur(3px);
+    pointer-events:none; transition:opacity .6s;}
+  .viewer-hint.gone{opacity:0;}
+  .viewer-hint kbd{background:#0F0D08; border:1px solid var(--gold-dim); border-radius:4px; padding:0 6px;
+    font-family:Consolas,monospace; font-size:10px; color:var(--gold-hi);}
+  .viewer-tools{position:absolute; right:14px; top:50px; z-index:6; display:flex; flex-direction:column;
+    gap:6px; align-items:flex-end;}
+  .viewer-tools .btn{padding:5px 11px; font-size:10px; letter-spacing:.1em;}
+  .viewer-tools .btn.on{background:var(--gold); color:var(--bg); font-weight:700;}
+  .model-credit{position:absolute; right:14px; bottom:14px; z-index:6; max-width:46%; font-size:9.5px;
+    line-height:1.6; letter-spacing:.03em; color:rgba(206,198,178,.66); text-align:right; pointer-events:auto;}
+  .model-credit a{color:var(--gold-hi); text-decoration:none; border-bottom:1px dotted var(--gold-dim);}
+  .model-credit a:hover{border-bottom-color:var(--gold);}
+  .viewer-status{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:6;
+    font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted);
+    background:rgba(11,10,7,.82); border:1px solid var(--line); padding:8px 15px; border-radius:999px;
+    pointer-events:none;}
+  .viewer-status.gone{display:none;}
+  .viewer-status.err{color:var(--danger); border-color:var(--danger);}
   .scene-card h3{position:absolute; top:12px; left:16px; z-index:6; font-size:11px; letter-spacing:.22em;
     color:rgba(238,233,215,.92); text-transform:uppercase; display:flex; gap:14px; align-items:center;
-    text-shadow:0 1px 4px rgba(0,0,0,.8);}
-  .scene-stage{position:absolute; inset:0; z-index:4;}
-  .seat-dock{position:absolute; left:50%; bottom:54px; transform:translateX(-50%); z-index:6;
+    text-shadow:0 1px 4px rgba(0,0,0,.8); pointer-events:none;}
+  .scene-stage{position:absolute; inset:0; z-index:4; pointer-events:none;}
+  .scene-photo{position:absolute; inset:0; z-index:5; display:none; background:#0B0A07;}
+  .scene-photo img{width:100%; height:100%; object-fit:cover; display:block;}
+  .scene-photo.on{display:block; cursor:pointer;}
+  .seat-dock{position:absolute; left:50%; bottom:54px; transform:translateX(-50%); z-index:6; pointer-events:auto;
     width:min(440px, 54vw); border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#14161c,#0a0b10 70%);
     border:1px solid rgba(201,162,39,.35); box-shadow:0 12px 38px rgba(0,0,0,.65), 0 0 0 1px rgba(0,0,0,.4);}
   #sceneCv{display:block; width:100%; height:auto; background:#0C0B08;}
@@ -72,7 +94,7 @@
   .topctl .btn{padding:7px 13px;}
   .topctl .tc-lbl{font-size:10px; letter-spacing:.2em; color:var(--faint); margin:0 2px;}
   .scene-foot{position:absolute; left:0; right:0; bottom:0; z-index:5; display:flex; gap:18px;
-    flex-wrap:wrap; align-items:center; padding:30px 22px 12px;
+    flex-wrap:wrap; align-items:center; padding:30px 22px 12px; pointer-events:none;
     font-size:12px; color:rgba(224,218,200,.9);
     background:linear-gradient(transparent, rgba(8,7,4,.78) 58%);}
   .scene-foot b{color:var(--gold-hi); font-weight:600;}
@@ -241,6 +263,14 @@
     padding:10px; border-radius:8px; font:12px/1.5 "Consolas",monospace; resize:vertical; min-height:44px;}
   .lav .btn{margin-top:8px;}
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./assets/vendor/three.module.js",
+    "three/addons/": "./assets/vendor/jsm/"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -270,15 +300,32 @@
 <div class="wrap">
   <div class="scene-band">
     <div class="scene-card">
-      <img id="photoInterior" src="assets/interior.jpg" alt="Real driver-focused interior photo — midsize premium cabin (photo: Pexels)">
-      <div class="photo-credit">Photo: Pexels · free license</div>
-      <h3>the cabin — real interior photo · midsize premium <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
+      <canvas id="cabin3d" aria-label="Interactive 3D view of the whole car cabin — drag to orbit, wheel to zoom, W/S/Q/E to travel"></canvas>
+      <h3>the cabin — live 3D model · drag to explore <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
+      <div class="viewer-tools">
+        <button class="btn on" id="vShell" type="button">exterior</button>
+        <button class="btn" id="vPhoto" type="button">photo</button>
+        <button class="btn" id="vReset" type="button">reset view</button>
+      </div>
+      <div class="viewer-status" id="viewerStatus">loading 3D cabin…</div>
+      <div class="viewer-hint" id="viewerHint">
+        drag · orbit &nbsp;|&nbsp; wheel · zoom &nbsp;|&nbsp; right-drag · pan<br>
+        <kbd>W</kbd><kbd>S</kbd> travel fwd/back &nbsp; <kbd>Q</kbd><kbd>E</kbd> travel left/right
+      </div>
+      <div class="model-credit" id="modelCredit">
+        3D model: Car Concept (<a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept" target="_blank" rel="noopener">Khronos Group</a>) — CC-BY-4.0 ·
+        <a href="assets/model/LICENSE-CarConcept.md" target="_blank" rel="noopener">LICENSE</a> ·
+        model by Eric Chadwick / Darmstadt Graphics Group
+      </div>
       <div class="event-banner" id="eventBanner"></div>
       <div class="speed-streaks" id="streaks">
         <div class="streak" style="top:22%; animation-delay:0s"></div>
         <div class="streak" style="top:45%; animation-delay:.35s"></div>
         <div class="streak" style="top:68%; animation-delay:.7s"></div>
         <div class="streak" style="top:82%; animation-delay:.2s"></div>
+      </div>
+      <div class="scene-photo" id="scenePhoto" title="click to return to the 3D cabin">
+        <img src="assets/interior.jpg" alt="Reference cabin interior photo — click to go back to the live 3D model">
       </div>
       <div class="scene-stage">
         <div id="sceneWrap" class="seat-dock">
@@ -291,7 +338,7 @@
         <span>seat height <b id="sfHgt">38 cm</b></span>
         <span>rotation <b id="sfRot">0°</b></span>
         <span>rides smooth <b class="mono" id="sfG">0.0 g</b></span>
-        <span id="sfLine" style="margin-left:auto;">real interior photo · adjust slide / height / rotation · live seat render below</span>
+        <span id="sfLine" style="margin-left:auto;">orbit / zoom the 3D cabin · adjust slide / height / rotation · live seat render below</span>
       </div>
     </div>
   </div>
@@ -1729,8 +1776,6 @@
   }
 
   /* ================= boot ================= */
-  var PHOTO_SRC = "assets/interior.jpg";
-  $("photoInterior").src = PHOTO_SRC;
   sizeCanvas();
   loadPriors();
   buildDialTicks(); buildRailTicks();
@@ -1762,6 +1807,303 @@
   window.addEventListener("resize", function () { sizeCanvas(); buildTlEvents(); });
   setTimeout(function () { sizeCanvas(); buildTlEvents(); }, 60);
   requestAnimationFrame(frame);
+})();
+</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+(function () {
+  var MODEL_SRC = "assets/model/CarConcept.glb";
+  /* cabin cutaway: keep every Interior* part, hide the shell, wheels and trim */
+  var EXT_MAT_RE = /^(paint|panel sides|mechanical|glass|signallight|brakelight|headlight|mirror|brake|disc|tireside|tiretread|rim[12]|license)$/i;
+  var EXT_NAME_RE = /^(body|engine|wheel|axle|license)/i;
+  var KEEP_NAME_RE = /^interior/i;
+  function isExterior(o) {
+    var n = o.name || "";
+    if (KEEP_NAME_RE.test(n)) return false;
+    if (EXT_NAME_RE.test(n)) return true;
+    var mm = Array.isArray(o.material) ? o.material : [o.material];
+    var ns = mm.map(function (m) { return (m && m.name) || ""; });
+    return ns.length > 0 && ns.every(function (x) { return EXT_MAT_RE.test(x); });
+  }
+  var HOST = document.getElementById("cabin3d");
+  var statusEl = document.getElementById("viewerStatus");
+  var hintEl = document.getElementById("viewerHint");
+  var shellBtn = document.getElementById("vShell");
+  var resetBtn = document.getElementById("vReset");
+  var state = window.__CABIN3D__ = {
+    ready: false, error: null, webgl: false, src: MODEL_SRC, revision: THREE.REVISION,
+    cutaway: true, exterior: false, photo: false, triangles: 0, materials: [], travelKeys: [],
+    camPos: null, target: null
+  };
+  function status(t, err) {
+    if (!statusEl) return;
+    statusEl.textContent = t;
+    statusEl.className = "viewer-status" + (err ? " err" : "");
+  }
+  if (!HOST || !HOST.getContext) { state.error = "no-canvas"; return; }
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: HOST, antialias: true, powerPreference: "high-performance" });
+  } catch (e) {
+    state.error = "no-webgl"; status("3D unavailable — WebGL not supported in this browser", true); return;
+  }
+  state.webgl = true;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.35;
+  if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x15161c);
+  try {
+    var bgc = document.createElement("canvas"); bgc.width = 4; bgc.height = 256;
+    var bgx = bgc.getContext("2d");
+    if (bgx) {
+      var grd = bgx.createLinearGradient(0, 0, 0, 256);
+      grd.addColorStop(0, "#3a3e48"); grd.addColorStop(0.5, "#1e2129"); grd.addColorStop(1, "#0a0b0f");
+      bgx.fillStyle = grd; bgx.fillRect(0, 0, 4, 256);
+      var bgTex = new THREE.CanvasTexture(bgc);
+      if ("colorSpace" in bgTex) bgTex.colorSpace = THREE.SRGBColorSpace;
+      scene.background = bgTex;
+    }
+  } catch (e) { /* keep flat colour */ }
+  var pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
+
+  var camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.02, 120);
+  camera.position.set(3, 1.6, 3.4);
+
+  var sun = new THREE.DirectionalLight(0xfff3d6, 2.0); sun.position.set(4, 7, 3); scene.add(sun);
+  var fill = new THREE.DirectionalLight(0x9fc4ff, 0.8); fill.position.set(-5, 3, -4); scene.add(fill);
+  scene.add(new THREE.HemisphereLight(0xdfe6ff, 0x241d12, 1.0));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  var camLamp = new THREE.PointLight(0xfff4e0, 6, 0, 2);
+  camera.add(camLamp); scene.add(camera);
+  /* interior studio light — only shines in cabin/cutaway mode */
+  var cabinLight = new THREE.PointLight(0xfff0dd, 34, 0, 2);
+  var cabinLight2 = new THREE.PointLight(0xdfe8ff, 16, 0, 2);
+  scene.add(cabinLight); scene.add(cabinLight2);
+
+  var controls = new OrbitControls(camera, HOST);
+  controls.enableDamping = true; controls.dampingFactor = 0.075;
+  controls.rotateSpeed = 0.62; controls.zoomSpeed = 0.85; controls.panSpeed = 0.7;
+  controls.screenSpacePanning = true;
+  controls.target.set(0, 0.8, 0);
+  state.THREE = THREE; state.camera = camera; state.controls = controls;
+
+  var keyState = {};
+  var travel = new THREE.Vector3();
+  var forward = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  function isTyping() {
+    var a = document.activeElement;
+    return a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable);
+  }
+  window.addEventListener("keydown", function (e) {
+    var k = (e.key || "").toLowerCase();
+    if (k !== "w" && k !== "s" && k !== "q" && k !== "e") return;
+    if (isTyping()) return;
+    keyState[k] = true;
+    if (state.travelKeys.indexOf(k) === -1) state.travelKeys.push(k);
+    if (hintEl) hintEl.classList.add("gone");
+  });
+  window.addEventListener("keyup", function (e) { keyState[(e.key || "").toLowerCase()] = false; });
+  window.addEventListener("blur", function () { for (var k in keyState) keyState[k] = false; });
+
+  function applyTravel(dt) {
+    var sp = (state.size ? Math.sqrt(state.size.x * state.size.x + state.size.y * state.size.y + state.size.z * state.size.z) : 1.4) * 0.28 * dt;
+    forward.subVectors(controls.target, camera.position); forward.y = 0;
+    if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1);
+    forward.normalize();
+    right.crossVectors(forward, up).normalize();
+    travel.set(0, 0, 0);
+    if (keyState.w) travel.add(forward);
+    if (keyState.s) travel.sub(forward);
+    if (keyState.e) travel.add(right);
+    if (keyState.q) travel.sub(right);
+    if (travel.lengthSq() === 0) return;
+    travel.normalize().multiplyScalar(sp);
+    camera.position.add(travel);
+    controls.target.add(travel);
+  }
+
+  var loader = new GLTFLoader();
+  var root = null;
+  var homeCut = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+  var homeExt = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+  function applyHome(h) { camera.position.copy(h.pos); controls.target.copy(h.target); controls.update(); }
+
+  function collect(o) {
+    var mats = Array.isArray(o.material) ? o.material : [o.material];
+    var names = mats.map(function (m) { return (m && m.name) || ""; });
+    for (var i = 0; i < names.length; i++) {
+      if (names[i] && state.materials.indexOf(names[i]) === -1) state.materials.push(names[i]);
+    }
+    o.userData.__ext = isExterior(o);
+    for (var j = 0; j < mats.length; j++) { if (mats[j] && "envMapIntensity" in mats[j]) mats[j].envMapIntensity = 1.35; }
+    if (o.geometry) {
+      var g = o.geometry;
+      state.triangles += g.index ? g.index.count / 3 : (g.attributes && g.attributes.position ? g.attributes.position.count / 3 : 0);
+    }
+  }
+  function setExterior(on) {
+    state.exterior = !!on; state.cutaway = !on;
+    if (root) root.traverse(function (o) { if (o.isMesh && o.userData.__ext !== undefined) o.visible = on ? true : !o.userData.__ext; });
+    cabinLight.intensity = on ? 0 : 34;
+    cabinLight2.intensity = on ? 0 : 16;
+    if (shellBtn) shellBtn.className = "btn" + (on ? " on" : "");
+    if (root) applyHome(on ? homeExt : homeCut);
+  }
+  function resetView() {
+    if (root) applyHome(state.exterior ? homeExt : homeCut);
+  }
+
+  status("loading 3D cabin · 0%");
+  loader.load(MODEL_SRC, function (gltf) {
+    root = gltf.scene;
+    root.traverse(function (o) { if (o.isMesh) collect(o); });
+    scene.add(root);
+    state.root = root;
+    var box = new THREE.Box3().setFromObject(root);
+    var size = box.getSize(new THREE.Vector3());
+    var center = box.getCenter(new THREE.Vector3());
+    var radius = Math.max(size.length() * 0.5, 0.001);
+    state.size = { x: size.x, y: size.y, z: size.z };
+    state.center = { x: center.x, y: center.y, z: center.z };
+    cabinLight.position.set(center.x, box.max.y + size.y * 0.5, center.z);
+    cabinLight2.position.set(center.x, box.min.y + size.y * 0.4, center.z - size.z * 0.18);
+    state.radius = radius;
+    controls.minDistance = Math.max(radius * 0.03, 0.05);
+    controls.maxDistance = radius * 5.5;
+    camera.near = Math.max(radius * 0.002, 0.01); camera.far = radius * 40;
+    camera.updateProjectionMatrix();
+
+    /* view home: the whole car from outside */
+    homeExt.target.set(center.x, box.min.y + size.y * 0.52, center.z);
+    homeExt.pos.copy(homeExt.target).addScaledVector(new THREE.Vector3(0.95, 0.42, 1.0).normalize(), radius * 1.2);
+
+    /* semantic anchors straight from the model's own part names */
+    var anchors = {}, seats = [], wheels = [];
+    root.traverse(function (o) {
+      if (!o.isMesh || !o.name) return;
+      var n = o.name.toLowerCase();
+      var c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+      if (!anchors.engine && n === "engine") anchors.engine = c;
+      else if (!anchors.rear && /rearhatch/.test(n)) anchors.rear = c;
+      else if (/^interiorseatscolor/.test(n)) {
+        var sb = new THREE.Box3().setFromObject(o);
+        seats.push({ c: sb.getCenter(new THREE.Vector3()), y0: sb.min.y, y1: sb.max.y });
+        if (!anchors.seat) anchors.seat = seats[seats.length - 1];
+      }
+      else if (/^interiorsteeringwheel/.test(n)) wheels.push(c);
+      else if (!anchors.dash && /^interiordashmid/.test(n)) anchors.dash = c;
+    });
+    var fwd = (anchors.engine && anchors.rear)
+      ? anchors.engine.clone().sub(anchors.rear).setY(0).normalize()
+      : new THREE.Vector3(0, 0, 1);
+    var side = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+    var wheel = new THREE.Vector3();
+    if (wheels.length) { wheels.forEach(function (w) { wheel.add(w); }); wheel.divideScalar(wheels.length); }
+    /* driver seat = the seat nearest the steering wheel axis (LHD / RHD safe) */
+    var driver = seats.length ? seats[0] : null;
+    if (seats.length > 1 && wheels.length) {
+      var d0 = Math.abs(seats[0].c.x - wheel.x), d1 = Math.abs(seats[1].c.x - wheel.x);
+      if (d1 < d0) driver = seats[1];
+    }
+    var eye = driver
+      ? driver.c.clone().addScaledVector(fwd, 0.16).addScaledVector(side, 0.04)
+      : new THREE.Vector3(center.x, box.min.y + size.y * 0.5, center.z);
+    if (driver) eye.y = Math.min(1.14, driver.y0 + (driver.y1 - driver.y0) * 0.5 + 0.52);
+    var glance = wheels.length ? wheel.clone() : (anchors.dash ? anchors.dash.clone() : eye.clone().addScaledVector(fwd, 0.6));
+    /* cabin home: INSIDE the driver cabin at eye level, looking at the steering wheel & dash */
+    homeCut.pos.copy(eye);
+    homeCut.target.copy(glance);
+    state.anchors = {
+      engine: !!anchors.engine, rearHatch: !!anchors.rear, seat: !!anchors.seat, dash: !!anchors.dash,
+      driverEye: eye.toArray().map(function (v) { return +v.toFixed(3); }),
+      steeringWheel: wheels.length ? wheel.toArray().map(function (v) { return +v.toFixed(3); }) : null,
+      forward: fwd.toArray().map(function (v) { return +v.toFixed(3); })
+    };
+
+    setExterior(false);
+    state.ready = true;
+    state.camPos = camera.position.toArray();
+    state.target = controls.target.toArray();
+    status("cabin ready · " + Math.round(state.triangles).toLocaleString() + " tris");
+    setTimeout(function () { if (statusEl) statusEl.className = "viewer-status gone"; }, 1200);
+  }, function (ev) {
+    if (ev && ev.total) status("loading 3D cabin · " + Math.round(ev.loaded / ev.total * 100) + "%");
+  }, function (err) {
+    state.error = String((err && err.message) || err);
+    status("could not load 3D cabin", true);
+    if (window.console && console.warn) console.warn("cabin3d load failed", err);
+  });
+
+  function resize() {
+    var w = HOST.clientWidth || 1, h = HOST.clientHeight || 1;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  if (window.ResizeObserver) { try { new ResizeObserver(resize).observe(HOST); } catch (e) { /* ignore */ } }
+  window.addEventListener("resize", resize);
+  resize();
+
+  HOST.addEventListener("pointerdown", function () { HOST.classList.add("grabbing"); if (hintEl) hintEl.classList.add("gone"); });
+  window.addEventListener("pointerup", function () { HOST.classList.remove("grabbing"); });
+  if (shellBtn) shellBtn.addEventListener("click", function () { setExterior(!state.exterior); });
+  if (resetBtn) resetBtn.addEventListener("click", resetView);
+  /* optional photo backdrop: the real interior photo stays reachable as a toggle */
+  var photoBtn = document.getElementById("vPhoto");
+  var photoEl = document.getElementById("scenePhoto");
+  if (photoBtn && photoEl) {
+    function setPhoto(on) {
+      state.photo = !!on;
+      photoEl.classList.toggle("on", state.photo);
+      photoBtn.className = "btn" + (state.photo ? " on" : "");
+    }
+    photoBtn.addEventListener("click", function () { setPhoto(!state.photo); });
+    photoEl.addEventListener("click", function () { setPhoto(false); });
+  }
+
+  var last = (window.performance && performance.now) ? performance.now() : Date.now();
+  function animate(now) {
+    requestAnimationFrame(animate);
+    var dt = Math.min((now - last) / 1000, 0.05); last = now;
+    if (dt > 0) applyTravel(dt);
+    controls.update();
+    renderer.render(scene, camera);
+    state.camPos = camera.position.toArray();
+    state.target = controls.target.toArray();
+  }
+  requestAnimationFrame(animate);
+
+  state.hook = function (opts) {
+    opts = opts || {};
+    if (opts.setExterior !== undefined) setExterior(opts.setExterior);
+    if (opts.reset) resetView();
+    var visible = 0, vbox = null;
+    if (root) {
+      vbox = new THREE.Box3();
+      root.traverse(function (o) { if (o.isMesh && o.visible) { visible++; vbox.expandByObject(o); } });
+    }
+    var vsize = (vbox && !vbox.isEmpty()) ? vbox.getSize(new THREE.Vector3()).toArray() : null;
+    return {
+      ready: state.ready, error: state.error, webgl: state.webgl, revision: state.revision,
+      src: state.src, materials: state.materials.length, materialNames: state.materials.slice(),
+      triangles: Math.round(state.triangles), cutaway: state.cutaway, exterior: state.exterior,
+      photo: state.photo,
+      cam: camera.position.toArray(), target: controls.target.toArray(),
+      distance: camera.position.distanceTo(controls.target),
+      orbit: !!controls, reticle: HOST.clientWidth + "x" + HOST.clientHeight,
+      visibleMeshes: visible, visibleSize: vsize,
+      anchors: state.anchors,
+      travelKeys: state.travelKeys.slice()
+    };
+  };
 })();
 </script>
 </body>
