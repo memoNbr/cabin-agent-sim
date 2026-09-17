@@ -37,7 +37,7 @@
   .phase.ride{border-color:var(--gold); color:var(--gold-hi);}
   .phase.done{border-color:var(--ok); color:var(--ok);}
 
-  .wrap{max-width:1240px; margin:0 auto; padding:18px 22px 60px;}
+  .wrap{max-width:1600px; margin:0 auto; padding:14px 22px 60px;}
   .grid{display:grid; grid-template-columns:minmax(0,1fr) 390px; gap:18px; align-items:start;}
   @media (max-width:1000px){ .grid{grid-template-columns:1fr;} }
 
@@ -47,9 +47,10 @@
     text-transform:uppercase; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;}
 
   /* ---- scene ---- */
-  #scene{position:relative;}
-  #scene svg{width:100%; height:auto; display:block; border-radius:8px; background:#0C0B08;}
-  #sceneCv{width:100%; height:auto; display:block; border-radius:8px; background:#0C0B08;}
+  .scene-band{position:relative; max-width:1600px; margin:0 auto; padding:16px 22px 0;}
+  .scene-card{position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px 14px;}
+  .scene-stage{position:relative; display:flex; justify-content:center; align-items:center; min-height:320px;}
+  #sceneCv{display:block; border-radius:8px; background:#0C0B08; max-width:100%;}
   .topctl{display:flex; align-items:center; gap:8px; flex-wrap:wrap;
     border-bottom:1px solid var(--line); background:var(--panel); padding:9px 22px;}
   .topctl .btn{padding:7px 13px;}
@@ -77,8 +78,6 @@
     60%{transform:translate(-3px,-3px);} 75%{transform:translate(2px,2px);}}
 
   /* ---- dial + rail ---- */
-  .ctl-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
-  @media (max-width:480px){ .ctl-grid{grid-template-columns:1fr;} }
   .dial-wrap{text-align:center;}
   .dial-wrap svg{width:170px; height:170px; cursor:pointer;}
   .dial-read{display:flex; justify-content:center; gap:14px; align-items:baseline; margin-top:6px;}
@@ -97,6 +96,23 @@
   .rail-scalediv{width:6px; position:absolute; right:0; height:1px; background:var(--line);}
   .rail-side{display:flex; flex-direction:column; gap:4px; justify-content:center; font-size:12px;}
   .rail-side b{color:var(--gold-hi); font-size:24px; display:block;}
+  .ctl-grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; align-items:center;}
+  @media (max-width:980px){ .ctl-grid3{grid-template-columns:1fr 1fr;} }
+  @media (max-width:640px){ .ctl-grid3{grid-template-columns:1fr;} }
+  .kbdbar{display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-bottom:14px; padding:8px 12px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px; font-size:11.5px; color:var(--muted);}
+  .kbdbar b{color:var(--gold-hi); font-weight:600;}
+  .kbdbar kbd{background:#0F0D08; border:1px solid var(--gold-dim); border-radius:4px; padding:1px 7px;
+    font-family:Consolas,monospace; font-size:10.5px; color:var(--gold-hi);}
+  .slide-host{display:flex; flex-direction:column; gap:10px; align-items:center;}
+  .slide-track{position:relative; width:214px; height:46px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:23px;}
+  .slide-thumb{position:absolute; top:50%; transform:translate(-50%,-50%); width:34px; height:34px;
+    background:var(--gold); border-radius:50%; cursor:grab; touch-action:none; box-shadow:0 0 10px rgba(201,162,39,.4);}
+  .slide-read{display:flex; justify-content:center; gap:12px; align-items:baseline;}
+  .slide-read b{font-size:24px; color:var(--gold);}
+  .slide-labs{display:flex; justify-content:space-between; width:214px; font-size:9.5px; letter-spacing:.14em;
+    color:var(--faint); text-transform:uppercase;}
   .gauge{margin-top:12px;}
   .gauge .gl{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-bottom:4px;}
   .gauge .gtrack{height:7px; background:var(--panel2); border-radius:4px; overflow:hidden;}
@@ -234,14 +250,12 @@
 </div>
 
 <div class="wrap">
-  <div class="grid">
-    <!-- LEFT -->
-    <div>
-      <div class="card" id="scene">
-<h3>vehicle — EQS-class autonomous cabin <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
+  <div class="scene-band">
+    <div class="card scene-card">
+<h3>vehicle — midsize premium cabin · driver's seat · centred side view <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;">0 km/h</span></h3>
+      <div class="scene-stage">
         <div id="sceneWrap">
-        <canvas id="sceneCv" width="980" height="540" role="img" aria-label="3D interior of the EQS-class autonomous cabin"></canvas>
-        </div>
+          <canvas id="sceneCv" width="1600" height="900" role="img" aria-label="3D side view of a midsize premium cabin — driver's seat, door card, steering wheel, A-pillar"></canvas>
         </div>
         <div class="event-banner" id="eventBanner"></div>
         <div class="speed-streaks" id="streaks">
@@ -250,17 +264,30 @@
           <div class="streak" style="top:68%; animation-delay:.7s"></div>
           <div class="streak" style="top:82%; animation-delay:.2s"></div>
         </div>
-        <div class="scene-foot">
-          <span>seat height <b id="sfHgt">38 cm</b></span>
-          <span>rotation <b id="sfRot">0°</b></span>
-          <span>rides smooth <b class="mono" id="sfG">0.0 g</b></span>
-          <span id="sfLine" style="margin-left:auto;">parked · adjust your seat</span>
-        </div>
       </div>
+      <div class="scene-foot">
+        <span>slide <b class="mono" id="sfSl">0 cm</b></span>
+        <span>seat height <b id="sfHgt">38 cm</b></span>
+        <span>rotation <b id="sfRot">0°</b></span>
+        <span>rides smooth <b class="mono" id="sfG">0.0 g</b></span>
+        <span id="sfLine" style="margin-left:auto;">parked · adjust slide / height / rotation</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <div>
 
       <div class="card">
-        <h3>parameters — seat</h3>
-        <div class="ctl-grid">
+        <h3>parameters — seat · slide / height / rotation</h3>
+        <div class="kbdbar">
+          <span>drive the seat</span>
+          <span><kbd>←</kbd> <kbd>→</kbd> <b>rotation</b></span>
+          <span><kbd>↑</kbd> <kbd>↓</kbd> <b>height</b></span>
+          <span><kbd>A</kbd> <kbd>D</kbd> <b>slide</b></span>
+        </div>
+        <div class="ctl-grid3">
           <div class="dial-wrap">
             <svg id="dial" viewBox="0 0 160 160" aria-label="seat rotation dial">
               <circle cx="80" cy="80" r="74" fill="#0F0D08" stroke="#2a2416" stroke-width="2"/>
@@ -292,6 +319,19 @@
               <span style="color:var(--faint)">CM</span>
               <b class="mono" id="hgtRead">38</b>
               <span class="mono" id="hgtAtt" style="color:var(--gold-dim)">att .45</span>
+            </div>
+          </div>
+
+          <div class="slide-host">
+            <div class="slide-labs"><span>back</span><span>front · FWD</span></div>
+            <div class="slide-track" id="slTrack">
+              <div id="slCenter" style="position:absolute; left:50%; top:5px; bottom:5px; width:1px; background:var(--gold-dim); opacity:.55;"></div>
+              <div class="slide-thumb" id="slThumb" aria-label="seat slide"></div>
+            </div>
+            <div class="slide-read">
+              <span style="color:var(--faint)">SLIDE</span>
+              <b class="mono" id="slRead">0</b>
+              <span class="mono" id="slAtt" style="color:var(--gold-dim)">cm</span>
             </div>
           </div>
         </div>
@@ -389,8 +429,8 @@
   </div>
 
   <footer>
-    COTAM-based cognitive agent · driver-seat rotation &amp; height · setup 0-2 min, ride 2-10 min.
-    Attitude data from Dilek, master thesis ika RWTH · SAE J1100 proportions · interactive demo artifact for Lavish review.
+    COTAM-based cognitive agent · driver seat slide / height / rotation · setup 0-2 min, ride 2-10 min.
+    Attitude data from Dilek, master thesis ika RWTH · SAE J1100 midsize proportions · interactive demo artifact for Lavish review.
   </footer>
 </div>
 
@@ -528,7 +568,7 @@
 
   /* ================= state ================= */
   var S = {
-    rot: 0, hgt: 38,
+    rot: 0, hgt: 38, sl: 0,
     t: 0, running: true, timeScale: 4,
     phase: "setup", done: false,
     speed: 0, targetSpeed: 0, gNow: 0, joltNow: 0,
@@ -899,12 +939,30 @@
   }
 
 /* ================= 3D cabin renderer (canvas) ================= */
-  var CVW = 980, CVH = 540, CVF = 560, CVN = 16;
-  var GLIGHT = { x: -0.5, y: 0.72, z: 0.42 };
-  var CamB = { p: { x: 78, y: 68, z: -112 }, f: { x: 0, y: 0, z: 1 }, r: { x: 1, y: 0, z: 0 }, u: { x: 0, y: 1, z: 0 } };
-  var CamBase = CamB;
+  var CVF_BASE = 690, CVW = 1600, CVH = 900, CVF = CVF_BASE, CVN = 16;
+  var GLIGHT = { x: 0.35, y: 0.78, z: 0.52 };
+  var SEATX = -20;
+  var CAM_P = { x: 92, y: 45, z: 28 }, CAM_T = { x: -20, y: 44, z: 28 };
+  var CamBase = lookAt({ x: CAM_P.x, y: CAM_P.y, z: CAM_P.z }, { x: CAM_T.x, y: CAM_T.y, z: CAM_T.z });
+  var CamB = CamBase;
   var DLS = [];
   var GX = null;
+  function sizeCanvas() {
+    var cv = $("sceneCv"), st = $("sceneWrap");
+    if (!cv || !cv.getContext) return;
+    var W = st ? st.clientWidth : 0;
+    if (!W) W = Math.max(320, Math.floor((window.innerWidth || 1400) * 0.96));
+    var Hmax = Math.max(420, Math.floor((window.innerHeight || 860) * 0.78));
+    var h = Math.floor(W * 9 / 16); if (h > Hmax) h = Hmax;
+    var w = Math.floor(h * 16 / 9);
+    cv.style.width = w + "px"; cv.style.height = h + "px";
+    var dpr = window.devicePixelRatio || 1;
+    var bw = Math.floor(w * dpr) || 1, bh = Math.floor(h * dpr) || 1;
+    if (cv.width !== bw) cv.width = bw;
+    if (cv.height !== bh) cv.height = bh;
+    CVW = cv.width; CVH = cv.height;
+    CVF = CVF_BASE * (CVW / 1600);
+  }
   (function () {
     var cv = document.getElementById("sceneCv");
     if (cv && cv.getContext) GX = cv.getContext("2d");
@@ -920,18 +978,17 @@
     return { p: pos, f: f, r: r, u: u };
   }
   function camAt(t, swayK) {
-    // ride inertia: during curves the world leans into the corner,
-    // braking dives the nose, jolts rattle harder than idle breathing
+    // ride inertia: curves lean into the corner, braking dives, jolts rattle
     var l = ((S.rot % 360) + 360) % 360;
     var side = Math.sin((l - 20) * Math.PI / 180);
     var sK = swayK || 0;
-    var crv = Math.max(0, S.gNow - 0.22) * 9.2 * (side >= 0 ? 1 : -1) * sK;
-    var dv = (S.speed < 55 && S.targetSpeed < S.speed) ? (55 - S.speed) / 55 * 4.2 * sK : 0;
+    var crv = Math.max(0, S.gNow - 0.22) * 8.5 * (side >= 0 ? 1 : -1) * sK;
+    var dv = (S.speed < 55 && S.targetSpeed < S.speed) ? (55 - S.speed) / 55 * 4.0 * sK : 0;
     var base = lookAt(
-      { x: 78 + Math.sin(t * 1.1) * 0.7, y: 68 + Math.sin(t * 1.6) * 0.5, z: -112 + Math.sin(t * 0.9) * 0.4 },
-      { x: 16, y: 42, z: 18 });
+      { x: CAM_P.x + Math.sin(t * 1.1) * 0.5, y: CAM_P.y + Math.sin(t * 1.6) * 0.4, z: CAM_P.z + Math.sin(t * 0.9) * 0.3 },
+      { x: CAM_T.x, y: CAM_T.y, z: CAM_T.z });
     if (!sK) return base;
-    var swT = { x: base.r.x * crv, y: Math.max(0, crv) * 0.28, z: base.r.z * crv + dv };
+    var swT = { x: base.r.x * crv, y: Math.max(0, crv) * 0.22, z: base.r.z * crv + dv };
     return {
       p: { x: base.p.x + swT.x, y: base.p.y + swT.y, z: base.p.z + swT.z },
       f: base.f, r: base.r, u: base.u
@@ -943,7 +1000,6 @@
     return { x: CVW / 2 + d3(d, CamB.r) * CVF / D, y: CVH / 2 - d3(d, CamB.u) * CVF / D, z: D };
   }
   function faceN(a, b, c) { return cr3(sub3(b, a), sub3(c, a)); }
-  function shift(p, dx, dy, dz) { return { x: p.x + dx, y: p.y + dy, z: p.z + dz }; }
   function rotY(p, deg, axX, axZ) {
     var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
     var x = p.x - axX, z = p.z - axZ;
@@ -1031,289 +1087,229 @@
   }
 
   function addExterior3D() {
-    var spd = S.speed, m = (S.t * spd * 0.45);
-    /* sky */
-    pushP([v3(-1700, 320, 2500), v3(1700, 320, 2500), v3(1700, -160, 2500), v3(-1700, -160, 2500)], "rgb(7,11,22)", null);
-    pushP([v3(-1700, 26, 2500), v3(1700, 26, 2500), v3(1700, -160, 2500), v3(-1700, -160, 2500)], "rgb(16,25,45)", null);
-    pushP([v3(-1700, 34, 2500), v3(1700, 34, 2500), v3(1700, -18, 2500), v3(-1700, -18, 2500)], "rgb(30,42,66)", { alpha: 0.9 });
-    /* city strip at horizon */
-    pushP([v3(-1500, 8, 2600), v3(1500, 8, 2600), v3(1500, -16, 2600), v3(-1500, -16, 2600)], "#05070c", null);
-    var ci = 0;
-    for (ci = 0; ci < 16; ci++) {
-      pushSph(v3(-900 + ci * 130, 2, 2620), 3.4 + (ci % 3), "#0a0e18", { alpha: 0.9 });
-    }
-    for (ci = 0; ci < 12; ci++) {
-      pushSph(v3(-1100 + ci * 170, (ci % 3) * 5 + 12, 2620), 0.9, "rgba(230,200,90,.5)", { alpha: 0.7 });
-    }
-    /* moon + stars */
-    pushSph(v3(-280, 210, 2350), 58, "rgba(200,195,160,.10)", null);
-    pushSph(v3(-280, 210, 2350), 20, "#e9e2c4", { alpha: 0.85 });
-    var st = [[-90, 240, 2280, 1.5], [60, 230, 2400, 1.1], [150, 258, 2320, 1.3], [-240, 270, 2380, 1.0],
-      [320, 240, 2360, 1.2], [-400, 250, 2440, 1.1], [420, 266, 2420, 0.9], [-160, 232, 2500, 0.8],
-      [500, 214, 2400, 1.0], [-520, 226, 2460, 1.2]];
-    for (var si = 0; si < st.length; si++) {
-      pushSph(v3(st[si][0], st[si][1], st[si][2]), st[si][3], "rgba(210,220,255,.8)", { alpha: 0.8 });
-    }
-    /* road sheet — the world leans into corners with swing, braking dives it */
-    var parax = (CamB.p.x - CamBase.p.x) * 0.85 + (CamB.p.z - CamBase.p.z) * 0.25;
-    pushP([v3(-1700 + parax, 0, 210), v3(1700 + parax, 0, 210), v3(1700 + parax, -140, 2600), v3(-1700 + parax, -140, 2600)], "rgb(12,14,12)", null);
-    pushP([v3(-240 + parax, 0, 210), v3(240 + parax, 0, 210), v3(240 + parax, -140, 2600), v3(-240 + parax, -140, 2600)], "rgb(16,18,15)", { alpha: 0.85 });
-    /* near asphalt grain racing past */
-    for (var gr = 0; gr < 14; gr++) {
-      var gz = 212 + ((m * 1.6 + gr * 97) % 580);
-      var gx = -150 + ((gr * 71) % 280);
-      pushP([v3(gx, 0.05, gz), v3(gx + 5, 0.05, gz), v3(gx + 5, 0.05, gz + 22), v3(gx, 0.05, gz + 22)], "rgba(46,52,58,.4)", { alpha: 0.5 });
-    }
-    /* moving lane dashes */
-    for (var k = 0; k < 40; k++) {
-      var zz = 260 + k * 26 - (m % 26);
-      if (zz < 244) zz += 40 * 26;
-      pushP([v3(-163 + parax, 0.12, zz), v3(-157 + parax, 0.12, zz), v3(-157 + parax, 0.12, zz + 9), v3(-163 + parax, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
-      pushP([v3(157 + parax, 0.12, zz), v3(163 + parax, 0.12, zz), v3(163 + parax, 0.12, zz + 9), v3(157 + parax, 0.12, zz + 9)], "rgb(94,90,78)", { alpha: 0.75 });
-    }
-    /* headlamp beam washing over the asphalt ahead */
-    pushP([v3(-30, 0.06, 300), v3(30, 0.06, 300), v3(30, 0.06, 2200), v3(-30, 0.06, 2200)], "rgba(180,200,235,.05)", { alpha: 0.5 + Math.atan(S.joltNow * 3) * 0.25 });
-    pushP([v3(-13, 0.08, 330), v3(13, 0.08, 330), v3(13, 0.08, 1300), v3(-13, 0.08, 1300)], "rgba(220,232,255,.07)", { alpha: 0.45 });
-    /* lamp posts + guardrail */
-    pushP([v3(-588 + parax, -1, 180), v3(-532 + parax, -1, 180), v3(-532 + parax, 1.4, 2600), v3(-588 + parax, 1.4, 2600)], "#22282f", null);
-    pushP([v3(532 + parax, -1, 180), v3(588 + parax, -1, 180), v3(588 + parax, 1.4, 2600), v3(532 + parax, 1.4, 2600)], "#22282f", null);
-    for (var p = 0; p < 46; p++) {
-      var pz = 250 + p * 30 - (m % 30);
-      if (pz < 235) pz += 46 * 30;
-      pushP([v3(-564 + parax, 0, pz), v3(-556 + parax, 0, pz), v3(-556 + parax, 12, pz), v3(-564 + parax, 12, pz)], "rgb(12,15,20)", null);
-      pushP([v3(556 + parax, 0, pz), v3(564 + parax, 0, pz), v3(564 + parax, 12, pz), v3(556 + parax, 12, pz)], "rgb(12,15,20)", null);
-      pushSph(v3(-560 + parax, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
-      pushSph(v3(-560 + parax, 14, pz), 7, "rgba(240,226,166,.14)", null);
-      pushSph(v3(-560 + parax, 14, pz), 15, "rgba(240,226,166,.05)", null);
-      pushSph(v3(560 + parax, 14, pz), 2.6, "#f0e2a6", { alpha: 0.95 });
-      pushSph(v3(560 + parax, 14, pz), 7, "rgba(240,226,166,.14)", null);
-      pushSph(v3(560 + parax, 14, pz), 15, "rgba(240,226,166,.05)", null);
-      /* sodium pools on the road */
-      pushP([v3(-620 + parax, 0.1, pz - 9), v3(-500 + parax, 0.1, pz - 9), v3(-500 + parax, 0.1, pz + 11), v3(-620 + parax, 0.1, pz + 11)], "rgba(240,226,166,.05)", { alpha: 0.5 });
-      pushP([v3(500 + parax, 0.1, pz - 9), v3(620 + parax, 0.1, pz - 9), v3(620 + parax, 0.1, pz + 11), v3(500 + parax, 0.1, pz + 11)], "rgba(240,226,166,.05)", { alpha: 0.5 });
-    }
-    /* oncoming traffic glow — twin headlights drifting up the left lane */
-    for (var c2 = 0; c2 < 3; c2++) {
-      var cz = 900 + (((m * 1.7 + c2 * 380) % 1400));
-      pushSph(v3(-330 + c2 * 30, 3.5, cz), 3.2, "rgba(240,238,214,.6)", { alpha: 0.55 });
-      pushSph(v3(-318 + c2 * 30, 3.5, cz), 1.6, "rgba(255,255,240,.9)", { alpha: 0.7 });
-      pushSph(v3(-363 + c2 * 30, 3.5, cz), 3.0, "rgba(240,238,214,.5)", { alpha: 0.5 });
-      pushSph(v3(-352 + c2 * 30, 3.5, cz), 1.5, "rgba(255,255,240,.85)", { alpha: 0.65 });
+    var m = S.t * S.speed * 0.35;
+    pushP([v3(-1600, 260, 1500), v3(1600, 260, 1500), v3(1600, -180, 1500), v3(-1600, -180, 1500)], "rgb(6,9,16)", null);
+    pushP([v3(-1600, 30, 1300), v3(1600, 30, 1300), v3(1600, -180, 1300), v3(-1600, -180, 1300)], "rgb(13,19,32)", null);
+    pushP([v3(-1600, 36, 1050), v3(1600, 36, 1050), v3(1600, -6, 1050), v3(-1600, -6, 1050)], "rgb(24,32,52)", { alpha: 0.9 });
+    var bl = 0;
+    for (bl = 0; bl < 9; bl++) {
+      var bx = -900 + ((m * 0.22 + bl * 213) % 1600);
+      pushSph(v3(bx, 8, 960), 24 + (bl % 3) * 9, "rgba(230,200,90,.05)", { alpha: 0.8 });
     }
   }
 
   function addGlass3D() {
     var gi = [
-      [v3(-78, 46, 118), v3(78, 48, 122), v3(78, 76, 160), v3(-78, 74, 156)],
-      [v3(-84, 46, -38), v3(-84, 46, 110), v3(-84, 74, 112), v3(-84, 74, -36)],
-      [v3(84, 46, -38), v3(84, 46, 110), v3(84, 74, 112), v3(84, 74, -36)]
+      [v3(-54, 62, 100), v3(54, 62, 100), v3(54, 108, 146), v3(-54, 108, 146)],
+      [v3(-54, 44, -38), v3(-53.5, 44, 88), v3(-53.5, 110, 92), v3(-54, 112, -34)],
+      [v3(-54, 44, -52), v3(-54, 44, -42), v3(-54, 108, -44), v3(-54, 108, -54)]
     ];
     for (var i = 0; i < gi.length; i++) {
-      pushP(gi[i], "rgba(9,16,30,.30)", null);
-      pushP(gi[i], "rgba(190,210,255,.045)", null);
+      pushP(gi[i], "rgba(8,15,28,.22)", null);
+      pushP(gi[i], "rgba(190,210,255,.04)", null);
     }
-    pushP(gi[0], null, { stroke: "rgba(160,170,190,.5)", lw: 2.5 });
-    /* rain beading on the windscreen, running down in thin streaks */
+    pushP(gi[0], null, { stroke: "rgba(160,170,190,.45)", lw: 2.2 });
+    pushP(gi[1], null, { stroke: "rgba(160,170,190,.35)", lw: 1.8 });
     if (S.rain > 0.02) {
       var sweep = (S.t * 0.32) % 1;
-      for (var r = 0; r < 44; r++) {
-        var rx = -74 + ((r * 41) % 148), ry = 50 + ((r * 29) % 22);
-        if (Math.abs(((rx / 148) + 0.5) - sweep) < 0.06) continue;
-        var sl = (r % 7) - 3;
-        pushP([v3(rx + sl, ry, 132), v3(rx + sl + 0.8, ry, 132), v3(rx + sl + 0.8, ry + 5, 129), v3(rx + sl, ry + 5, 129)], "rgba(205,220,240,.20)", { alpha: 0.85 });
+      for (var r = 0; r < 40; r++) {
+        var rx = -50 + ((r * 41) % 100), ry = 64 + ((r * 29) % 40);
+        if (Math.abs(((rx / 100) + 0.5) - sweep) < 0.06) continue;
+        var sl2 = (r % 7) - 3;
+        pushP([v3(rx + sl2, ry, 128), v3(rx + sl2 + 0.8, ry, 128), v3(rx + sl2 + 0.8, ry + 5, 124), v3(rx + sl2, ry + 5, 124)], "rgba(205,220,240,.18)", { alpha: 0.85 });
       }
     }
   }
 
   function addFloor() {
-    pushP([v3(-95, 0, -70), v3(95, 0, -70), v3(95, 0, 122), v3(-95, 0, 122)], "rgb(11,12,15)", null);
-    pushP([v3(-95, 0.4, 70), v3(95, 0.4, 70), v3(95, 0.4, 122), v3(-95, 0.4, 122)], "rgba(0,0,0,.4)", { alpha: 0.55 });
-    pushP([v3(-30, 0.2, -55), v3(-25, 0.2, -55), v3(-25, 0.2, 105), v3(-30, 0.2, 105)], "rgb(26,30,40)", { alpha: 0.6 });
-    pushP([v3(25, 0.2, -55), v3(30, 0.2, -55), v3(30, 0.2, 105), v3(25, 0.2, 105)], "rgb(26,30,40)", { alpha: 0.6 });
-    /* footwell mats with inlaid edge stitching */
-    pushP([v3(-44, 0.35, 2), v3(-6, 0.35, 2), v3(-6, 0.35, 70), v3(-44, 0.35, 70)], "rgba(17,19,25,.95)", null);
-    pushP([v3(-44, 0.55, 2), v3(-6, 0.55, 2), v3(-6, 0.55, 6), v3(-44, 0.55, 6)], "rgba(201,162,39,.14)", null);
-    pushP([v3(-44, 0.55, 66), v3(-6, 0.55, 66), v3(-6, 0.55, 70), v3(-44, 0.55, 70)], "rgba(201,162,39,.14)", null);
-    pushP([v3(6, 0.35, 2), v3(44, 0.35, 2), v3(44, 0.35, 70), v3(6, 0.35, 70)], "rgba(17,19,25,.95)", null);
-    pushP([v3(6, 0.55, 2), v3(44, 0.55, 2), v3(44, 0.55, 6), v3(6, 0.55, 6)], "rgba(201,162,39,.14)", null);
-    /* warm ambient wash pooling under the cabin */
-    pushP([v3(-70, 0.3, -40), v3(70, 0.3, -40), v3(70, 0.3, 110), v3(-70, 0.3, 110)], "rgba(230,200,90,.035)", { alpha: 0.6 });
-    pushSph(v3(0, 0.6, -6), 34, "rgba(0,0,0,.45)", { alpha: 0.6 });
+    pushP([v3(-60, 0, -60), v3(60, 0, -60), v3(60, 0, 110), v3(-60, 0, 110)], "rgb(9,10,13)", null);
+    pushP([v3(-60, 0.4, 60), v3(60, 0.4, 60), v3(60, 0.4, 110), v3(-60, 0.4, 110)], "rgba(0,0,0,.40)", { alpha: 0.5 });
+    pushP([v3(-44, 0.3, 18), v3(-6, 0.3, 18), v3(-6, 0.3, 64), v3(-44, 0.3, 64)], "rgba(14,16,22,.95)", null);
+    pushP([v3(-44, 0.5, 18), v3(-6, 0.5, 18), v3(-6, 0.5, 23), v3(-44, 0.5, 23)], "rgba(201,162,39,.13)", null);
+    pushP([v3(-44, 0.5, 58), v3(-6, 0.5, 58), v3(-6, 0.5, 64), v3(-44, 0.5, 64)], "rgba(201,162,39,.13)", null);
+    pushP([v3(-30, 0.22, -45), v3(-6, 0.22, -45), v3(-6, 0.22, 30), v3(-30, 0.22, 30)], "rgba(30,34,44,.5)", null);
+    pushSph(v3(SEATX, 0.8, 0), 30, "rgba(0,0,0,.5)", { alpha: 0.55 });
+    pushP([v3(-46, 0.35, 2), v3(20, 0.35, 2), v3(20, 0.35, 24), v3(-46, 0.35, 24)], "rgba(230,200,90,.03)", { alpha: 0.6 });
+  }
+
+  function vpanel(x, yTop, yBot, zF, zB, c) {
+    var p = [v3(x, yTop, zB), v3(x, yTop, zF), v3(x, yBot, zF), v3(x, yBot, zB)];
+    pushP(p, shade(c, faceN(p[0], p[1], p[2])), null);
   }
 
   function addCabin() {
-    /* rear B pillars (cutaway frame) */
-    pushP([v3(-86, 0, -60), v3(-80, 0, -60), v3(-80, 79, -60), v3(-86, 79, -60)], shade("#10131b", faceN(v3(-86, 0, -60), v3(-80, 0, -60), v3(-80, 79, -60))), null);
-    pushP([v3(80, 0, -60), v3(86, 0, -60), v3(86, 79, -60), v3(80, 79, -60)], shade("#10131b", faceN(v3(80, 0, -60), v3(86, 0, -60), v3(86, 79, -60))), null);
-    /* left door card */
-    pushP([v3(-84, 0, -58), v3(-84, 0, 112), v3(-84, 46, 114), v3(-84, 46, -56)], shade("#1b2231", faceN(v3(-84, 0, -58), v3(-84, 0, 112), v3(-84, 46, 114))), null);
-    /* upper door roll + armrest + handle recess */
-    pushP([v3(-85, 30, -20), v3(-85, 30, 100), v3(-85, 37, 100), v3(-85, 37, -20)], shade("#232b3d", faceN(v3(-85, 30, -20), v3(-85, 30, 100), v3(-85, 37, 100))), null);
-    pushP([v3(-86, 26, -14), v3(-86, 26, 96), v3(-86, 29, 96), v3(-86, 29, -14)], shade("#2b2415", faceN(v3(-86, 26, -14), v3(-86, 26, 96), v3(-86, 29, 96))), null);
-    pushP([v3(-87, 38, 2), v3(-83, 38, 2), v3(-83, 40, 40), v3(-87, 40, 40)], "rgba(120,130,155,.28)", null);
-    pushP([v3(-88, 12, -34), v3(-80, 12, -34), v3(-80, 19, -34), v3(-88, 19, -34)], shade("#2a3146", faceN(v3(-88, 12, -34), v3(-80, 12, -34), v3(-80, 19, -34))), null);
-    pushP([v3(-88, 12, -34), v3(-88, 12, 2), v3(-88, 19, 2), v3(-88, 19, -34)], shade("#252b3f", faceN(v3(-88, 12, -34), v3(-88, 12, 2), v3(-88, 19, 2))), null);
-    pushP([v3(-88, 12, 2), v3(-80, 12, 2), v3(-80, 19, 2), v3(-88, 19, 2)], shade("#2a3146", faceN(v3(-88, 12, 2), v3(-80, 12, 2), v3(-80, 19, 2))), null);
-    /* ambient light ribbon along the door */
-    pushP([v3(-88, 40, -2), v3(-84, 40, -2), v3(-84, 40, 46), v3(-87, 40, 46)], "rgba(201,162,39,.25)", null);
-    pushP([v3(-86.5, 29.5, -40), v3(-86.5, 29.5, 96), v3(-86.5, 31, 96), v3(-86.5, 31, -40)], "rgba(107,213,192,.16)", null);
-    /* right door card (near camera edge) */
-    pushP([v3(84, 0, -58), v3(84, 0, 96), v3(84, 46, 98), v3(84, 46, -56)], shade("#161c2a", faceN(v3(84, 0, -58), v3(84, 0, 96), v3(84, 46, 98))), null);
-    /* roof + panoroof */
-    pushP([v3(-98, 77, -80), v3(98, 77, -80), v3(98, 77, 150), v3(-98, 77, 150)], shade("#0e1119", v3(0, 1, 0)), null);
-    pushP([v3(-64, 76.2, -48), v3(64, 76.2, -48), v3(64, 76.2, 112), v3(-64, 76.2, 112)], "rgb(17,26,44)", { alpha: 0.82 });
-    pushP([v3(-90, 74.6, -60), v3(90, 74.6, -60), v3(90, 75.4, -60), v3(-90, 75.4, -60)], "rgba(230,200,90,.35)", null);
-    /* ambient light bands framing the glass roof */
-    pushP([v3(-70, 75.3, -56), v3(-64, 75.3, -56), v3(-64, 75.3, 120), v3(-70, 75.3, 120)], "rgba(230,200,90,.22)", null);
-    pushP([v3(64, 75.3, -56), v3(70, 75.3, -56), v3(70, 75.3, 120), v3(64, 75.3, 120)], "rgba(230,200,90,.22)", null);
-    pushP([v3(-70, 75.3, 120), v3(70, 75.3, 120), v3(70, 75.3, 125), v3(-70, 75.3, 125)], "rgba(107,213,192,.16)", null);
-    /* second-row bench behind the pillar line, split back with dropped armrest */
-    pushP([v3(-92, 30, -50), v3(92, 30, -50), v3(92, 34, -66), v3(-92, 34, -66)], shade("#1a2334", faceN(v3(-92, 30, -50), v3(92, 30, -50), v3(92, 34, -66))), null);
-    pushP([v3(-92, 34, -66), v3(92, 34, -66), v3(92, 62, -80), v3(-92, 62, -80)], shade("#232b40", faceN(v3(-92, 34, -66), v3(92, 34, -66), v3(92, 62, -80)), 0.03), null);
-    pushP([v3(-92, 62, -80), v3(92, 62, -80), v3(92, 66, -78), v3(-92, 66, -78)], shade("#2c3550", faceN(v3(-92, 62, -80), v3(92, 62, -80), v3(92, 66, -78))), null);
-    pushP([v3(-30, 30, -50), v3(-30, 30, -66), v3(-30, 60, -79), v3(-30, 60, -80)], "rgba(0,0,0,.35)", null);
-    pushP([v3(30, 30, -50), v3(30, 30, -66), v3(30, 60, -79), v3(30, 60, -80)], "rgba(0,0,0,.35)", null);
-    pushP([v3(-8, 30, -50), v3(8, 30, -50), v3(8, 40, -64), v3(-8, 40, -64)], shade("#2b3350", faceN(v3(-8, 30, -50), v3(8, 30, -50), v3(8, 40, -64))), null);
-    pushP([v3(-8, 40, -64), v3(8, 40, -64), v3(8, 42, -63), v3(-8, 42, -63)], "rgba(230,200,90,.10)", null);
-    /* integrated rear headrests */
-    pushP([v3(-70, 62, -79), v3(-48, 62, -79), v3(-48, 74, -77), v3(-70, 74, -77)], shade("#242c44", faceN(v3(-70, 62, -79), v3(-48, 62, -79), v3(-48, 74, -77))), null);
-    pushP([v3(48, 62, -79), v3(70, 62, -79), v3(70, 74, -77), v3(48, 74, -77)], shade("#242c44", faceN(v3(48, 62, -79), v3(70, 62, -79), v3(70, 74, -77))), null);
-    /* rear parcel shelf catches the cabin glow */
-    pushP([v3(-92, 58, -88), v3(92, 58, -88), v3(92, 60, -93), v3(-92, 60, -93)], "rgba(24,30,44,.9)", null);
+    vpanel(-52.5, 44, -2, 94, -42, "#171d2b");
+    vpanel(-51.2, 42, 5, 90, -40, "#1d2434");
+    vpanel(-51.2, 14, 5, -20, -40, "#141a27");
+    box(-47.5, 30, 24, 4, 36, -16, "#2a2414", "#231d10", 0);
+    pushP([v3(-52, 32, 10), v3(-43, 32, 10), v3(-43, 34, 26), v3(-52, 34, 26)], shade("#332a14", faceN(v3(-52, 32, 10), v3(-43, 32, 10), v3(-43, 34, 26))), null);
+    pushSph(v3(-52, 13, 56), 6.5, "#0d111a", { stroke: "rgba(120,130,160,.35)", lw: 1 });
+    pushSph(v3(-52, 13, 56), 4.2, "#0d111a", null);
+    pushP([v3(-52, 36, 26), v3(-47, 36, 26), v3(-47, 38.5, 34), v3(-52, 38.5, 34)], "rgba(18,22,32,.9)", null);
+    pushP([v3(-52.5, 40, 90), v3(-49.5, 40, 90), v3(-49.5, 40, -38), v3(-52.5, 40, -38)], "rgba(201,162,39,.28)", null);
+    pushP([v3(-54, 44, 94), v3(-49, 44, 94), v3(-49, 44.7, 94), v3(-54, 44.7, 94)], "rgba(180,190,210,.30)", null);
+    pushP([v3(-54, -2, -46), v3(-47, -2, -46), v3(-47, 112, -49), v3(-54, 112, -49)], shade("#0d111a", faceN(v3(-54, -2, -46), v3(-47, -2, -46), v3(-47, 112, -49))), null);
+    pushP([v3(-47, 40, -48), v3(-45, 40, -48), v3(-45, 84, -49), v3(-47, 84, -49)], "#20283a", null);
+    pushP([v3(-54, 6, 96), v3(-46, 8, 100), v3(-46, 108, 142), v3(-54, 106, 138)], shade("#10141f", faceN(v3(-54, 6, 96), v3(-46, 8, 100), v3(-46, 108, 142))), null);
+    pushP([v3(-54, 58, 102), v3(-46, 60, 104), v3(-46, 63, 118), v3(-54, 61, 116)], shade("#1a2030", faceN(v3(-54, 58, 102), v3(-46, 60, 104), v3(-46, 63, 118))), null);
+    pushP([v3(-52, 59, 102), v3(46, 62, 102), v3(46, 64, 108), v3(-52, 61, 108)], shade("#202838", faceN(v3(-52, 59, 102), v3(46, 62, 102), v3(46, 64, 108))), null);
+    pushP([v3(-54, 108, -50), v3(-45, 108, -50), v3(-45, 118, 150), v3(-54, 118, 150)], shade("#111624", faceN(v3(-54, 108, -50), v3(-45, 108, -50), v3(-45, 118, 150))), null);
+    pushP([v3(-56, 113, -56), v3(56, 113, -56), v3(56, 113, 150), v3(-56, 113, 150)], shade("#141a29", v3(0, 1, 0), 0), null);
+    pushP([v3(-56, 116, -56), v3(56, 116, -56), v3(56, 117, 150), v3(-56, 117, 150)], shade("#0b0e16", v3(0, 1, 0)), null);
+    pushP([v3(-54, 4, -66), v3(-45, 4, -66), v3(-45, 46, -58), v3(-54, 46, -58)], shade("#101522", faceN(v3(-54, 4, -66), v3(-45, 4, -66), v3(-45, 46, -58)), -0.12), null);
+    pushP([v3(-54, 46, -58), v3(-45, 46, -58), v3(-45, 66, -62), v3(-54, 66, -62)], shade("#131a28", faceN(v3(-54, 46, -58), v3(-45, 46, -58), v3(-45, 66, -62)), -0.1), null);
+    box(10, 40, 0, 5, 108, 58, "#171d2b", "#10141d", 0);
+    pushP([v3(5, 40, 104), v3(15, 40, 104), v3(15, 42, 110), v3(5, 42, 110)], "#1c2030", null);
+    pushP([v3(5, 40, 64), v3(15, 40, 64), v3(15, 42, 74), v3(5, 42, 74)], "#141a26", null);
   }
 
   function addDash() {
-    var dF = [v3(-82, 44, 116), v3(82, 46, 120), v3(82, 30, 117), v3(-82, 28, 113)];
-    pushP(dF, shade("#2a2416", faceN(dF[0], dF[1], dF[2])), null);
-    pushP(dF, null, { stroke: "rgba(201,162,39,.4)", lw: 1 });
-    var dT = [v3(-82, 44, 116), v3(82, 46, 120), v3(82, 47, 124), v3(-82, 45, 120)];
-    pushP(dT, shade("#332a16", faceN(dT[0], dT[1], dT[2])), null);
-    /* hyperscreen */
-    var sc = [v3(-80, 50, 120), v3(80, 52, 124), v3(80, 51, 128), v3(-80, 49, 124)];
-    pushP(sc, "#142a4a", null);
-    pushP(sc, "rgba(74,157,238,.16)", null);
-    pushP([v3(-80, 49.6, 122), v3(80, 51.6, 124), v3(80, 51.4, 123), v3(-80, 49.4, 121)], "rgba(160,200,255,.10)", null);
-    pushP([v3(16, 51.8, 125.6), v3(18, 51.8, 125.6), v3(18, 52.6, 127.4), v3(16, 52.6, 127.4)], "rgba(230,200,90,.5)", null);
-    pushP([v3(52, 51.8, 125.6), v3(54, 51.8, 125.6), v3(54, 52.6, 127.4), v3(52, 52.6, 127.4)], "rgba(74,157,238,.55)", null);
-    pushP([v3(-82, 47, 122), v3(82, 49, 124), v3(82, 49.4, 122), v3(-82, 47.4, 120)], "rgba(230,200,90,.4)", null);
-    /* center console */
-    box(0, 34, 0, 10, 96, 44, "#1a2030", "#131826", 0);
-    pushP([v3(-6, 34, 94), v3(6, 34, 96), v3(6, 35, 102), v3(-6, 35, 100)], "#1c3250", null);
-    /* stowed column + folded yoke (left / driver side) */
-    box(-62, 30, 16, 7, 116, 110, "#1c222f", "#151a26", 0);
-    pushP([v3(-69, 26, 114), v3(-55, 26, 114), v3(-55, 26.4, 116), v3(-69, 26.4, 116)], "rgba(201,162,39,.5)", null);
+    vpanel(-46, 52, 38, 92, 62, "#191f2e");
+    pushP([v3(-46, 48, 76), v3(-2, 48, 76), v3(-2, 40, 76), v3(-46, 40, 76)], shade("#141a28", faceN(v3(-46, 48, 76), v3(-2, 48, 76), v3(-2, 40, 76))), null);
+    pushP([v3(-46, 52, 92), v3(14, 52, 92), v3(14, 63, 96), v3(-46, 63, 96)], shade("#232d42", faceN(v3(-46, 52, 92), v3(14, 52, 92), v3(14, 63, 96))), null);
+    pushP([v3(-46, 63, 96), v3(14, 63, 96), v3(14, 66, 100), v3(-46, 66, 100)], shade("#1b2233", faceN(v3(-46, 63, 96), v3(14, 63, 96), v3(14, 66, 100))), null);
+    pushP([v3(-46, 52, 92), v3(14, 52, 92), v3(14, 54, 92), v3(-46, 54, 92)], "rgba(120,130,155,.25)", null);
+    pushP([v3(-30, 50, 86), v3(-4, 50, 86), v3(-4, 60, 88), v3(-30, 60, 88)], "#0b1222", null);
+    pushP([v3(-30, 51, 87.5), v3(-4, 51, 87.5), v3(-4, 59, 89), v3(-30, 59, 89)], "rgba(74,157,238,.14)", null);
+    pushP([v3(5, 42, 102), v3(15, 42, 102), v3(15, 55, 106), v3(5, 55, 106)], "#0b1222", null);
+    pushP([v3(6, 44, 103.5), v3(14, 44, 103.5), v3(14, 53, 105), v3(6, 53, 105)], "rgba(74,157,238,.16)", null);
+    pushSph(v3(10, 37, 104), 2.2, "#0e141f", null);
+    pushSph(v3(10, 33, 102), 2.2, "#0e141f", null);
+    pushSph(v3(10, 29, 100), 2.2, "#0e141f", null);
+    pushCap(v3(-24, 36, 58), v3(-20, 60, 74), 7.2, "rgba(0,0,0,.35)", { alpha: 0.5 });
+    pushCap(v3(-24, 36, 58), v3(-20, 60, 74), 5.5, "#1d2434", { shadow: "rgba(0,0,0,.5)" });
+    var hubC = v3(-20, 61, 76);
+    var axN = n3(sub3(v3(-20, 61, 76), v3(-24, 36, 58)));
+    var wu1 = n3(cr3(axN, v3(0, 1, 0)));
+    var wu2 = cr3(axN, wu1);
+    var wR = 17, prev = null;
+    for (var wi = 0; wi <= 24; wi++) {
+      var wa = wi / 24 * 6.2832;
+      var wc = v3(hubC.x + wu1.x * Math.cos(wa) * wR + wu2.x * Math.sin(wa) * wR,
+        hubC.y + wu1.y * Math.cos(wa) * wR + wu2.y * Math.sin(wa) * wR,
+        hubC.z + wu1.z * Math.cos(wa) * wR + wu2.z * Math.sin(wa) * wR);
+      if (prev) pushCap(prev, wc, 2.2, "#11131a", { shadow: "rgba(0,0,0,.6)" });
+      prev = wc;
+    }
+    for (var sp = 0; sp < 4; sp++) {
+      var sa = sp * 6.2832 / 4;
+      var sr = v3(hubC.x + Math.cos(sa) * wR, hubC.y + Math.sin(sa) * wR, hubC.z);
+      pushCap(hubC, sr, 1.6, "#222a3c", null);
+      pushCap(hubC, sr, 2.4, "rgba(0,0,0,.35)", null);
+    }
+    pushSph(hubC, 3.4, "#222a3c", { stroke: "rgba(201,162,39,.6)", lw: 1 });
   }
 
   function seatSlide() {
-    /* seat rails run slightly downhill toward the rear; the pedestal
-       carriages slide forward as the cushion is raised (38..46 cm) */
-    return ((S.hgt - 38) / 8) * 7;
+    return S.sl;
   }
   function addSeat() {
-    var hgt = S.hgt, ct = hgt, cb = hgt - 12, yawI = S.rot;
-    var SHIFT_ROT = ((S.rot % 360) + 360) % 360;
-    var yawDeg = SHIFT_ROT;
-    var sl = seatSlide();
-    /* floor rail tracks (static) with brushed gold inlay */
-    pushP([v3(-16, 0.5, -36), v3(-10, 0.5, -36), v3(-10, 0.5, 36), v3(-16, 0.5, 36)], "rgba(201,162,39,.55)", null);
-    pushP([v3(10, 0.5, -36), v3(16, 0.5, -36), v3(16, 0.5, 36), v3(10, 0.5, 36)], "rgba(201,162,39,.55)", null);
-    pushP([v3(-14, 0.9, -34), v3(14, 0.9, -34), v3(14, 0.9, -18), v3(-14, 0.9, -18)], "rgba(10,12,16,.9)", null);
-    pushP([v3(-14, 0.9, 18), v3(14, 0.9, 18), v3(14, 0.9, 34), v3(-14, 0.9, 34)], "rgba(10,12,16,.9)", null);
-    /* pedestal base slides on the rail as height rises, keeping the seat
-       plane level while the carriage runs forward */
-    box(0, cb, 0, 15, 4 + sl, -16 + sl, "#1a202f", "#141a26", 0);
-    pushP([v3(-16, cb - 6, -16 + sl), v3(16, cb - 6, -16 + sl), v3(16, cb - 6, -12 + sl), v3(-16, cb - 6, -12 + sl)], "rgba(230,200,90,.5)", null);
-    /* swivel hub disc (turns with the seat, rides on the sliding carriage) */
-    var hubC = v3(0, cb + 0.6, -6 + sl);
-    function L(x, y, z) {
-      var p = rotY(v3(x, y, z), yawDeg, 0, -6);
-      return { x: p.x, y: p.y, z: p.z + sl };
-    }
+    var H = S.hgt, cb = H - 11, yaw = ((S.rot % 360) + 360) % 360;
+    var sl = S.sl, SX = SEATX;
+    pushP([v3(SX - 10, 0.6, -30), v3(SX - 6, 0.6, -30), v3(SX - 6, 0.6, 30), v3(SX - 10, 0.6, 30)], "rgba(201,162,39,.5)", null);
+    pushP([v3(SX + 6, 0.6, -30), v3(SX + 10, 0.6, -30), v3(SX + 10, 0.6, 30), v3(SX + 6, 0.6, 30)], "rgba(201,162,39,.5)", null);
+    pushP([v3(SX - 9, 0.9, -28), v3(SX + 9, 0.9, -28), v3(SX + 9, 0.9, -12), v3(SX - 9, 0.9, -12)], "rgba(10,12,16,.92)", null);
+    pushP([v3(SX - 9, 0.9, 12), v3(SX + 9, 0.9, 12), v3(SX + 9, 0.9, 28), v3(SX - 9, 0.9, 28)], "rgba(10,12,16,.92)", null);
+    box(SX, 3.2, 0.6, 12, sl + 15, sl - 15, "#181e2c", "#12161f", 0);
+    var topY = cb;
+    var linkA = [v3(SX - 6, 3.4, sl + 8), v3(SX + 6, 3.4, sl + 8), v3(SX + 5, topY - 0.6, sl + 10), v3(SX - 5, topY - 0.6, sl + 10)];
+    var linkB = [v3(SX - 6, 3.4, sl - 8), v3(SX + 6, 3.4, sl - 8), v3(SX + 5, topY - 1, sl - 10), v3(SX - 5, topY - 1, sl - 10)];
+    pushP(linkA, shade("#202838", faceN(linkA[0], linkA[1], linkA[2])), null);
+    pushP(linkB, shade("#151b28", faceN(linkB[0], linkB[1], linkB[2])), null);
+    pushCap(v3(SX, 3.6, sl), v3(SX, topY - 1.6, sl), 3.2, "#28324a", { shadow: "rgba(0,0,0,.55)" });
+    pushCap(v3(SX, 3.6, sl - 7), v3(SX, topY - 2, sl - 5), 1.4, "#3a455f", null);
+    pushCap(v3(SX, 3.6, sl + 7), v3(SX, topY - 2, sl + 5), 1.4, "#3a455f", null);
+    box(SX, topY, topY - 1.4, 15, sl + 12, sl - 12, "#1a2130", "#141a26", 0);
+    function L(x, y, z) { return rotY(v3(x, y, z), yaw, SX, sl); }
     var disc = [];
-    for (var a = 0; a < 14; a++) {
-      var an = a / 14 * 6.2832;
-      disc.push(L(Math.sin(an) * 20, cb + 0.6, -6 + Math.cos(an) * 20));
+    for (var a = 0; a < 16; a++) {
+      var an = a / 16 * 6.2832;
+      disc.push(L(SX + Math.sin(an) * 15, topY - 0.5, sl + Math.cos(an) * 15));
     }
-    pushP(disc, "#0e1119", null);
-    pushP([hubC, L(-5, cb + 0.7, -6), L(5, cb + 0.7, -6)], "rgba(20,24,34,.9)", null);
-    pushSph(hubC, 5, "#1a2130", { stroke: "rgba(230,200,90,.7)", lw: 1.2 });
-    pushSph(L(0, cb + 0.8, -6), 1.1, "rgba(230,200,90,.6)", null);
-    var wn = yawDeg * Math.PI / 180;
-    pushP([hubC, L(Math.sin(wn) * 20, cb + 0.7, -6 + Math.cos(wn) * 20), L(Math.sin(wn + 0.28) * 20, cb + 0.7, -6 + Math.cos(wn + 0.28) * 20)], "rgba(230,200,90,.9)", null);
-    /* cushion */
-    var cTop = [
-      [L(-22, ct, -12), L(22, ct, -12), L(22, ct, 8), L(-22, ct, 8)],
-      [L(-22, cb, -12), L(22, cb, -12), L(22, cb, 8), L(-22, cb, 8)]
-    ];
-    var cSide = [
-      [L(-22, ct, 8), L(22, ct, 8), L(22, cb, 8), L(-22, cb, 8)],
-      [L(-22, ct, -12), L(22, ct, -12), L(22, cb, -12), L(-22, cb, -12)],
-      [L(22, ct, -12), L(22, ct, 8), L(22, cb, 8), L(22, cb, -12)],
-      [L(-22, ct, -12), L(-22, ct, 8), L(-22, cb, 8), L(-22, cb, -12)]
-    ];
-    pushP(cTop[0], shade("#39445e", faceN(cTop[0][0], cTop[0][1], cTop[0][2]), 0.06), null);
-    pushP(cTop[0], "rgba(60,70,100,.22)", null);
-    for (var si = 0; si < cSide.length; si++) {
-      pushP(cSide[si], shade(si === 0 ? "#2b334a" : "#1e2434", faceN(cSide[si][0], cSide[si][1], cSide[si][2])), null);
-    }
-    /* backrest (tilted box) */
-    var ctV = 20 * Math.PI / 180, dyB = Math.cos(ctV) * 50, szB = Math.sin(ctV) * 50;
-    var bRear = [L(-22, ct, -23), L(22, ct, -23), L(22, ct + dyB, -23 - szB), L(-22, ct + dyB, -23 - szB)];
-    var bFront = [L(-22, ct, -12), L(22, ct, -12), L(22, ct + dyB, -12 - szB), L(-22, ct + dyB, -12 - szB)];
-    var bLef = [L(-22, ct, -23), L(-22, ct, -12), L(-22, ct + dyB, -12 - szB), L(-22, ct + dyB, -23 - szB)];
-    var bRig = [L(22, ct, -23), L(22, ct, -12), L(22, ct + dyB, -12 - szB), L(22, ct + dyB, -23 - szB)];
-    pushP(bRear, shade("#171c2a", faceN(bRear[0], bRear[1], bRear[2])), null);
-    pushP(bFront, shade("#2b3346", faceN(bFront[0], bFront[1], bFront[2]), 0.05), null);
-    pushP(bLef, shade("#1a2030", faceN(bLef[0], bLef[1], bLef[2])), null);
-    pushP(bRig, shade("#1a2030", faceN(bRig[0], bRig[1], bRig[2])), null);
-    var seed = [L(-16, ct + 8, -13), L(0, ct + 10, -13), L(0, ct + dyB - 8, -13 - szB)];
-    pushCap(seed[0], seed[2], 1.4, "rgba(230,200,90,.5)", null);
-    /* headrest */
-    var hrF = [L(-13, ct + 50, -33), L(13, ct + 50, -33), L(13, ct + 60, -27), L(-13, ct + 60, -27)];
-    var hrT = [L(-13, ct + 60, -27), L(13, ct + 60, -27), L(13, ct + 64, -29), L(-13, ct + 64, -29)];
-    pushP(hrF, shade("#2b3346", faceN(hrF[0], hrF[1], hrF[2])), null);
-    pushP(hrT, shade("#39445e", faceN(hrT[0], hrT[1], hrT[2])), null);
+    pushP(disc, "#0f1320", null);
+    var nAng = yaw * Math.PI / 180;
+    pushP([v3(SX, topY - 0.2, sl),
+      L(SX + Math.sin(nAng) * 12, topY - 0.2, sl + Math.cos(nAng) * 12),
+      L(SX + Math.sin(nAng + 0.18) * 12, topY - 0.2, sl + Math.cos(nAng + 0.18) * 12)], "rgba(230,200,90,.9)", null);
+    pushSph(v3(SX, topY - 0.5, sl), 3.4, "#1a2130", { stroke: "rgba(230,200,90,.7)", lw: 1 });
+    var cTop = [L(SX - 17, H, sl - 12), L(SX + 17, H, sl - 12), L(SX + 17, H, sl + 10), L(SX - 17, H, sl + 10)];
+    var cBot = [L(SX - 17, cb, sl - 12), L(SX + 17, cb, sl - 12), L(SX + 17, cb, sl + 10), L(SX - 17, cb, sl + 10)];
+    pushP(cTop, shade("#35405a", faceN(cTop[0], cTop[1], cTop[2]), 0.07), null);
+    pushP(cTop, "rgba(60,70,100,.20)", null);
+    pushP(cBot, shade("#1a2130", faceN(cBot[1], cBot[0], cBot[2])), null);
+    var cF = [L(SX - 17, cb, sl + 10), L(SX + 17, cb, sl + 10), L(SX + 17, H, sl + 10), L(SX - 17, H, sl + 10)];
+    var cR = [L(SX - 17, cb, sl - 12), L(SX + 17, cb, sl - 12), L(SX + 17, H, sl - 12), L(SX - 17, H, sl - 12)];
+    var cL = [L(SX - 17, cb, sl - 12), L(SX - 17, cb, sl + 10), L(SX - 17, H, sl + 10), L(SX - 17, H, sl - 12)];
+    var cRig = [L(SX + 17, cb, sl - 12), L(SX + 17, cb, sl + 10), L(SX + 17, H, sl + 10), L(SX + 17, H, sl - 12)];
+    pushP(cF, shade("#2a3248", faceN(cF[0], cF[1], cF[2])), null);
+    pushP(cR, shade("#161b28", faceN(cR[0], cR[1], cR[2])), null);
+    pushP(cL, shade("#1c2334", faceN(cL[0], cL[1], cL[2])), null);
+    pushP(cRig, shade("#232b40", faceN(cRig[0], cRig[1], cRig[2])), null);
+    var bolL = [L(SX - 17, H, sl - 13), L(SX - 14, H + 1.6, sl - 13), L(SX - 14, H + 1.6, sl + 11), L(SX - 17, H, sl + 11)];
+    var bolR = [L(SX + 17, H, sl - 13), L(SX + 14, H + 1.6, sl - 13), L(SX + 14, H + 1.6, sl + 11), L(SX + 17, H, sl + 11)];
+    pushP(bolL, shade("#3a4662", faceN(bolL[0], bolL[1], bolL[2])), null);
+    pushP(bolR, shade("#3a4662", faceN(bolR[0], bolR[1], bolR[2])), null);
+    pushCap(L(SX - 15, H + 0.4, sl + 9.5), L(SX + 15, H + 0.4, sl + 9.5), 0.8, "rgba(230,200,90,.55)", null);
+    pushCap(L(SX - 15, H + 0.4, sl - 11.5), L(SX + 15, H + 0.4, sl - 11.5), 0.8, "rgba(230,200,90,.4)", null);
+    var bkZ = Math.sin(22 * Math.PI / 180) * 50, bkY = Math.cos(22 * Math.PI / 180) * 50;
+    var bF0 = [L(SX - 15, H, sl - 12), L(SX + 15, H, sl - 12), L(SX + 15, H + bkY, sl - 12 - bkZ), L(SX - 15, H + bkY, sl - 12 - bkZ)];
+    var bB0 = [L(SX - 15, H, sl - 21), L(SX + 15, H, sl - 21), L(SX + 15, H + bkY, sl - 21 - bkZ), L(SX - 15, H + bkY, sl - 21 - bkZ)];
+    var bT = [L(SX - 15, H + bkY, sl - 12 - bkZ), L(SX + 15, H + bkY, sl - 12 - bkZ), L(SX + 15, H + bkY, sl - 21 - bkZ), L(SX - 15, H + bkY, sl - 21 - bkZ)];
+    pushP(bF0, shade("#2b3348", faceN(bF0[0], bF0[1], bF0[2]), 0.05), null);
+    pushP(bF0, "rgba(70,80,110,.14)", null);
+    pushP(bB0, shade("#131927", faceN(bB0[0], bB0[1], bB0[2])), null);
+    pushP(bT, shade("#35405a", faceN(bT[0], bT[1], bT[2])), null);
+    var bLS = [L(SX - 15, H, sl - 12), L(SX - 15, H, sl - 21), L(SX - 15, H + bkY, sl - 21 - bkZ), L(SX - 15, H + bkY, sl - 12 - bkZ)];
+    var bRS = [L(SX + 15, H, sl - 12), L(SX + 15, H, sl - 21), L(SX + 15, H + bkY, sl - 21 - bkZ), L(SX + 15, H + bkY, sl - 12 - bkZ)];
+    pushP(bLS, shade("#1a2030", faceN(bLS[0], bLS[1], bLS[2])), null);
+    pushP(bRS, shade("#202738", faceN(bRS[0], bRS[1], bRS[2])), null);
+    pushCap(L(SX - 14, H + bkY - 6, sl - 12 - bkZ), L(SX + 14, H + bkY - 6, sl - 12 - bkZ), 0.8, "rgba(230,200,90,.4)", null);
+    var hrF = [L(SX - 9, H + bkY, sl - 33), L(SX + 9, H + bkY, sl - 33), L(SX + 9, H + bkY + 13, sl - 26), L(SX - 9, H + bkY + 13, sl - 26)];
+    var hrT = [L(SX - 9, H + bkY + 13, sl - 26), L(SX + 9, H + bkY + 13, sl - 26), L(SX + 9, H + bkY + 16, sl - 28), L(SX - 9, H + bkY + 16, sl - 28)];
+    pushP(hrF, shade("#2b3348", faceN(hrF[0], hrF[1], hrF[2])), null);
+    pushP(hrT, shade("#35405a", faceN(hrT[0], hrT[1], hrT[2])), null);
+    var hrL = [L(SX - 9, H + bkY, sl - 33), L(SX - 9, H + bkY, sl - 30), L(SX - 9, H + bkY + 16, sl - 30), L(SX - 9, H + bkY + 13, sl - 33)];
+    pushP(hrL, shade("#1a2030", faceN(hrL[0], hrL[1], hrL[2])), null);
   }
 
   function drawFigure() {
-    var hgt = S.hgt;
-    var hipY = hgt + 2;
+    var H = S.hgt;
+    var hipY = H + 2;
     var yawDeg = ((S.rot % 360) + 360) % 360;
-    var sl = seatSlide();
-    var H = v3(0, hipY, -6);
-    function L(p) {
-      var q = rotY(p, yawDeg, 0, -6);
-      return { x: q.x, y: q.y, z: q.z + sl };
+    var sl = seatSlide(), SX = SEATX;
+    function L(x, y, z) {
+      var q = rotY(v3(x, y, z), yawDeg, SX, sl);
+      return { x: q.x, y: q.y, z: q.z };
     }
-    function fwd() { return rotY(v3(0, 0, 1), yawDeg, 0, -6); }
+    function fwd() { return rotY(v3(0, 0, 1), yawDeg, SX, sl); }
     var FV = fwd();
-    var shX = v3(0, 46, -4), shL = v3(-18, 47, -3), shR = v3(18, 47, -3);
-    var hipT = L(H), sL = L(shift(shX, -18, 1, 1)), sR = L(shift(shX, 18, 1, 1));
+    var shX = v3(SX, 46, sl), shL = v3(SX - 18, 47, sl - 1), shR = v3(SX + 18, 47, sl - 1);
+    var hipT = L(0, hipY, sl), sL = L(SX - 18, 47, sl + 1), sR = L(SX + 18, 47, sl + 1);
     /* torso */
-    var bk = L(shift(v3(0, hipY, -6), -FV.x * 2.2, -1.5, -FV.z * 2.2));
-    var hipF = L(v3(0, hipY - 3, -6));
+    var bk = L(0, hipY, sl - 2.2);
+    var hipF = L(0, hipY - 3, sl);
     pushCap(bk, hipF, 13.5, "rgba(20,22,30,.85)", null);
-    var torsoA = L(v3(0, hipY - 2, -6));
-    var torsoB = L(shift(shX, 0, 1, -1));
+    var torsoA = L(0, hipY - 2, sl);
+    var torsoB = L(SX, 47, sl - 1);
     pushCap(torsoA, torsoB, 12.5, "#3b4356", null);
-    var sLw = L(shift(shX, -18, 2, 1)), sRw = L(shift(shX, 18, 2, 1));
+    var sLw = L(SX - 18, 48, sl), sRw = L(SX + 18, 48, sl);
     pushCap(sLw, sRw, 9, "#414a60", null);
-    /* belt buckled strap — retracts from the B-pillar when facing forward */
+    /* belt buckled strap — anchors to the door pillar zone when facing forward */
     var nrm = ((S.rot % 360) + 360) % 360;
     if (nrm < 14 || nrm > 346) {
-      var beltA = v3(-52, 56, -58 - sl * 0.2);
-      var beltB = v3(2, hipY - 5, -4 + sl);
+      var beltA = v3(SX - 12, 58, sl + 4);
+      var beltB = v3(SX + 2, hipY - 5, sl - 4);
       pushCap(beltA, beltB, 2.3, "#C9A227", null);
-      pushCap(L(v3(0, 40, 6)), beltB, 1.7, "rgba(230,200,90,.85)", null);
+      pushCap(L(0, 40, sl + 6), beltB, 1.7, "rgba(230,200,90,.85)", null);
       pushSph(beltB, 2.1, "#E6C85A", null);
       pushSph(beltA, 2.6, "#1b2334", { stroke: "rgba(230,200,90,.6)", lw: 1 });
     }
     /* neck + head */
-    var neckB = L(v3(0, 52, -5)), headC = L(v3(0, 60, -6));
+    var neckB = L(0, 52, sl), headC = L(0, 60, sl);
     pushCap(neckB, headC, 4.6, "#d9c7a2", null);
     /* arms */
-    var elL = L(v3(-16, 30, 7)), haL = L(v3(-11, 20, 15));
-    var elR = L(v3(16, 30, 7)), haR = L(v3(11, 20, 15));
+    var elL = L(SX - 16, 30, sl + 7), haL = L(SX - 11, 20, sl + 15);
+    var elR = L(SX + 16, 30, sl + 7), haR = L(SX + 11, 20, sl + 15);
     pushCap(sL, elL, 5.6, "#4a5470", { shadow: "rgba(0,0,0,.5)" });
     pushCap(elL, haL, 4.4, "#3f4860", { shadow: "rgba(0,0,0,.5)" });
     pushCap(sR, elR, 5.6, "#4a5470", { shadow: "rgba(0,0,0,.5)" });
@@ -1321,25 +1317,25 @@
     pushSph(haL, 3.3, "#d9c7a2", null);
     pushSph(haR, 3.3, "#d9c7a2", null);
     /* legs */
-    var L1 = 52, th = (40 + (hgt - 38) * 1.8) * Math.PI / 180;
+    var L1 = 52, th = (40 + (H - 38) * 1.8) * Math.PI / 180;
     var legLat = [[-7.5, -5], [7.5, 5]];
     for (var li = 0; li < 2; li++) {
       var lat = legLat[li][0], toe = legLat[li][1];
       var kneel = { x: lat, y: -Math.sin(th) * L1, z: Math.cos(th) * L1 };
       var footT = { x: lat + toe, y: 3 - hipY, z: 40 };
-      var kv = L(v3(kneel.x, hipY + kneel.y, -6 + kneel.z));
-      var fv3 = L(v3(footT.x, hipY + footT.y, -6 + footT.z));
+      var kv = L(kneel.x, hipY + kneel.y, sl + kneel.z);
+      var fv3 = L(footT.x, hipY + footT.y, sl + footT.z);
       var ddx = fv3.x - kv.x, ddy = fv3.y - kv.y, ddz = fv3.z - kv.z;
       var dl = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz) || 1;
       var L2 = 50, cl = Math.min(dl, L2) / dl;
-      pushCap(L(v3(0, hipY, -6)), kv, 7.6, "#333c4f", { shadow: "rgba(0,0,0,.5)" });
+      pushCap(L(0, hipY, sl), kv, 7.6, "#333c4f", { shadow: "rgba(0,0,0,.5)" });
       var footW = v3(kv.x + ddx * cl, kv.y + ddy * cl, kv.z + ddz * cl);
       pushCap(kv, footW, 5.6, "#2b3344", { shadow: "rgba(0,0,0,.5)" });
       pushSph(v3(footW.x + FV.x * 4, footW.y + 2.5, footW.z + FV.z * 4), 4.4, "#14192a", null);
     }
-    pushSph(L(v3(0, 3.5, 40)), 13, "rgba(0,0,0,.35)", { alpha: 0.5 });
+    pushSph(L(0, 3.5, sl + 40), 13, "rgba(0,0,0,.35)", { alpha: 0.5 });
     /* head + face/hair */
-    var headW = L(v3(0, 60, -6));
+    var headW = L(0, 60, sl);
     pushSph(headW, 9, "#d9c7a2", null);
     var hn = n3(sub3(CamB.p, headW));
     var face = d3(hn, FV);
@@ -1353,71 +1349,11 @@
       pushSph(v3(eyeOf.x - ri.x * 3.2, eyeOf.y, eyeOf.z - ri.z * 3.2), 1.2, "#10130e", null);
       pushSph(v3(headW.x + FV.x * 7, headW.y - 1.4, headW.z + FV.z * 7), 2.4, "rgba(210,180,150,.6)", null);
     }
+    pushCap(L(0, 32, sl + 10), L(0, 26, sl + 16), 2.2, "#0c121f", null);
+    pushSph(L(0, 26, sl + 18), 3.2, "rgba(9,13,24,.9)", { stroke: "rgba(120,130,160,.5)", lw: 1 });
   }
 
   function overlays() {
-    /* dashed nav lane + HUD on windshield */
-    var h1 = proj(v3(-46, 57, 130));
-    if (h1) {
-      GX.save();
-      GX.setLineDash([6, 7]);
-      GX.strokeStyle = "rgba(230,200,90,.55)";
-      GX.lineWidth = 1.6;
-      GX.beginPath();
-      GX.moveTo(h1.x - 30, h1.y + 4);
-      GX.quadraticCurveTo(h1.x, h1.y - 26, h1.x + 34, h1.y - 2);
-      GX.stroke();
-      GX.restore();
-      GX.fillStyle = "#E6C85A";
-      GX.font = "11px Consolas, monospace";
-      GX.textAlign = "left";
-      GX.fillText("AUTO · L3 READY", h1.x - 34, h1.y - 14);
-      GX.textAlign = "left";
-    }
-    /* cluster decal on screen */
-    var sp9 = proj(v3(-50, 51, 125));
-    if (sp9) {
-      GX.strokeStyle = "rgba(230,200,90,.9)";
-      GX.lineWidth = 1.4;
-      GX.beginPath(); GX.arc(sp9.x, sp9.y, 6, 0, 6.2832); GX.stroke();
-      GX.strokeStyle = "rgba(74,157,238,.95)";
-      GX.beginPath(); GX.arc(sp9.x + 60, sp9.y, 19, 0, 6.2832); GX.stroke();
-      GX.fillStyle = "rgba(120,180,255,.9)";
-      GX.font = "8px Consolas, monospace";
-      GX.fillText("KM/H", sp9.x - 6, sp9.y + 12);
-      GX.fillText("EQS SUV", sp9.x + 38, sp9.y + 12);
-      var wav = 0;
-      for (wav = 0; wav < 4; wav++) {
-        var hgtW = 3 + ((wav * 7 + Math.floor(S.t * 3)) % 4);
-        GX.fillRect(sp9.x + 86 + wav * 5, sp9.y + 4 - hgtW, 2, hgtW + 3);
-      }
-    }
-    /* stowed yoke label + vents */
-    var yk = proj(v3(-62, 26, 116));
-    if (yk) {
-      GX.strokeStyle = "#C9A227"; GX.lineWidth = 2;
-      GX.beginPath(); GX.arc(yk.x, yk.y, 7, 0, 6.2832); GX.stroke();
-      GX.strokeStyle = "rgba(120,130,160,.5)";
-      GX.beginPath(); GX.arc(yk.x, yk.y, 12, 0, 6.2832); GX.stroke();
-      GX.fillStyle = "#8a93a8"; GX.font = "7.5px Segoe UI";
-      GX.fillText("stowed", yk.x - 14, yk.y - 18);
-    }
-    var vR = proj(v3(30, 36, 116));
-    if (vR) {
-      GX.strokeStyle = "rgba(120,130,160,.55)"; GX.lineWidth = 1.2;
-      GX.beginPath(); GX.arc(vR.x, vR.y, 4, 0, 6.2832); GX.stroke();
-    }
-    var vL = proj(v3(-30, 36, 115));
-    if (vL) {
-      GX.strokeStyle = "rgba(120,130,160,.55)"; GX.lineWidth = 1.2;
-      GX.beginPath(); GX.arc(vL.x, vL.y, 4, 0, 6.2832); GX.stroke();
-    }
-    /* moon reflection on panoroof + roof stars */
-    var roofM = proj(v3(20, 76.4, 20));
-    if (roofM) {
-      GX.fillStyle = "rgba(200,195,160,.25)";
-      GX.beginPath(); GX.arc(roofM.x, roofM.y, 7, 0, 6.2832); GX.fill();
-    }
     /* heading ribbon — which way Phill is facing in the cabin */
     var headDeg = ((S.rot % 360) + 360) % 360;
     GX.fillStyle = "rgba(11,10,7,.72)";
@@ -1431,6 +1367,14 @@
     GX.strokeStyle = "rgba(230,200,90,.5)";
     GX.beginPath(); GX.moveTo(150, 30); GX.lineTo(150 - Math.sin(headDeg * Math.PI / 180) * 6, 30 - Math.cos(headDeg * Math.PI / 180) * 6);
     GX.stroke();
+    /* A-pillar camera gate — subtle marking of the door zone */
+    var ap = proj(v3(SEATX + 12, 52, 84));
+    if (ap) {
+      GX.strokeStyle = "rgba(120,130,160,.5)"; GX.lineWidth = 1;
+      GX.beginPath(); GX.arc(ap.x, ap.y, 30, 0, 6.2832); GX.stroke();
+      GX.fillStyle = "#8a93a8"; GX.font = "7.5px Segoe UI";
+      GX.fillText("A-PILLAR", ap.x - 20, ap.y + 40);
+    }
     /* vignette */
     var vg = GX.createRadialGradient(CVW / 2, CVH / 2, 150, CVW / 2, CVH / 2, 560);
     vg.addColorStop(0, "rgba(0,0,0,0)");
@@ -1447,41 +1391,10 @@
     }
   }
 
-  function drawPlan() {
-    var r = ((S.rot % 360) + 360) % 360;
-    var cx = CVW - 86, cy = 72;
-    GX.save();
-    GX.strokeStyle = "rgba(86,96,120,.9)"; GX.lineWidth = 1;
-    GX.beginPath(); GX.arc(cx, cy, 44, 0, 6.2832); GX.stroke();
-    GX.strokeStyle = "rgba(42,51,70,.9)"; GX.lineWidth = 1;
-    GX.beginPath(); GX.arc(cx, cy, 37, 0, 6.2832); GX.stroke();
-    GX.translate(cx, cy);
-    GX.rotate(r * Math.PI / 180);
-    GX.fillStyle = "rgba(230,200,90,.16)";
-    GX.strokeStyle = "rgba(230,200,90,.55)";
-    GX.lineWidth = 1;
-    GX.beginPath(); GX.moveTo(0, 0); GX.lineTo(-38 * Math.sin(1.0472), -38 * Math.cos(1.0472));
-    GX.arc(0, 0, 38, -1.0472 - Math.PI / 2, 1.0472 - Math.PI / 2); GX.closePath(); GX.fill(); GX.stroke();
-    GX.fillStyle = "#3a3220";
-    GX.fillRect(-11, -15, 22, 30);
-    GX.strokeStyle = "#E6C85A"; GX.lineWidth = 1.4;
-    GX.strokeRect(-11, -15, 22, 30);
-    GX.setLineDash([3, 3]);
-    GX.strokeStyle = "rgba(230,200,90,.8)"; GX.lineWidth = 1.2;
-    GX.beginPath(); GX.moveTo(0, 0); GX.lineTo(0, -38); GX.stroke();
-    GX.setLineDash([]);
-    GX.restore();
-    GX.fillStyle = "#C9A227"; GX.font = "8px Consolas, monospace";
-    GX.textAlign = "center";
-    GX.fillText("F", cx, cy - 46);
-    GX.fillText("R", cx, cy + 52);
-    GX.fillText("SWIVEL", cx, cy + 62);
-    GX.textAlign = "left";
-  }
-
   function renderSeatScene() {
     $("sfHgt").textContent = S.hgt + " cm";
     $("sfRot").textContent = Math.round((((S.rot % 360) + 360) % 360)) + "°";
+    $("sfSl").textContent = (S.sl >= 0 ? "+" : "") + S.sl + " cm";
     if (!GX) return;
     CamBase = camAt(S.t);
     CamB = camAt(S.t, 1);
@@ -1503,7 +1416,9 @@
     for (var i = 0; i < DLS.length; i++) DLS[i].d();
     GX.restore();
     overlays();
-    drawPlan();
+    if (window.__CABIN_PROBE__ && window.__CABIN_PROBE__.hook) {
+      try { window.__CABIN_PROBE__.hook({ proj: proj, CamBase: CamBase, CVW: CVW, CVH: CVH, CVF: CVF, S: S, PHILL: PHILL }); } catch (e) { /* headless */ }
+    }
   }
   function banner(text, cls) {
     var b = $("eventBanner");
@@ -1563,6 +1478,11 @@
     $("hgtTarget").style.top = (H0 - (PHILL.targetHgt - 38) * ((H0 - H1) / 8)) + "px";
     $("hgtRead").textContent = S.hgt;
     $("hgtAtt").textContent = "att " + rate(HGT, S.hgt).toFixed(2);
+  }
+  function renderSlide() {
+    var x = 50 + (S.sl / 8) * 42; // % across the track, ±8 cm
+    $("slThumb").style.left = "calc(" + x + "% - 9px)";
+    $("slRead").textContent = (S.sl >= 0 ? "+" : "") + S.sl;
   }
   function renderGauges() {
     var aR = Math.round(rate(ROT, S.rot) * 100), aH = Math.round(rate(HGT, S.hgt) * 100);
@@ -1679,7 +1599,7 @@
   }
   function renderAll() {
     renderClock(); renderSceneFx(); renderSeatScene(); renderDial();
-    renderRail(); renderGauges(); renderMood(); renderMemory();
+    renderRail(); renderSlide(); renderGauges(); renderMood(); renderMemory();
   }
 
   /* ================= seat interaction ================= */
@@ -1704,6 +1624,15 @@
     if (Math.abs(h - PHILL.targetHgt) > PHILL.tolHgt && Math.random() < 0.6) {
       speak(h < PHILL.targetHgt ? pick(THOUGHTS.seatLow) : pick(THOUGHTS.rotOther));
     } else if (h === PHILL.targetHgt && Math.random() < 0.7) { speak(pick(THOUGHTS.seatGood)); }
+  }
+  function setSl(s) {
+    s = Math.max(-8, Math.min(8, Math.round(s)));
+    if (s === S.sl) return;
+    lastUserInput = S.t;
+    S.sl = s;
+    renderAll();
+    logLine("adj", "slide → " + (s >= 0 ? "+" : "") + s + " cm");
+    if (s < 0 && Math.random() < 0.5) { speak(pick(THOUGHTS.seatLow)); }
   }
 
   // dial pointer
@@ -1733,6 +1662,18 @@
   track.addEventListener("pointermove", function (e) { if (draggingH) setHgt(hgtFromEvent(e)); });
   track.addEventListener("pointerup", function () { draggingH = false; });
 
+  // slide track
+  var slTrack = $("slTrack");
+  function slFromEvent(e) {
+    var r = slTrack.getBoundingClientRect();
+    var x = (e.clientX - r.left) / r.width;
+    return Math.round(8 * (2 * x - 1));
+  }
+  var draggingSl = false;
+  slTrack.addEventListener("pointerdown", function (e) { draggingSl = true; slTrack.setPointerCapture && slTrack.setPointerCapture(e.pointerId); setSl(slFromEvent(e)); });
+  slTrack.addEventListener("pointermove", function (e) { if (draggingSl) setSl(slFromEvent(e)); });
+  slTrack.addEventListener("pointerup", function () { draggingSl = false; });
+
   // keyboard: arrows + space
   window.addEventListener("keydown", function (e) {
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
@@ -1740,6 +1681,7 @@
     else if (e.key === "ArrowRight") setRot(S.rot + 5);
     else if (e.key === "ArrowUp") setHgt(S.hgt + 1);
     else if (e.key === "ArrowDown") setHgt(S.hgt - 1);
+    else if (/^[aAdD]$/.test(e.key)) setSl(e.key.toLowerCase() === "a" ? S.sl - 1 : S.sl + 1);
     else if (e.key === " ") { e.preventDefault(); togglePlay(); }
   });
 
@@ -1875,6 +1817,7 @@
   }
 
   /* ================= boot ================= */
+  sizeCanvas();
   loadPriors();
   buildDialTicks(); buildRailTicks();
   // initial setup dialogue — "Evening again…" if last ride left priors behind
@@ -1883,7 +1826,7 @@
       (S.priors.trust >= 0.6 ? "the cabin earned some trust." : S.priors.trust >= 0.45 ? "still cautious, but willing." : "I left wary. Let's see what changes."),
       true);
   } else {
-    speak("Evening. No wheel in front of me — right. Give me a moment to sit right.", true);
+    speak("Evening. Right, driver's seat — wheel dead ahead. Give me a moment to sit in properly.", true);
   }
   setTimeout(function () {
     speak("Fresh out of the factory feel. Raise the seat a touch if you like, I sit tall.", true);
@@ -1902,8 +1845,8 @@
     if (q) q.style.display = "none";
   });
   setupLavish();
-  window.addEventListener("resize", buildTlEvents);
-  setTimeout(buildTlEvents, 60);
+  window.addEventListener("resize", function () { sizeCanvas(); buildTlEvents(); });
+  setTimeout(function () { sizeCanvas(); buildTlEvents(); }, 60);
   requestAnimationFrame(frame);
 })();
 </script>
