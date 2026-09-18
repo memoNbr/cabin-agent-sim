@@ -14,3 +14,8 @@ data/
 # Tools
 .vscode/
 .idea/
+
+# Node / Vite
+node_modules/
+dist/
+.tmp/
