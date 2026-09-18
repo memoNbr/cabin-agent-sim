@@ -10,6 +10,38 @@ The intuition you can test here: give the same cabin to different
 personas and watch their behaviour and their trust answers change.
 Editing a persona is editing one JSON file — the agent code stays the same.
 
+## Web app (Vite + three.js)
+
+The interactive cabin runs as a **Vite web app at the repo root**
+(`index.html` + `src/`), using `three` from npm — no vendored copy.
+It contains the drawn empty shell, the seat wired live to the dock
+(`S.rot` deg / `S.sl` cm / `S.hgt` cm), and the roaming avatar.
+
+```bash
+npm install          # once — vite + three
+npm run dev          # local dev server → http://127.0.0.1:5173
+npm run build        # production bundle → dist/
+npm run preview      # serve the built bundle locally
+```
+
+Module map:
+
+```
+index.html          Vite entry — scene stage, seat dock, chips, summary, trust survey
+src/main.js         boot order: cabin → avatar → cognitive → ui
+src/cabin.js        3D scene: drawn shell, seat (+seatRig/agentMount), lights,
+                    orbit controls; exports cabinApi {scene, camera, controls,
+                    renderer, seatRig, agentMount, seatMount, state}
+src/avatar.js       roaming drawn agent — sits on the seat, walks the cabin
+src/cognitive.js    the cognitive agent (BDI, self-settle, THOUGHTS, trust survey,
+                    priors) + the live 2D dock render; publishes __SEAT_LIVE__
+src/ui.js           aggregation: mirrors the avatar pose onto __CABIN3D__.avatarPose
+public/             Pexels reference photos (interior.jpg / interior-alt.jpg)
+```
+
+The older stdlib-python runner still lives under `cabin_sim/` + `web/` for the
+LLM/scripted loop below.
+
 ## How it works
 
 **Agent loop (light BDI):**
