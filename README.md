@@ -17,6 +17,15 @@ The interactive cabin runs as a **Vite web app at the repo root**
 It contains the drawn empty shell, the seat wired live to the dock
 (`S.rot` deg / `S.sl` cm / `S.hgt` cm), and the roaming avatar.
 
+Single-seat adjustment limits (drawn rig, clamped):
+
+| adjustment | range | default | control |
+|---|---|---|---|
+| seatback recline | 10–40° | 24° | `[` `]` keys · recline rail in the seat card |
+| slide (fore-aft) | ±8 cm | 0 cm | `A` `D` · dock slide rail |
+| seat height | 38–46 cm | 38 cm | `↑` `↓` · dock height rail |
+| rotation (yaw) | 0–360° | 0° | `←` `→` · dial |
+
 ```bash
 npm install          # once — vite + three
 npm run dev          # local dev server → http://127.0.0.1:5173

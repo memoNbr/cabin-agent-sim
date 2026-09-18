@@ -38,26 +38,27 @@ export const cabinApi = (function () {
     var bgx = bgc.getContext("2d");
     if (bgx) {
       var grd = bgx.createLinearGradient(0, 0, 0, 256);
-      grd.addColorStop(0, "#93a1b5"); grd.addColorStop(0.52, "#525c6c"); grd.addColorStop(1, "#232a34");
+      grd.addColorStop(0, "#ffffff"); grd.addColorStop(0.5, "#f5f8fc"); grd.addColorStop(1, "#e8eef8");
       bgx.fillStyle = grd; bgx.fillRect(0, 0, 4, 256);
       var bgTex = new THREE.CanvasTexture(bgc);
       if ("colorSpace" in bgTex) bgTex.colorSpace = THREE.SRGBColorSpace;
       scene.background = bgTex;
     }
-  } catch (e) { scene.background = new THREE.Color(0x525c6c); }
+  } catch (e) { scene.background = new THREE.Color(0xf5f8fc); }
   var pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
 
   var camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.02, 60);
-  /* starts low, facing forward, at driver eye height, looking up toward the windshield cant */
-  var homeCam = { pos: new THREE.Vector3(-0.34, 1.06, 0.18), target: new THREE.Vector3(0.14, 0.52, 1.32) };
+  /* starts at driver eye height, looking forward into the clean white cabin */
+  var homeCam = { pos: new THREE.Vector3(-0.34, 1.06, 0.4), target: new THREE.Vector3(0, 0.55, 1.0) };
   camera.position.copy(homeCam.pos);
 
-  /* cool ambient + a soft warm key so the white reads cleanly */
-  scene.add(new THREE.HemisphereLight(0xcfe0f5, 0x39424e, 1.15));
-  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-  var key = new THREE.DirectionalLight(0xfff2dc, 1.35); key.position.set(-2.2, 3.6, 2.8); scene.add(key);
-  var rim = new THREE.DirectionalLight(0x9dbdff, 1.0); rim.position.set(3.0, 1.6, -3.2); scene.add(rim);
+  /* soft even lighting for clean white interior */
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xf0f4ff, 1.0));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  var key = new THREE.DirectionalLight(0xfffaf5, 0.8); key.position.set(-1.5, 3.0, 2.0); scene.add(key);
+  var fill = new THREE.DirectionalLight(0xe8f0ff, 0.5); fill.position.set(1.5, 2.5, -2.0); scene.add(fill);
+  var rim = new THREE.DirectionalLight(0xcce0ff, 0.3); rim.position.set(0, 3.5, 0); scene.add(rim);
 
   var controls = new OrbitControls(camera, HOST);
   controls.enableDamping = true; controls.dampingFactor = 0.075;
@@ -70,8 +71,8 @@ export const cabinApi = (function () {
   /* ================= drawn-shell builder ================= */
   var shell = new THREE.Group(); shell.name = "cabinShell"; scene.add(shell);
   var roofG = new THREE.Group(); roofG.name = "roofAssembly"; shell.add(roofG);
-  var fillMat = new THREE.MeshStandardMaterial({ color: 0xf5f6f8, roughness: 0.92, metalness: 0.0 });
-  fillMat.envMapIntensity = 0.22;
+  var fillMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.0 });
+  fillMat.envMapIntensity = 0.1;
   fillMat.polygonOffset = true; fillMat.polygonOffsetFactor = -1.5; fillMat.polygonOffsetUnits = -2;
   var edgeMat = new THREE.LineBasicMaterial({ color: 0x0a0c10 });
 
@@ -82,7 +83,7 @@ export const cabinApi = (function () {
     return o;
   }
   function drawn(name, geometry, color, group) {
-    var m = fillMat.clone(); m.color.setHex(color === undefined ? 0xf5f6f8 : color);
+    var m = fillMat.clone(); m.color.setHex(color === undefined ? 0xffffff : color);
     var mesh = new THREE.Mesh(geometry, m);
     group = group || shell;
     group.add(tag(mesh, name));
@@ -98,7 +99,21 @@ export const cabinApi = (function () {
     if (rot) { g.rotateX(rot.rx || 0); g.rotateZ(rot.rz || 0); }
     drawn(name, g, color, group);
   }
-  function quadPart(name, corners, color, group) {
+
+  /* clean white interior box: floor, 4 walls, ceiling */
+  var W = 1.74, L = 2.5, H = 1.2;
+  var halfW = W / 2, halfL = L / 2;
+  boxPart("floor", 0, 0.06, 0, W, 0.12, L, 0xffffff);
+  boxPart("wallL", -halfW, H / 2, 0, 0.08, H, L, 0xffffff);
+  boxPart("wallR", halfW, H / 2, 0, 0.08, H, L, 0xffffff);
+  boxPart("wallF", 0, H / 2, halfL, W, H, 0.08, 0xffffff);
+  boxPart("wallRear", 0, H / 2, -halfL, W, H, 0.08, 0xffffff);
+  boxPart("ceiling", 0, H + 0.06, 0, W, 0.1, L, 0xffffff, roofG);
+
+  /* subtle window accents — thin glazing lines on front/rear walls */
+  var winMat = new THREE.MeshStandardMaterial({ color: 0xd0e8ff, roughness: 0.1, metalness: 0.0, transparent: true, opacity: 0.18 });
+  winMat.envMapIntensity = 0.3;
+  function winQuad(name, corners, group) {
     var g = new THREE.BufferGeometry();
     var pos = new Float32Array([
       corners[0][0], corners[0][1], corners[0][2],
@@ -109,33 +124,29 @@ export const cabinApi = (function () {
     g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     g.setIndex([0, 1, 2, 0, 2, 3]);
     g.computeVertexNormals();
-    drawn(name, g, color, group);
+    var mesh = new THREE.Mesh(g, winMat);
+    group = group || shell;
+    group.add(tag(mesh, name));
+    var edges = new THREE.EdgesGeometry(g, 8);
+    var ln = new THREE.LineSegments(edges, edgeMat);
+    group.add(tag(ln, name + "-edge"));
   }
-
-  boxPart("floorPan", 0, 0.06, -0.05, 1.74, 0.12, 2.5, 0xf7f8fa);
-  boxPart("centerTunnel", 0, 0.21, -0.10, 0.34, 0.18, 1.9, 0xeef1f4);
-  boxPart("doorCardL", -0.745, 0.40, -0.05, 0.05, 0.56, 2.06, 0xf2f4f6);
-  boxPart("doorCardR", 0.745, 0.40, -0.05, 0.05, 0.56, 2.06, 0xf2f4f6);
-  boxPart("armrestL", -0.66, 0.46, 0.0, 0.12, 0.06, 0.7, 0xeaedf0);
-  boxPart("armrestR", 0.66, 0.46, 0.0, 0.12, 0.06, 0.7, 0xeaedf0);
-  boxPart("pillarA-L", -0.635, 0.91, 0.81, 0.09, 0.46, 0.09, 0xf3f5f7, shell, { rx: -0.13, rz: -0.151 });
-  boxPart("pillarA-R", 0.635, 0.91, 0.81, 0.09, 0.46, 0.09, 0xf3f5f7, shell, { rx: -0.13, rz: 0.151 });
-  boxPart("pillarB-L", -0.67, 0.88, 0.30, 0.08, 0.44, 0.08, 0xf3f5f7);
-  boxPart("pillarB-R", 0.67, 0.88, 0.30, 0.08, 0.44, 0.08, 0xf3f5f7);
-  boxPart("rearBulkhead", 0, 0.49, -1.13, 1.42, 0.75, 0.05, 0xf2f4f6);
-  boxPart("rearLedge", 0, 0.88, -1.12, 1.42, 0.045, 0.16, 0xeaedf0);
-  quadPart("windshieldCant", [
-    [-0.60, 1.12, 0.80], [0.60, 1.12, 0.80], [0.66, 0.40, 1.20], [-0.66, 0.40, 1.20]
-  ], 0xdfe6ee);
-  boxPart("dashCowl", 0, 0.43, 1.06, 1.34, 0.045, 0.20, 0xecf0f4);
-  boxPart("roofRailL", -0.655, 1.14, -0.15, 0.08, 0.05, 1.9, 0xf5f6f8, roofG);
-  boxPart("roofRailR", 0.655, 1.14, -0.15, 0.08, 0.05, 1.9, 0xf5f6f8, roofG);
-  boxPart("roofHeaderFront", 0, 1.145, 0.85, 1.36, 0.055, 0.09, 0xf5f6f8, roofG);
-  boxPart("roofHeaderRear", 0, 1.125, -1.12, 1.36, 0.055, 0.09, 0xf5f6f8, roofG);
-  boxPart("sunroofFrameF", 0, 1.13, 0.60, 0.70, 0.045, 0.045, 0xf2f4f6, roofG);
-  boxPart("sunroofFrameR", 0, 1.13, -0.02, 0.70, 0.045, 0.045, 0xf2f4f6, roofG);
-  boxPart("sunroofFrameL", -0.35, 1.13, 0.29, 0.045, 0.045, 0.62, 0xf2f4f6, roofG);
-  boxPart("sunroofFrameRib", 0.35, 1.13, 0.29, 0.045, 0.045, 0.62, 0xf2f4f6, roofG);
+  winQuad("windshield", [
+    [-0.55, 0.95, halfL - 0.01], [0.55, 0.95, halfL - 0.01],
+    [0.60, 0.35, halfL - 0.01], [-0.60, 0.35, halfL - 0.01]
+  ]);
+  winQuad("rearWindow", [
+    [-0.55, 0.95, -halfL + 0.01], [0.55, 0.95, -halfL + 0.01],
+    [0.55, 0.45, -halfL + 0.01], [-0.55, 0.45, -halfL + 0.01]
+  ]);
+  winQuad("sideWindowL", [
+    [-halfW + 0.01, 0.95, 0.65], [-halfW + 0.01, 0.95, -0.65],
+    [-halfW + 0.01, 0.45, -0.65], [-halfW + 0.01, 0.45, 0.65]
+  ]);
+  winQuad("sideWindowR", [
+    [halfW - 0.01, 0.95, 0.65], [halfW - 0.01, 0.95, -0.65],
+    [halfW - 0.01, 0.45, -0.65], [halfW - 0.01, 0.45, 0.65]
+  ]);
 
   /* ================= seat mount point =================
      SEAT.mount: world-space foot of the driver seat. The seat rig is built here,
@@ -167,14 +178,53 @@ export const cabinApi = (function () {
   seatMount.add(seatRig);
   boxPart("seatPlinth", 0, 0.03, 0, 0.54, 0.04, 0.46, 0xf2f4f6, seatRig);
   boxPart("seatSquab", 0, 0.19, 0, 0.52, 0.28, 0.50, 0xf5f6f8, seatRig);
-  boxPart("seatBack", 0, 0.52, -0.24, 0.50, 0.56, 0.12, 0xf3f5f7, seatRig, { rx: -0.16 });
-  boxPart("seatHead", 0, 0.84, -0.35, 0.30, 0.11, 0.08, 0xf3f5f7, seatRig, { rx: -0.16 });
+  /* seatback + headrest hang on a recline hinge at the squab's rear edge.
+     backRig.rotation.x = seatback recline (10–40°, default 24°); the rest of the
+     seat still rides live from S.rot / S.sl / height via __SEAT_LIVE__. */
+  var RECLINE = { kind: "seatback", unit: "deg", min: 10, max: 40, default: 24 };
+  var backRig = tag(new THREE.Group(), "backRig");
+  backRig.position.set(0, 0.30, -0.25);
+  seatRig.add(backRig);
+  boxPart("seatBack", 0, 0.29, 0, 0.50, 0.56, 0.12, 0xf3f5f7, backRig);
+  boxPart("seatHead", 0, 0.66, -0.04, 0.30, 0.11, 0.08, 0xf3f5f7, backRig);
   var agentMount = tag(new THREE.Object3D(), "agentMount");
   agentMount.position.set(0, 0.86, 0.02);
   agentMount.userData.AGENT = true;
   seatRig.add(agentMount);
   state.SEAT = SEAT; state.seatMount = seatMount; state.agentMount = agentMount;
-  state.seatRig = seatRig;
+  state.seatRig = seatRig; state.backRig = backRig; state.RECLINE = RECLINE;
+
+  var rcTrackEl = document.getElementById("rcTrack");
+  var rcThumbEl = document.getElementById("rcThumb");
+  var rcReadEl = document.getElementById("rcRead");
+  state.reclineDeg = RECLINE.default;
+  backRig.rotation.x = -THREE.MathUtils.degToRad(state.reclineDeg);
+  if (rcThumbEl) rcThumbEl.style.left = ((state.reclineDeg - RECLINE.min) / (RECLINE.max - RECLINE.min) * 100) + "%";
+  if (rcReadEl) rcReadEl.textContent = state.reclineDeg + "°";
+  function setRecline(d) {
+    d = Math.round(Math.max(RECLINE.min, Math.min(RECLINE.max, d)));
+    if (d === state.reclineDeg) return;
+    state.reclineDeg = d;
+    backRig.rotation.x = -THREE.MathUtils.degToRad(d);
+    if (rcReadEl) rcReadEl.textContent = d + "°";
+    if (rcThumbEl) rcThumbEl.style.left = ((d - RECLINE.min) / (RECLINE.max - RECLINE.min) * 100) + "%";
+  }
+  if (rcTrackEl && rcThumbEl) {
+    var rcDrag = false;
+    function rcFrom(e) {
+      var r = rcTrackEl.getBoundingClientRect();
+      var x = (e.clientX - r.left) / (r.width || 1);
+      return RECLINE.min + Math.max(0, Math.min(1, x)) * (RECLINE.max - RECLINE.min);
+    }
+    rcTrackEl.addEventListener("pointerdown", function (e) {
+      rcDrag = true;
+      if (rcTrackEl.setPointerCapture) rcTrackEl.setPointerCapture(e.pointerId);
+      setRecline(rcFrom(e));
+    });
+    rcTrackEl.addEventListener("pointermove", function (e) { if (rcDrag) setRecline(rcFrom(e)); });
+    rcTrackEl.addEventListener("pointerup", function () { rcDrag = false; });
+    rcTrackEl.addEventListener("pointercancel", function () { rcDrag = false; });
+  }
 
   var travel = new THREE.Vector3();
   var travelF = new THREE.Vector3(), travelR = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
@@ -185,8 +235,9 @@ export const cabinApi = (function () {
   }
   window.addEventListener("keydown", function (e) {
     var k = (e.key || "").toLowerCase();
-    if (k !== "w" && k !== "s" && k !== "q" && k !== "e") return;
     if (isTyping()) return;
+    if (k === "[" || k === "]") { setRecline(state.reclineDeg + (k === "]" ? 5 : -5)); return; }
+    if (k !== "w" && k !== "s" && k !== "q" && k !== "e") return;
     keyState[k] = true;
     if (state.travelKeys.indexOf(k) === -1) state.travelKeys.push(k);
     if (hintEl) hintEl.classList.add("gone");
@@ -301,6 +352,11 @@ export const cabinApi = (function () {
         local: agentMount.position.toArray(),
         world: agentMount.getWorldPosition(new THREE.Vector3()).toArray(),
         agent: agentMount.userData.AGENT
+      },
+      recline: {
+        deg: state.reclineDeg,
+        limits: { min: RECLINE.min, max: RECLINE.max },
+        backRigRotX: backRig.rotation.x
       },
       SEAT: SEAT,
       travelKeys: state.travelKeys.slice()

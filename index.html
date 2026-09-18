@@ -298,7 +298,7 @@
       <div class="viewer-status" id="viewerStatus">drawing the cabin shell…</div>
       <div class="viewer-hint" id="viewerHint">
         drag · orbit &nbsp;|&nbsp; wheel · zoom &nbsp;|&nbsp; right-drag · pan<br>
-        <kbd>W</kbd><kbd>S</kbd> travel fwd/back &nbsp; <kbd>Q</kbd><kbd>E</kbd> travel left/right
+        <kbd>W</kbd><kbd>S</kbd> travel fwd/back &nbsp; <kbd>Q</kbd><kbd>E</kbd> travel left/right &nbsp; <kbd>[</kbd><kbd>]</kbd> recline
       </div>
       <div class="event-banner" id="eventBanner"></div>
       <div class="speed-streaks" id="streaks">
@@ -321,7 +321,7 @@
         <span>seat height <b id="sfHgt">38 cm</b></span>
         <span>rotation <b id="sfRot">0°</b></span>
         <span>rides smooth <b class="mono" id="sfG">0.0 g</b></span>
-        <span id="sfLine" style="margin-left:auto;">drawn empty shell · orbit / zoom · adjust slide / height / rotation · live seat render below</span>
+        <span id="sfLine" style="margin-left:auto;">drawn empty cabin · full-ADJUSTABLE single seat · track ±8 cm · height 38–46 cm · seatback 10–40° · live render below</span>
       </div>
     </div>
   </div>
@@ -331,12 +331,13 @@
     <div>
 
       <div class="card">
-        <h3>parameters — seat · slide / height / rotation</h3>
+        <h3>parameters — seat · slide / height / recline / rotation</h3>
         <div class="kbdbar">
           <span>drive the seat</span>
           <span><kbd>←</kbd> <kbd>→</kbd> <b>rotation</b></span>
           <span><kbd>↑</kbd> <kbd>↓</kbd> <b>height</b></span>
           <span><kbd>A</kbd> <kbd>D</kbd> <b>slide</b></span>
+          <span><kbd>[</kbd> <kbd>]</kbd> <b>recline</b></span>
         </div>
         <div class="ctl-grid3">
           <div class="dial-wrap">
@@ -383,6 +384,17 @@
               <span style="color:var(--faint)">SLIDE</span>
               <b class="mono" id="slRead">0</b>
               <span class="mono" id="slAtt" style="color:var(--gold-dim)">cm</span>
+            </div>
+          </div>
+          <div class="slide-host" style="grid-column:1/-1; margin-top:6px;">
+            <div class="slide-labs"><span>upright · 10°</span><span>reclined · 40°</span></div>
+            <div class="slide-track" id="rcTrack" aria-label="seatback recline slider">
+              <div class="slide-thumb" id="rcThumb"></div>
+            </div>
+            <div class="slide-read">
+              <span style="color:var(--faint)">SEATBACK</span>
+              <b class="mono" id="rcRead">24°</b>
+              <span class="mono" style="color:var(--gold-dim)">deg · [ ] keys</span>
             </div>
           </div>
         </div>
