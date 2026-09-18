@@ -1348,6 +1348,7 @@
     $("dockHgt").textContent = S.hgt + " cm";
     $("dockRot").textContent = Math.round((((S.rot % 360) + 360) % 360)) + "°";
     $("dockSl").textContent = (S.sl >= 0 ? "+" : "") + S.sl + " cm";
+    window.__SEAT_LIVE__ = { rot: S.rot, sl: S.sl, hgt: S.hgt };
     if (!GX) return;
     CamBase = camAt(S.t);
     CamB = camAt(S.t, 1);
@@ -1940,9 +1941,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   boxPart("sunroofFrameL", -0.35, 1.13, 0.29, 0.045, 0.045, 0.62, 0xf2f4f6, roofG);
   boxPart("sunroofFrameRib", 0.35, 1.13, 0.29, 0.045, 0.045, 0.62, 0xf2f4f6, roofG);
 
-  /* ================= seat mount point (future seat fits here) =================
-     SEAT.mount: world-space foot of the future driver seat — set to S.rot / S.sl /
-     height later. Only a dashed marking is drawn now; no seat geometry. */
+  /* ================= seat mount point =================
+     SEAT.mount: world-space foot of the driver seat. The seat rig is built here,
+     live-offset each frame from S.rot (yaw deg) / S.sl (±8 cm) / height (cm). */
   var SEAT = {
     mount: { x: -0.34, y: 0.12, z: -0.05 },
     pivot: { x: -0.34, y: 0.12, z: -0.05 },
@@ -1955,14 +1956,29 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   shell.add(seatMount);
   var fp = new THREE.BufferGeometry();
   fp.setAttribute("position", new THREE.BufferAttribute(new Float32Array([
-    -0.23, 0.125, -0.29, 0.23, 0.125, -0.29, 0.23, 0.125, 0.19, -0.23, 0.125, 0.19
+    -0.23, 0.002, -0.29, 0.23, 0.002, -0.29, 0.23, 0.002, 0.19, -0.23, 0.002, 0.19
   ]), 3));
   var fpMat = new THREE.LineDashedMaterial({ color: 0x0a0c10, transparent: true, opacity: 0.4, dashSize: 0.045, gapSize: 0.035 });
   var fpLines = new THREE.LineLoop(fp, fpMat);
   fpLines.computeLineDistances();
   tag(fpLines, "seatFootprintDashed");
   seatMount.add(fpLines);
-  state.SEAT = SEAT; state.seatMount = seatMount;
+
+  /* drawn seat rig — white parts with black outline edges, matching the shell.
+     seatRig sits at the mount and carries every live seat transform so S.rot /
+     S.sl / height move this exact seat the agent will take. */
+  var seatRig = tag(new THREE.Group(), "seatRig");
+  seatMount.add(seatRig);
+  boxPart("seatPlinth", 0, 0.03, 0, 0.54, 0.04, 0.46, 0xf2f4f6, seatRig);
+  boxPart("seatSquab", 0, 0.19, 0, 0.52, 0.28, 0.50, 0xf5f6f8, seatRig);
+  boxPart("seatBack", 0, 0.52, -0.24, 0.50, 0.56, 0.12, 0xf3f5f7, seatRig, { rx: -0.16 });
+  boxPart("seatHead", 0, 0.84, -0.35, 0.30, 0.11, 0.08, 0xf3f5f7, seatRig, { rx: -0.16 });
+  var agentMount = tag(new THREE.Object3D(), "agentMount");
+  agentMount.position.set(0, 0.86, 0.02);
+  agentMount.userData.AGENT = true;
+  seatRig.add(agentMount);
+  state.SEAT = SEAT; state.seatMount = seatMount; state.agentMount = agentMount;
+  state.seatRig = seatRig;
 
   var travel = new THREE.Vector3();
   var travelF = new THREE.Vector3(), travelR = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
@@ -2018,7 +2034,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   state.camPos = camera.position.toArray();
   state.target = controls.target.toArray();
   state.parts = PARTS.slice();
-  status("shell drawn · " + PARTS.length + " parts · white body, black lines");
+  status("shell drawn · " + PARTS.length + " parts · seat mounted & live");
   setTimeout(function () { if (statusEl) statusEl.className = "viewer-status gone"; }, 1600);
 
   function resize() {
@@ -2052,6 +2068,13 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     requestAnimationFrame(animate);
     var dt = Math.min((now - last) / 1000, 0.05); last = now;
     if (dt > 0) applyTravel(dt);
+    var live = window.__SEAT_LIVE__;
+    if (live && seatRig) {
+      seatRig.position.y = (live.hgt - SEAT.default.heightCm) / 100;
+      seatRig.position.z = live.sl / 100;
+      seatRig.rotation.y = THREE.MathUtils.degToRad(live.rot);
+      state.seatLive = { rot: live.rot, sl: live.sl, hgt: live.hgt };
+    }
     controls.update();
     renderer.render(scene, camera);
     state.camPos = camera.position.toArray();
@@ -2071,6 +2094,18 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       distance: camera.position.distanceTo(controls.target),
       orbit: !!controls, reticle: HOST.clientWidth + "x" + HOST.clientHeight,
       seatMount: { name: seatMount.name, pos: seatMount.position.toArray(), default: seatMount.userData.seatDefault },
+      seatRig: {
+        name: seatRig.name,
+        pos: seatRig.position.toArray(),
+        rotY: seatRig.rotation.y,
+        live: state.seatLive || null
+      },
+      agentMount: {
+        name: agentMount.name,
+        local: agentMount.position.toArray(),
+        world: agentMount.getWorldPosition(new THREE.Vector3()).toArray(),
+        agent: agentMount.userData.AGENT
+      },
       SEAT: SEAT,
       travelKeys: state.travelKeys.slice()
     };
