@@ -26,6 +26,14 @@ Single-seat adjustment limits (drawn rig, clamped):
 | seat height | 38–46 cm | 38 cm | `↑` `↓` · dock height rail |
 | rotation (yaw) | 0–360° | 0° | `←` `→` · dial |
 
+Cayenne-inspired trim (interior-only, same scene + animate loop): sculpted
+dashboard with vents and a chrome brow line; low center console with a wide
+portrait infotainment screen and shifter; door cards with cognac armrests,
+metal door pulls and shoulder trim; three-spoke multi-function wheel with a
+digital instrument cluster (red tach arc + speed arc); warm amber ambient
+light strips on dash, doors and console; seat restyled to a comfort
+silhouette (wings/bolsters) with cognac + mustard contrast stitching.
+
 ```bash
 npm install          # once — vite + three
 npm run dev          # local dev server → http://127.0.0.1:5173
@@ -38,9 +46,11 @@ Module map:
 ```
 index.html          Vite entry — scene stage, seat dock, chips, summary, trust survey
 src/main.js         boot order: cabin → avatar → cognitive → ui
-src/cabin.js        3D scene: drawn shell, seat (+seatRig/agentMount), lights,
-                    orbit controls; exports cabinApi {scene, camera, controls,
-                    renderer, seatRig, agentMount, seatMount, state}
+src/cabin.js        3D scene: Cayenne-linen interior (sculpted dash, low console + portrait
+                    screen, door cards, 3-spoke wheel, digital cluster, ambient strip),
+                    seat (+seatRig/agentMount/recline hinge), lights, orbit controls;
+                    exports cabinApi {scene, camera, controls, renderer, seatRig,
+                    agentMount, seatMount, state}
 src/avatar.js       roaming drawn agent — sits on the seat, walks the cabin
 src/cognitive.js    the cognitive agent (BDI, self-settle, THOUGHTS, trust survey,
                     priors) + the live 2D dock render; publishes __SEAT_LIVE__

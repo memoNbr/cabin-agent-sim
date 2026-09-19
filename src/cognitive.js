@@ -957,6 +957,52 @@
     }
   }
 
+  /* ================= live cognitive bridge (brain → body) =================
+     Exposes a single public live store the 3D avatar can read each frame.
+     The SAME object reference is updated in place every tick, so consumers
+     holding window.__COG_LIVE__ always see fresh state. No render/DOM/BDI
+     semantics change; existing hooks (__SEAT_LIVE__, __CABIN_PROBE__) stand.
+     Subscribers via window.__COG_SUBSCRIBE__(fn) get the store and may
+     unsubscribe via the returned cancel function. */
+  var cogSubs = [];
+  function cogSubscribe(fn) {
+    if (typeof fn !== "function") return function () {};
+    cogSubs.push(fn);
+    return function () {
+      var i = cogSubs.indexOf(fn);
+      if (i >= 0) cogSubs.splice(i, 1);
+    };
+  }
+  var cogLive = window.__COG_LIVE__;
+  if (!cogLive || typeof cogLive !== "object") { cogLive = {}; window.__COG_LIVE__ = cogLive; }
+  if (!cogLive.mood) cogLive.mood = {};
+  if (!cogLive.ride) cogLive.ride = {};
+  var cogPriors = { rides: 0, trust: null };
+  cogLive.priors = cogPriors;
+  function publishCog() {
+    cogLive.mood.comfort = S.mood.comfort;
+    cogLive.mood.energy = S.mood.energy;
+    cogLive.mood.suspicion = S.mood.suspicion;
+    cogLive.trust = S.trust.score;
+    cogLive.intention = S.bdi.intention || null;
+    cogLive.ride.speed = S.speed;
+    cogLive.ride.g = S.gNow;
+    cogLive.ride.jolt = S.joltNow;
+    cogLive.ride.rain = S.rain;
+    cogLive.ride.phase = S.phase;
+    cogLive.ride.t = S.t;
+    cogLive.thoughts = S.thoughts.length ? S.thoughts[0].text : "";
+    cogLive.speech = S.speech || "";
+    var p = S.priors;
+    cogPriors.rides = p ? (p.rides || 0) : 0;
+    cogPriors.trust = (p && typeof p.trust === "number") ? p.trust : null;
+    for (var i = 0; i < cogSubs.length; i++) {
+      try { cogSubs[i](cogLive); } catch (e) { /* a bad subscriber must not break the sim */ }
+    }
+  }
+  window.__COG_LIVE__ = cogLive;
+  window.__COG_SUBSCRIBE__ = cogSubscribe;
+
   /* ================= main loop ================= */
   var lastWall = performance.now();
   function frame(now) {
@@ -967,6 +1013,7 @@
       simulate(dt);
     }
     renderAll();
+    publishCog();
     requestAnimationFrame(frame);
   }
   function simulate(dt) {
@@ -1255,6 +1302,7 @@
   setupLavish();
   window.addEventListener("resize", function () { sizeCanvas(); buildTlEvents(); });
   setTimeout(function () { sizeCanvas(); buildTlEvents(); }, 60);
+  publishCog();
   requestAnimationFrame(frame);
 })();
 export {};

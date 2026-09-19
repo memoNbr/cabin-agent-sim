@@ -66,7 +66,7 @@ export const cabinApi = (function () {
   controls.screenSpacePanning = true;
   controls.target.copy(homeCam.target);
   controls.minDistance = 0.12; controls.maxDistance = 9;
-  state.THREE = THREE; state.camera = camera; state.controls = controls;
+  state.THREE = THREE; state.camera = camera; state.controls = controls; state.scene = scene;
 
   /* ================= drawn-shell builder ================= */
   var shell = new THREE.Group(); shell.name = "cabinShell"; scene.add(shell);
@@ -74,7 +74,7 @@ export const cabinApi = (function () {
   var fillMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.0 });
   fillMat.envMapIntensity = 0.1;
   fillMat.polygonOffset = true; fillMat.polygonOffsetFactor = -1.5; fillMat.polygonOffsetUnits = -2;
-  var edgeMat = new THREE.LineBasicMaterial({ color: 0x0a0c10 });
+  var edgeMat = new THREE.LineBasicMaterial({ color: 0x14171c });
 
   function tag(o, name) {
     o.name = name;
@@ -96,19 +96,50 @@ export const cabinApi = (function () {
   function boxPart(name, cx, cy, cz, w, h, d, color, group, rot) {
     var g = new THREE.BoxGeometry(w, h, d);
     g.translate(cx, cy, cz);
-    if (rot) { g.rotateX(rot.rx || 0); g.rotateZ(rot.rz || 0); }
+    if (rot) { g.rotateX(rot.rx || 0); g.rotateY(rot.ry || 0); g.rotateZ(rot.rz || 0); }
     drawn(name, g, color, group);
   }
 
-  /* clean white interior box: floor, 4 walls, ceiling */
+  /* ================= dark Cayenne palette shell ================= */
   var W = 1.74, L = 2.5, H = 1.2;
   var halfW = W / 2, halfL = L / 2;
-  boxPart("floor", 0, 0.06, 0, W, 0.12, L, 0xffffff);
-  boxPart("wallL", -halfW, H / 2, 0, 0.08, H, L, 0xffffff);
-  boxPart("wallR", halfW, H / 2, 0, 0.08, H, L, 0xffffff);
-  boxPart("wallF", 0, H / 2, halfL, W, H, 0.08, 0xffffff);
-  boxPart("wallRear", 0, H / 2, -halfL, W, H, 0.08, 0xffffff);
-  boxPart("ceiling", 0, H + 0.06, 0, W, 0.1, L, 0xffffff, roofG);
+  var C = {
+    /* jet-black cabin base — very deep near-black with a subtle blue-grey
+       undertone, matte: exterior body (walls), carpet, roof shell */
+    jets: {
+      body: 0x0f1113,   /* walls / body shell */
+      carpet: 0x090a0d, /* floor */
+      headliner: 0x0d0e11,
+      headBands: 0x15171b, /* subtle headliner texture bands */
+      seam: 0x111316    /* roofline seam */
+    },
+    /* charcoal cabin leather — dash / doors / seat bases (kept as-is) */
+    leather: 0x23211d, leather2: 0x2b2824, bolster: 0x201d20,
+    cognac: 0x9c7b4d, stitch: 0xd8b586,
+    /* hardware + trim */
+    alu: 0xb7bcc4, aluDark: 0x8d939b, steel: 0x1f2227,
+    wheel: 0x1e1d1b, hub: 0x23221f, blackBtn: 0x14161a, cluster: 0x131519,
+    /* GTS red — Carmine-toned accent, used sparingly */
+    red: 0xd4001f, redDim: 0x9a0f22
+  };
+  var J = C.jets;
+  boxPart("floor", 0, 0.06, 0, W, 0.12, L, J.carpet);
+  boxPart("wallL", -halfW, H / 2, 0, 0.08, H, L, J.body);
+  boxPart("wallR", halfW, H / 2, 0, 0.08, H, L, J.body);
+  boxPart("wallF", 0, H / 2, halfL, W, H, 0.08, J.body);
+  boxPart("wallRear", 0, H / 2, -halfL, W, H, 0.08, J.body);
+  boxPart("ceiling", 0, H + 0.06, 0, W, 0.1, L, J.headliner, roofG);
+  /* jet-black roofline from inside: subtle texture bands across the headliner */
+  boxPart("headlinerBandF", 0, 1.208, 0.55, W - 0.12, 0.004, 0.05, J.headBands, roofG);
+  boxPart("headlinerBandC", 0, 1.208, 0, W - 0.12, 0.004, 0.05, J.headBands, roofG);
+  boxPart("headlinerBandR", 0, 1.208, -0.55, W - 0.12, 0.004, 0.05, J.headBands, roofG);
+  /* thin seam where the roofline meets the glass */
+  boxPart("headlinerSeam", 0, 1.205, 0, W + 0.02, 0.012, L + 0.02, J.seam, roofG);
+  /* red GTS pinstripe welt along the roof edge seams — the black-car read */
+  boxPart("roofPinstripeF", 0, 1.258, 1.2535, W - 0.02, 0.01, 0.01, C.red, roofG);
+  boxPart("roofPinstripeRear", 0, 1.258, -1.2535, W - 0.02, 0.01, 0.01, C.red, roofG);
+  boxPart("roofPinstripeLeft", -0.873, 1.258, 0, 0.01, 0.01, L - 0.02, C.red, roofG);
+  boxPart("roofPinstripeRight", 0.873, 1.258, 0, 0.01, 0.01, L - 0.02, C.red, roofG);
 
   /* subtle window accents — thin glazing lines on front/rear walls */
   var winMat = new THREE.MeshStandardMaterial({ color: 0xd0e8ff, roughness: 0.1, metalness: 0.0, transparent: true, opacity: 0.18 });
@@ -147,6 +178,138 @@ export const cabinApi = (function () {
     [halfW - 0.01, 0.95, 0.65], [halfW - 0.01, 0.95, -0.65],
     [halfW - 0.01, 0.45, -0.65], [halfW - 0.01, 0.45, 0.65]
   ]);
+  /* windshield sits on a real cowl: raise its lower edge onto the dash brow */
+  var ws = scene.getObjectByName("windshield");
+  if (ws) {
+    var wp = ws.geometry.attributes.position;
+    if (wp) {
+      var wa = wp.array;
+      for (var wi = 0; wi < wa.length; wi += 3) if (Math.abs(wa[wi + 1] - 0.35) < 1e-3) wa[wi + 1] = 0.70;
+      wp.needsUpdate = true;
+    }
+  }
+
+  /* ================= Cayenne interior surfaces =================
+     interior-only wrap over the empty cabin: sculpted dash, low center
+     console with a wide portrait infotainment screen, door cards with
+     armrests + metallic accents, a three-spoke multi-function wheel,
+     digital instrument cluster and a warm ambient strip. Flat drawn panels
+     keep it light and fast in the same scene + animate() loop. */
+  var interior = tag(new THREE.Group(), "cabinInterior");
+  shell.add(interior);
+  var aluMat = new THREE.MeshStandardMaterial({ color: C.alu, roughness: 0.35, metalness: 0.85 });
+  var aluDarkMat = new THREE.MeshStandardMaterial({ color: C.aluDark, roughness: 0.4, metalness: 0.8 });
+  var glassMat = new THREE.MeshStandardMaterial({ color: 0x0e1013, roughness: 0.18, metalness: 0.9 });
+  var screenMat = new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.3, metalness: 0.6, emissive: 0x101a28, emissiveIntensity: 0.45 });
+  var ambientMat = new THREE.MeshStandardMaterial({ color: 0x1d140a, emissive: 0xff9c4a, emissiveIntensity: 0.5, roughness: 0.5 });
+  aluMat.envMapIntensity = 0.8; aluDarkMat.envMapIntensity = 0.7; glassMat.envMapIntensity = 0.6;
+  function meshPart(name, geometry, mat, group) {
+    var m = new THREE.Mesh(geometry, mat === undefined ? fillMat : mat);
+    group = group || interior;
+    group.add(tag(m, name));
+    if (geometry.index) state.triangles += geometry.index.count / 3;
+    else if (geometry.attributes.position) state.triangles += geometry.attributes.position.count / 3;
+    return m;
+  }
+  function boxM(name, cx, cy, cz, w, h, d, mat, group, rot) {
+    var g = new THREE.BoxGeometry(w, h, d);
+    g.translate(cx, cy, cz);
+    if (rot) { g.rotateX(rot.rx || 0); g.rotateY(rot.ry || 0); g.rotateZ(rot.rz || 0); }
+    meshPart(name, g, mat, group);
+  }
+  function arc(name, cx, cy, cz, r, color, group, from, to, seg) {
+    from = from === undefined ? 0 : from; to = to === undefined ? Math.PI * 2 : to;
+    seg = seg || 40;
+    var pts = [];
+    for (var i = 0; i <= seg; i++) {
+      var a = from + (to - from) * i / seg;
+      pts.push(new THREE.Vector3(cx + Math.cos(a) * r, cy + Math.sin(a) * r, cz));
+    }
+    var g = new THREE.BufferGeometry().setFromPoints(pts);
+    var ln = new THREE.Line(g, new THREE.LineBasicMaterial({ color: color }));
+    (group || interior).add(tag(ln, name));
+  }
+
+  /* ---- door cards (driver + passenger) ---- */
+  function doorCard(sign) {
+    var xo = sign * 0.80, tl = sign < 0 ? "L" : "R", s = sign;
+    boxPart("doorPanel" + tl, xo, 0.40, 0, 0.10, 0.80, 1.88, C.leather2, interior);
+    boxPart("doorInsert" + tl, xo - s * 0.045, 0.40, -0.05, 0.016, 0.40, 1.1, C.leather, interior);
+    boxPart("doorShoulder" + tl, xo, 0.80, 0.12, 0.055, 0.018, 1.55, C.alu, interior);
+    boxPart("armrest" + tl, xo, 0.34, 0.10, 0.14, 0.065, 0.52, C.cognac, interior);
+    boxPart("armrestStitch" + tl, xo, 0.362, 0.02, 0.006, 0.012, 0.44, C.stitch, interior);
+    boxPart("doorPull" + tl, xo + s * 0.035, 0.24, 0.06, 0.07, 0.04, 0.34, C.aluDark, interior);
+    boxPart("doorSwitchPad" + tl, xo - s * 0.045, 0.36, 0.30, 0.05, 0.025, 0.08, C.cluster, interior);
+    var aD = meshPart("ambientDoor" + tl, new THREE.BoxGeometry(0.006, 0.006, 1.35), ambientMat);
+    aD.position.set(xo, 0.20, 0.02);
+  }
+  doorCard(-1); doorCard(1);
+
+  /* ---- sculpted dashboard ---- */
+  boxPart("dashFascia", 0, 0.38, 1.18, W, 0.50, 0.10, C.leather, interior);
+  boxPart("dashBrow", 0, 0.68, 1.10, 1.56, 0.08, 0.26, C.leather2, interior);
+  boxPart("dashChrome", 0, 0.722, 1.13, 1.5, 0.012, 0.2, C.alu, interior);
+  boxPart("dashStitch", 0, 0.722, 0.99, 1.3, 0.006, 0.008, C.stitch, interior);
+  boxPart("dashLower", 0, 0.10, 1.185, W, 0.14, 0.10, J.body, interior);
+  boxPart("ventL", -0.28, 0.46, 1.172, 0.10, 0.05, 0.016, C.aluDark, interior);
+  boxPart("ventC", 0, 0.46, 1.172, 0.16, 0.05, 0.016, C.aluDark, interior);
+  boxPart("ventR", 0.28, 0.46, 1.172, 0.10, 0.05, 0.016, C.aluDark, interior);
+
+  /* ---- low center console + wide portrait infotainment ---- */
+  boxPart("consoleTunnel", 0, 0.22, 0.55, 0.46, 0.30, 1.05, J.body, interior);
+  boxPart("consoleTray", 0, 0.40, 0.50, 0.31, 0.12, 0.88, C.leather2, interior);
+  boxPart("consoleKnee", 0, 0.28, 1.16, 0.32, 0.28, 0.20, C.leather, interior);
+  boxPart("consoleShifter", 0, 0.50, 0.315, 0.19, 0.055, 0.34, C.leather, interior);
+  var knob = meshPart("shifterKnob", new THREE.CylinderGeometry(0.022, 0.026, 0.05, 14), aluDarkMat);
+  knob.position.set(0, 0.545, 0.30);
+  boxPart("consoleSeam", 0, 0.503, 0.16, 0.15, 0.006, 0.007, C.stitch, interior);
+  boxM("screenFrame", 0, 0.63, 0.80, 0.32, 0.30, 0.04, aluDarkMat, interior, { ry: -0.10 });
+  boxM("screenGlass", 0, 0.63, 0.802, 0.295, 0.272, 0.02, glassMat, interior, { ry: -0.10 });
+  boxM("infotainmentScreen", 0, 0.63, 0.808, 0.285, 0.262, 0.014, screenMat, interior, { ry: -0.10 });
+
+  /* ---- three-spoke multi-function steering wheel + column ---- */
+  boxPart("steeringColumn", -0.34, 0.80, 1.12, 0.055, 0.055, 0.24, C.cluster, interior);
+  var wheelG = tag(new THREE.Group(), "steeringAssembly");
+  wheelG.position.set(-0.34, 0.80, 1.02);
+  wheelG.rotation.set(-0.22, 0.16, 0);
+  interior.add(wheelG);
+  meshPart("steeringRing", new THREE.TorusGeometry(0.155, 0.017, 12, 30), new THREE.MeshStandardMaterial({ color: C.wheel, roughness: 0.55, metalness: 0.1 }), wheelG);
+  meshPart("steeringHub", new THREE.CylinderGeometry(0.048, 0.048, 0.03, 18), new THREE.MeshStandardMaterial({ color: C.hub, roughness: 0.5, metalness: 0.15 }), wheelG);
+  boxM("steeringSpokeL", -0.115, 0.012, 0, 0.09, 0.052, 0.045, C.hub, wheelG, { rz: -0.22 });
+  boxM("steeringSpokeR", 0.115, 0.012, 0, 0.09, 0.052, 0.045, C.hub, wheelG, { rz: 0.22 });
+  boxM("steeringSpokeLow", 0, -0.098, 0, 0.15, 0.045, 0.045, C.hub, wheelG, { rz: 0 });
+  boxM("wheelBtnL", -0.115, 0.012, 0.012, 0.05, 0.028, 0.02, C.blackBtn, wheelG, { rz: -0.22 });
+  boxM("wheelBtnR", 0.115, 0.012, 0.012, 0.05, 0.028, 0.02, C.blackBtn, wheelG, { rz: 0.22 });
+  meshPart("wheelCrest", new THREE.CylinderGeometry(0.014, 0.014, 0.032, 12), new THREE.MeshStandardMaterial({ color: C.alu, roughness: 0.3, metalness: 0.9 }), wheelG);
+
+  /* ---- digital instrument cluster (behind the wheel) ---- */
+  var clusterG = tag(new THREE.Group(), "instrumentCluster");
+  clusterG.position.set(-0.34, 0.80, 1.13);
+  clusterG.rotation.set(-0.10, 0, 0);
+  interior.add(clusterG);
+  boxM("clusterPanel", 0, 0, 0, 0.34, 0.17, 0.045, C.cluster, clusterG);
+  boxM("clusterGlass", 0, 0, 0.03, 0.30, 0.12, 0.012, glassMat, clusterG);
+  arc("clusterTachArc", -0.065, 0, 0.031, 0.047, 0xd94f4f, clusterG, -1.9, 1.9, 34);
+  arc("clusterSpeedArc", 0.055, 0, 0.031, 0.041, 0xf2f4f6, clusterG, -1.7, 1.7, 34);
+  boxM("clusterNeedle", -0.065, 0.01, 0.032, 0.004, 0.03, 0.006, 0xd94f4f, clusterG);
+  boxM("clusterDividers", 0, 0, 0.032, 0.006, 0.09, 0.006, C.aluDark, clusterG);
+
+  /* ---- ambient light strips ---- */
+  var aDash = meshPart("ambientDash", new THREE.BoxGeometry(W - 0.2, 0.006, 0.05), ambientMat);
+  aDash.position.set(0, 0.17, 1.17);
+  var aCons = meshPart("ambientConsole", new THREE.BoxGeometry(0.24, 0.005, 0.015), ambientMat);
+  aCons.position.set(0, 0.475, 0.50);
+
+  /* ---- GTS red accents — small, deliberate (Carmine-toned C.red) ---- */
+  /* red contrast strip on the dash front edge, right under the windshield cowl
+     (reads through the glass from outside, and at eye level inside) */
+  boxPart("dashRedStrip", 0, 0.685, 1.225, W - 0.12, 0.014, 0.02, C.red, interior);
+  /* red stitching along the top of each door panel, just under the beltline */
+  boxPart("doorRedStitchL", -0.755, 0.77, 0.10, 0.011, 0.012, 1.50, C.red, interior, { rz: 0.018 });
+  boxPart("doorRedStitchR", 0.755, 0.77, 0.10, 0.011, 0.012, 1.50, C.red, interior, { rz: -0.018 });
+  /* red beltline seam where the side glass meets the body shoulder */
+  boxPart("beltlineSeamL", -0.832, 0.795, 0, 0.008, 0.014, 1.26, C.red, interior);
+  boxPart("beltlineSeamR", 0.832, 0.795, 0, 0.008, 0.014, 1.26, C.red, interior);
 
   /* ================= seat mount point =================
      SEAT.mount: world-space foot of the driver seat. The seat rig is built here,
@@ -171,13 +334,24 @@ export const cabinApi = (function () {
   tag(fpLines, "seatFootprintDashed");
   seatMount.add(fpLines);
 
-  /* drawn seat rig — white parts with black outline edges, matching the shell.
-     seatRig sits at the mount and carries every live seat transform so S.rot /
-     S.sl / height move this exact seat the agent will take. */
+  /* Cayenne comfort seat — dark leather with contrast stitching. seatRig sits
+     at the mount and carries every live seat transform so S.rot / S.sl /
+     height move this exact seat the agent will take; backRig adds recline. */
   var seatRig = tag(new THREE.Group(), "seatRig");
   seatMount.add(seatRig);
-  boxPart("seatPlinth", 0, 0.03, 0, 0.54, 0.04, 0.46, 0xf2f4f6, seatRig);
-  boxPart("seatSquab", 0, 0.19, 0, 0.52, 0.28, 0.50, 0xf5f6f8, seatRig);
+  boxPart("seatPlinth", 0, 0.03, 0, 0.60, 0.04, 0.52, C.steel, seatRig);
+  boxPart("seatTrackRail", 0, 0.052, 0, 0.06, 0.022, 0.56, C.alu, seatRig);
+  boxPart("seatSquab", 0, 0.19, 0, 0.58, 0.27, 0.54, C.leather, seatRig);
+  boxPart("seatCushion", 0, 0.26, 0.02, 0.40, 0.10, 0.46, C.leather2, seatRig);
+  boxPart("seatBolsterL", -0.205, 0.24, 0, 0.115, 0.25, 0.52, C.bolster, seatRig, { rz: 0.10 });
+  boxPart("seatBolsterR", 0.205, 0.24, 0, 0.115, 0.25, 0.52, C.bolster, seatRig, { rz: -0.10 });
+  boxPart("squabStitchF", 0, 0.312, -0.225, 0.38, 0.006, 0.007, C.stitch, seatRig);
+  boxPart("squabStitchB", 0, 0.312, 0.265, 0.38, 0.006, 0.007, C.stitch, seatRig);
+  /* GTS red piping around the seat cushion edges (seat keeps its cognac) */
+  boxPart("seatPipingF", 0, 0.28, -0.205, 0.38, 0.007, 0.007, C.red, seatRig);
+  boxPart("seatPipingRear", 0, 0.28, 0.245, 0.38, 0.007, 0.007, C.red, seatRig);
+  boxPart("seatPipingLeft", -0.19, 0.28, 0.02, 0.007, 0.007, 0.45, C.red, seatRig);
+  boxPart("seatPipingRight", 0.19, 0.28, 0.02, 0.007, 0.007, 0.45, C.red, seatRig);
   /* seatback + headrest hang on a recline hinge at the squab's rear edge.
      backRig.rotation.x = seatback recline (10–40°, default 24°); the rest of the
      seat still rides live from S.rot / S.sl / height via __SEAT_LIVE__. */
@@ -185,8 +359,13 @@ export const cabinApi = (function () {
   var backRig = tag(new THREE.Group(), "backRig");
   backRig.position.set(0, 0.30, -0.25);
   seatRig.add(backRig);
-  boxPart("seatBack", 0, 0.29, 0, 0.50, 0.56, 0.12, 0xf3f5f7, backRig);
-  boxPart("seatHead", 0, 0.66, -0.04, 0.30, 0.11, 0.08, 0xf3f5f7, backRig);
+  boxPart("seatBack", 0, 0.29, 0, 0.52, 0.56, 0.14, C.leather2, backRig);
+  boxPart("backWingL", -0.19, 0.30, -0.02, 0.115, 0.54, 0.15, C.bolster, backRig, { rz: -0.05 });
+  boxPart("backWingR", 0.19, 0.30, -0.02, 0.115, 0.54, 0.15, C.bolster, backRig, { rz: 0.05 });
+  boxPart("backSpineStitch", 0, 0.22, 0.08, 0.30, 0.50, 0.005, C.stitch, backRig);
+  boxPart("shoulderStitch", 0, 0.44, 0.08, 0.30, 0.006, 0.006, C.stitch, backRig);
+  boxPart("seatHead", 0, 0.66, -0.05, 0.34, 0.12, 0.10, C.leather2, backRig);
+  boxPart("headStitch", 0, 0.66, -0.012, 0.24, 0.006, 0.008, C.stitch, backRig);
   var agentMount = tag(new THREE.Object3D(), "agentMount");
   agentMount.position.set(0, 0.86, 0.02);
   agentMount.userData.AGENT = true;
@@ -281,7 +460,7 @@ export const cabinApi = (function () {
   state.camPos = camera.position.toArray();
   state.target = controls.target.toArray();
   state.parts = PARTS.slice();
-  status("shell drawn · " + PARTS.length + " parts · seat mounted & live");
+  status("Cayenne double-linen cabin drawn · " + PARTS.length + " parts · seat mounted & live");
   setTimeout(function () { if (statusEl) statusEl.className = "viewer-status gone"; }, 1600);
 
   function resize() {
@@ -357,6 +536,25 @@ export const cabinApi = (function () {
         deg: state.reclineDeg,
         limits: { min: RECLINE.min, max: RECLINE.max },
         backRigRotX: backRig.rotation.x
+      },
+      cayenne: {
+        interior: !!interior,
+        palette: {
+          body: "#" + J.body.toString(16).padStart(6, '0'),
+          carpet: "#" + J.carpet.toString(16).padStart(6, '0'),
+          headliner: "#" + J.headliner.toString(16).padStart(6, '0'),
+          headBands: "#" + J.headBands.toString(16).padStart(6, '0'),
+          leather: "#" + C.leather.toString(16).padStart(6, '0'),
+          cognac: "#" + C.cognac.toString(16).padStart(6, '0'),
+          stitch: "#" + C.stitch.toString(16).padStart(6, '0'),
+          steel: "#" + C.steel.toString(16).padStart(6, '0'),
+          red: "#" + C.red.toString(16).padStart(6, '0'),
+          alu: "#" + C.alu.toString(16).padStart(6, '0'),
+          ambient: "#ff9c4a"
+        },
+        wheelPos: wheelG.position.toArray(),
+        clusterPos: clusterG.position.toArray(),
+        ambientCount: 4
       },
       SEAT: SEAT,
       travelKeys: state.travelKeys.slice()

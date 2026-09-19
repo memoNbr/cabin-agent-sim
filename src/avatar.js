@@ -97,6 +97,38 @@ export function init(api) {
   box(body, "mouth", 0.028, 0.004, 0.004, 0, 0.36, 0.0495, dark);
   box(body, "cap", 0.088, 0.024, 0.088, 0, 0.406, 0, dark);
 
+  const headPivot = new THREE.Group();
+  headPivot.name = "headPivot";
+  body.add(headPivot);
+  const armLP = new THREE.Group();
+  armLP.name = "armLP";
+  body.add(armLP);
+  const armRP = new THREE.Group();
+  armRP.name = "armRP";
+  body.add(armRP);
+
+  function reparent(pivot, name) {
+    const m = body.getObjectByName(name);
+    if (!m) return;
+    const e = body.getObjectByName(name + "-edge");
+    m.position.set(-pivot.position.x, -pivot.position.y, -pivot.position.z);
+    pivot.add(m);
+    if (e) { e.position.set(-pivot.position.x, -pivot.position.y, -pivot.position.z); pivot.add(e); }
+  }
+
+  headPivot.position.set(0, 0.375, 0);
+  reparent(headPivot, "head");
+  reparent(headPivot, "eyeL");
+  reparent(headPivot, "eyeR");
+  reparent(headPivot, "mouth");
+  reparent(headPivot, "cap");
+  armLP.position.set(-0.096, 0.315, 0.014);
+  reparent(armLP, "armL");
+  reparent(armLP, "handL");
+  armRP.position.set(0.096, 0.315, 0.014);
+  reparent(armRP, "armR");
+  reparent(armRP, "handR");
+
   const state = {
     mode: "seated",
     leg: null,
@@ -139,6 +171,71 @@ export function init(api) {
     state.atWp = "driver";
   }
 
+  function cogF(v, d) { return (typeof v === "number" && isFinite(v)) ? clamp01(v) : d; }
+  function cogR(v) { return (typeof v === "number" && isFinite(v)) ? Math.max(0, v) : 0; }
+  let cogLinked = false;
+
+  function blend(t) {
+    const C = (typeof window !== "undefined" ? window.__COG_LIVE__ : null) || null;
+    if (C && !cogLinked) { cogLinked = true; console.log("[avatar] linked to cognitive live state"); }
+    const base = {
+      headX: 0, headY: Math.sin(t * 0.9) * 0.03,
+      armLX: 0, armLY: 0, armRX: 0, armRY: 0,
+      bodyX: -0.12, breatheK: 1
+    };
+    if (!C || state.mode !== "seated") return base;
+
+    const mood = C.mood || {};
+    const ride = C.ride || {};
+    const comfort = cogF(mood.comfort, 0.5);
+    const energy = cogF(mood.energy, 0.6);
+    const suspicion = cogF(mood.suspicion, 0.5);
+    const trust = cogF(C.trust, 0.5);
+    const joltN = cogR(ride.jolt);
+    const gN = cogR(ride.g);
+    const intent = C.intention;
+
+    let headX = base.headX, headY = base.headY;
+    let armLX = 0, armLY = 0, armRX = 0, armRY = 0;
+    let bodyX = base.bodyX, breatheK = base.breatheK;
+
+    const alertK = suspicion > 0.58 ? clamp01((suspicion - 0.58) / 0.42) : 0;
+    if (alertK > 0) {
+      const sp = 2.0 + energy * 2.8;
+      headY += Math.sin(t * sp) * 0.55 * alertK + Math.sin(t * 7.1) * 0.12 * alertK;
+      headX += Math.sin(t * sp * 0.5 + 1.2) * 0.1 * alertK;
+      armLX = -0.24 * alertK; armRX = -0.24 * alertK;
+      armLY = -0.16 * alertK; armRY = 0.16 * alertK;
+    }
+
+    const flinchK = clamp01(Math.max(0, (joltN - 0.22) / 0.35) + Math.max(0, (gN - 0.32) / 0.28));
+    if (flinchK > 0) {
+      bodyX = -0.12 - 0.2 * flinchK;
+      headX += 0.12 * flinchK;
+      armLX += -0.1 * flinchK; armRX += -0.1 * flinchK;
+      breatheK = 0.55;
+    }
+
+    if (intent === "settle") {
+      armRX = -0.5;
+      armRY = 0.22;
+    }
+
+    const slumpK = comfort > 0.7 ? clamp01((comfort - 0.7) / 0.3) : 0;
+    if (slumpK > 0) {
+      bodyX = Math.max(-0.12, bodyX + slumpK * 0.1);
+      headX += slumpK * 0.16;
+    }
+
+    const calmK = trust > 0.55 ? clamp01((trust - 0.55) / 0.35) : 0;
+    if (calmK > 0) {
+      headY *= (1 - calmK);
+      bodyX = Math.max(-0.16, bodyX - calmK * 0.04);
+    }
+
+    return { headX: headX, headY: headY, armLX: armLX, armLY: armLY, armRX: armRX, armRY: armRY, bodyX: bodyX, breatheK: breatheK };
+  }
+
   const pos = new THREE.Vector3();
   const target = new THREE.Vector3();
   const tquat = new THREE.Quaternion();
@@ -147,6 +244,8 @@ export function init(api) {
     for (let i = tasks.length - 1; i >= 0; i--) {
       if (t >= tasks[i].at) { const run = tasks[i].run; tasks.splice(i, 1); run(); }
     }
+
+    const pose = blend(t);
 
     let tx, tz, ty, tq;
     let striding = 0;
@@ -207,7 +306,7 @@ export function init(api) {
 
     root.quaternion.slerp(tq, damp(HEADING_EASE, dt));
 
-    const breathe = Math.sin(t * 2.1) * BREATHE;
+    const breathe = Math.sin(t * 2.1) * BREATHE * pose.breatheK;
     const hop = state.mode === "walk" && state.leg
       ? Math.sin(t * 9.2) * 0.016 * state.stride
       : (state.mode === "walk" ? Math.sin(t * 9.2) * 0.012 * state.stride : 0);
@@ -216,8 +315,15 @@ export function init(api) {
       body.rotation.z = Math.sin(t * 9.2) * 0.05 * state.stride;
     } else {
       body.rotation.z *= damp(3, dt);
-      body.rotation.x = -0.12;
+      body.rotation.x = pose.bodyX;
     }
+    const pk = damp(9, dt);
+    headPivot.rotation.x += (pose.headX - headPivot.rotation.x) * pk;
+    headPivot.rotation.y += (pose.headY - headPivot.rotation.y) * pk;
+    armLP.rotation.x += (pose.armLX - armLP.rotation.x) * pk;
+    armLP.rotation.y += (pose.armLY - armLP.rotation.y) * pk;
+    armRP.rotation.x += (pose.armRX - armRP.rotation.x) * pk;
+    armRP.rotation.y += (pose.armRY - armRP.rotation.y) * pk;
   }
 
   function next() {
