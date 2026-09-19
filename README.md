@@ -26,13 +26,14 @@ Single-seat adjustment limits (drawn rig, clamped):
 | seat height | 38–46 cm | 38 cm | `↑` `↓` · dock height rail |
 | rotation (yaw) | 0–360° | 0° | `←` `→` · dial |
 
-Cayenne-inspired trim (interior-only, same scene + animate loop): sculpted
-dashboard with vents and a chrome brow line; low center console with a wide
-portrait infotainment screen and shifter; door cards with cognac armrests,
-metal door pulls and shoulder trim; three-spoke multi-function wheel with a
-digital instrument cluster (red tach arc + speed arc); warm amber ambient
-light strips on dash, doors and console; seat restyled to a comfort
-silhouette (wings/bolsters) with cognac + mustard contrast stitching.
+Empty black-and-white monochrome interior (interior-only, same scene +
+animate loop): neutral black shell + charcoal trim with off-white Ivory
+seats, armrests and door inserts — black · grey · off-white, no colour.
+Sculpted surfaces only: dashboard with vents and a chrome brow line; low
+center console with shifter (portrait screen + cluster powered OFF/blank);
+door cards with ivory armrests and metal pulls; three-spoke wheel and seat
+(10–40° recline). The GTS red survives only as a thin hairline pinstripe
+on the roofline. No occupant fixtures — freshly-delivered and empty.
 
 ```bash
 npm install          # once — vite + three
@@ -46,11 +47,11 @@ Module map:
 ```
 index.html          Vite entry — scene stage, seat dock, chips, summary, trust survey
 src/main.js         boot order: cabin → avatar → cognitive → ui
-src/cabin.js        3D scene: Cayenne-linen interior (sculpted dash, low console + portrait
-                    screen, door cards, 3-spoke wheel, digital cluster, ambient strip),
-                    seat (+seatRig/agentMount/recline hinge), lights, orbit controls;
-                    exports cabinApi {scene, camera, controls, renderer, seatRig,
-                    agentMount, seatMount, state}
+src/cabin.js        3D scene: empty black/white monochrome interior (sculpted dash, low
+                    console, door cards, 3-spoke wheel; blank screen + cluster, powered
+                    off, no occupant fixtures), seat (+seatRig/agentMount/recline
+                    hinge), lights, orbit controls; exports cabinApi {scene, camera,
+                    controls, renderer, seatRig, agentMount, seatMount, state}
 src/avatar.js       roaming drawn agent — sits on the seat, walks the cabin
 src/cognitive.js    the cognitive agent (BDI, self-settle, THOUGHTS, trust survey,
                     priors) + the live 2D dock render; publishes __SEAT_LIVE__
