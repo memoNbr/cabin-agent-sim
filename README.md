@@ -10,6 +10,12 @@ The intuition you can test here: give the same cabin to different
 personas and watch their behaviour and their trust answers change.
 Editing a persona is editing one JSON file — the agent code stays the same.
 
+**The mind is Python; the browser only watches.** `cabin_sim/cognition.py`
+owns state and decides (BDI); the pages poll a versioned snapshot and
+forward input back. A real LLM (Groq free tier by default) words the
+thoughts, picks among *legal* goals and answers the chat — anything it
+can't do falls back to deterministic rules, so a run never breaks.
+
 ## Web app (Vite + three.js)
 
 The interactive cabin runs as a **Vite web app at the repo root**
@@ -45,7 +51,8 @@ npm run preview      # serve the built bundle locally
 Module map:
 
 ```
-index.html          Vite entry — scene stage, seat dock, chips, summary, trust survey
+index.html          Vite entry — scene stage, seat dock, chips, summary,
+                    trust survey, 💬 experimenter chat (async → POST /api/chat)
 src/main.js         boot order: cabin → avatar → cognitive → ui
 src/cabin.js        3D scene: empty black/white monochrome interior (sculpted dash, low
                     console, door cards, 3-spoke wheel; blank screen + cluster, powered
@@ -53,23 +60,35 @@ src/cabin.js        3D scene: empty black/white monochrome interior (sculpted da
                     hinge), lights, orbit controls; exports cabinApi {scene, camera,
                     controls, renderer, seatRig, agentMount, seatMount, state}
 src/avatar.js       roaming drawn agent — sits on the seat, walks the cabin
-src/cognitive.js    the cognitive agent (BDI, self-settle, THOUGHTS, trust survey,
-                    priors) + the live 2D dock render; publishes __SEAT_LIVE__
+src/cognitive.js    the VIEW adapter: polls /api/snapshot every 700 ms, draws the
+                    HUD + live 2D dock, forwards seat input; publishes __COG_LIVE__,
+                    __SEAT_LIVE__ and __EXPERIMENTER_CHAT__ — it decides nothing
+src/cognitive.legacy.js  the pre-port JS mind, archived unchanged (reference)
 src/ui.js           aggregation: mirrors the avatar pose onto __CABIN3D__.avatarPose
-public/             Pexels reference photos (interior.jpg / interior-alt.jpg)
+public/             interior refs (interior.jpg / interior-alt.jpg) + live sim
+                    captures (sim-live-web.png / sim-live-view.png)
 ```
 
-The older stdlib-python runner still lives under `cabin_sim/` + `web/` for the
-LLM/scripted loop below.
+`cabin_sim/` + `web/` serve the same sim **without npm**: a stdlib HTTP
+server on `:8000` that also renders an inline-SVG visual. The
+authoritative loop lives entirely in Python; `cabin_sim/MIGRATION.md`
+documents the JS → Python port.
 
 ## How it works
 
-**Agent loop (light BDI):**
+**Agent loop (BDI, one decision per step):**
 
 1. **Perceive** — reads the cabin state and its own mood (comfort, energy, suspicion).
-2. **Reason** — an LLM prompted with the persona answers *"as this person, what do I do next?"* with one JSON decision; without a key, a deterministic scripted fallback plays the same role.
+2. **Reason** — with `--reasoning auto` (the default when the provider is
+   `groq`/`ollama`) an LLM answers *"as this person, what do I do next?"*:
+   it may only choose among **goals Python considers legal**, and it words
+   the inner-monologue thought. `--reasoning rules` uses the deterministic
+   phrase banks only — that is what the test suite runs on.
 3. **Validate** — the chosen action is checked against a whitelist; the cabin clamps every change, so nothing can go out of bounds.
 4. **Act + narrate** — the action is applied, mood updates, and the persona's words show in the browser.
+
+Bad JSON, an illegal goal, a `429`, or a dead network all mean **rules for
+that tick** — the ride keeps ticking (and pytest stays green).
 
 **Trust questionnaire** — at the end of the session the persona rates the
 automated cabin on the 16-item MDMT:
@@ -92,15 +111,23 @@ python -m venv .venv
 .venv\Scripts\activate            # Windows (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
 
-python -m cabin_sim.main          # opens the browser view on http://127.0.0.1:8000
+python -m cabin_sim.main --provider groq    # mind + view → http://127.0.0.1:8000
 ```
 
-Then open http://127.0.0.1:8000 and watch the persona iterate.
+The session runs 5 minutes (`--duration 300`), ticking a decision every
+1.2 s (`--interval`). Open the URL and watch the persona iterate.
+
+Prefer the three.js cabin? In a second terminal:
+
+```bash
+npm install          # once — vite + three
+npm run dev          # http://127.0.0.1:5173, proxies /api → :8000
+```
 
 Headless run (no browser) for quick checks:
 
 ```bash
-python -m cabin_sim.main --steps 40
+python -m cabin_sim.main --headless --steps 40
 ```
 
 ## Using a real LLM (free + fast)
@@ -108,17 +135,38 @@ python -m cabin_sim.main --steps 40
 Edit `.env` (copy from `.env.example`):
 
 ```ini
-# Free, small and very fast cloud model
+# Free cloud brain — ~300 ms/call, ~30 req/min, no credit card
 LLM_PROVIDER=groq
 GROQ_API_KEY=your_key             # free at console.groq.com
+GROQ_MODEL=allam-2-7b
 
-# OR fully local, no key
+# OR fully local, no key (offline fallback)
 LLM_PROVIDER=ollama
-OLLAMA_MODEL=llama3.2
+OLLAMA_MODEL=qwen3:4b
+OLLAMA_THINK=0                    # Qwen3 hidden thinking: 19 s/call → 0.75 s off
 ```
 
-Provider is picked from `--provider`, then `.env`. Unknown or missing
-config never breaks a run — it falls back to the scripted provider.
+Provider is picked from `--provider`, then `.env` (the template ships
+`scripted` so a fresh clone runs silent — flip two lines to go live).
+Unknown or missing config never breaks a run. The reasoning mode is
+separate (`--reasoning auto|rules|llm`); deliberation is throttled to fit
+Groq's free tier (~6K TPM) and every failure falls back to rules for that
+tick. Optional `CHAT_MODEL` splits lanes: chat on one model, ticks on
+another (`--chat-model` on the CLI).
+
+## Chat with the persona
+
+The 💬 panel (and `POST /api/chat`) sends your line to the **live mind** —
+asynchronously, so the page never freezes while the model thinks (a `…`
+shows until Phill answers; if the mind is down the panel says so instead
+of faking a reply). Routing matches his thoughts: seat words act on his
+body, trust words answer from the live trust score, everything else goes
+to the model. The console hook keeps its legacy shape:
+
+```js
+window.__EXPERIMENTER_CHAT__.send("Do you trust this car?")   // → {ok, reply, state}
+window.__EXPERIMENTER_CHAT__.history()                        // [{who, t, text}] oldest first
+```
 
 ## Personas
 
@@ -136,17 +184,43 @@ and curiosity. Copy the file, change the numbers and the story, and run
 
 ```
 cabin_sim/
-  world.py          car interior: Seat + VendingMachine + Table (pure state)
-  actions.py        the agent's action whitelist; every change is clamped
-  agent.py          perceive -> reason -> validate -> act  (persona-aware)
-  provider.py       groq | ollama | scripted fallback
-  questionnaire.py  MDMT (16 items, 4 subscales, scoring)
-  session.py        1 session = timed decisions + end-of-session questionnaire
-  server.py         stdlib HTTP: the page + /api/state feed
-  main.py           CLI
-web/index.html      the browser visual (inline SVG, polls /api/state)
-personas/           editable persona JSON files
+  cognition.py       the Mind (authoritative): BDI perceive → desire →
+                     intention → act, mood/trust/memory, chat — pure Python
+  reasoning.py       LLM layer: deliberation + thoughts + chat, legal-set
+                     validation, free-tier throttle, rules fallback
+  provider.py        groq | ollama | scripted backends (think/token caps)
+  sim.py             SimEngine — the only clock: phases, ride script, priors
+  schema.py          build_snapshot — the single JSON contract for the views
+  server.py          stdlib HTTP: / · /api/state · /api/snapshot · /api/chat
+                     · /api/seat · /api/control + the ticker thread
+  session.py         1 session = engine + mind + event log + questionnaire
+  world.py           car interior: Seat + VendingMachine + Table (pure state)
+  actions.py         the agent's action whitelist; every change is clamped
+  agent.py           act layer: validate + apply, counts succeeded/blocked
+  questionnaire.py   MDMT (16 items, 4 subscales, scoring)
+  main.py            CLI (--provider · --reasoning · --chat-model · ...)
+  MIGRATION.md       JS → Python port notes
+web/index.html       inline-SVG visual served on :8000 (polls /api/state)
+src/                 three.js view adapter + archived pre-port mind
+tests/               pytest suite — 81 tests
+personas/            editable persona JSON files
+tutorial-cognitive.html         architecture tutorial (kiosk, 8 sections)
+tutorial-cognitive-python.html  companion walkthrough
+public/              interior reference photos + live sim captures
 ```
+
+## Tests & tutorials
+
+```bash
+python -m pytest tests -q     # 81 passed
+npm run build                 # exit 0
+```
+
+`tutorial-cognitive.html` is the guided tour of the architecture —
+8 collapsible sections covering the BDI overview, data structures, the
+cognition loop, memory, trust & mood, the event timeline, the API hooks
+and the key parameters. Open it directly in a browser (double-click).
+Live screenshots of the running sim ship in `public/sim-live-*.png`.
 
 ## References
 
