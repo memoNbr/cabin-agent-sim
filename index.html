@@ -258,6 +258,125 @@
   .lav textarea{width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--ink);
     padding:10px; border-radius:8px; font:12px/1.5 "Consolas",monospace; resize:vertical; min-height:44px;}
   .lav .btn{margin-top:8px;}
+
+  /* ================= kiosk mode: black/gray, cabin canvas full-screen ================= */
+  :root{--bg:#000; --panel:#0d0d0d; --line:#222;
+    --ink:#e8e8e8; --muted:#999; --faint:#5a5a5a;
+    --gold:#9a9a9a; --gold-hi:#d6d6d6; --gold-dim:#4a4a4a; --danger:#b35a5a; --ok:#8c8c8c; --teal:#8c8c8c;}
+  header, .topctl, .grid, footer, #summary, #trustQ{display:none !important;}
+  .wrap{max-width:none; padding:0;}
+  .scene-band{max-width:none; padding:0;}
+  .scene-card{height:100vh; min-height:100vh; border:0; border-radius:0; background:#000;}
+  #cabin3d{background:#000;}
+  .seat-dock, .scene-foot{display:none !important;}
+  #sceneCv{display:none;}
+  .event-banner{display:none !important;}
+  /* monochrome floating controls */
+  .viewer-tools .btn{background:rgba(16,16,16,.65); border:1px solid #3a3a3a; color:#c9c9c9; backdrop-filter:blur(3px);}
+  .viewer-tools .btn:hover{background:#cfcfcf; color:#000; border-color:#cfcfcf;}
+  .viewer-tools .btn.on{background:#cfcfcf; color:#000; border-color:#cfcfcf; font-weight:700;}
+  .viewer-hint{color:#b8b8b8; background:rgba(8,8,8,.55); border:1px solid #333;}
+  .viewer-hint kbd{background:#111; border:1px solid #484848; color:#ddd;}
+  .viewer-status{color:#8f8f8f; background:rgba(8,8,8,.85); border:1px solid #333;}
+  .viewer-status.err{color:var(--danger); border-color:var(--danger);}
+  .scene-card h3{color:rgba(224,224,224,.92); text-shadow:0 1px 4px rgba(0,0,0,.9);}
+
+  /* legacy seat portal is inert in kiosk mode — superseded by .sim-bar */
+  .seat-portal{display:none !important;}
+
+  /* ---- simulation control bar: small floating strip, bottom-center ---- */
+  .sim-bar{position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:8;
+    display:flex; align-items:center; gap:8px; padding:7px 11px; max-width:94vw; flex-wrap:wrap;
+    background:rgba(10,10,12,.88); border:1px solid #333; border-radius:9px;
+    backdrop-filter:blur(3px); font:11px/1 ui-monospace,Consolas,monospace; color:#b8b8b8;}
+  .sim-bar .kbtn{background:#141416; border:1px solid #3a3a3a; color:#cfcfcf; border-radius:5px;
+    padding:5px 11px; font:inherit; letter-spacing:.06em; cursor:pointer; transition:all .15s;}
+  .sim-bar .kbtn:hover{background:#cfcfcf; color:#000; border-color:#cfcfcf;}
+  .sim-bar .kbtn.on{background:#cfcfcf; color:#000; border-color:#cfcfcf; font-weight:700;}
+  .sim-clock{min-width:46px; text-align:center; color:#e8e8e8; background:#0b0b0d;
+    border:1px solid #333; border-radius:5px; padding:5px 7px; letter-spacing:.08em;}
+  .sim-jump{width:58px; background:#0b0b0d; border:1px solid #3a3a3a; color:#ddd; border-radius:5px;
+    padding:5px 7px; font:inherit;}
+  .sim-jump::placeholder{color:#666;}
+  .sim-jump:focus{outline:none; border-color:#888;}
+  .sim-speed{background:#141416; border:1px solid #3a3a3a; color:#cfcfcf; border-radius:5px;
+    padding:5px 6px; font:inherit; cursor:pointer;}
+  .sim-speed:focus{outline:none; border-color:#888;}
+  /* ---- adjustable seat: compact sliders, black/gray kiosk --------------- */
+  .seat-sys{display:flex; align-items:center; gap:9px; padding-left:9px; border-left:1px solid #333;}
+  .seat-sys.gone{display:none;}
+  .seat-lbl{display:flex; align-items:center; gap:5px; font-size:9px; letter-spacing:.12em;
+    text-transform:uppercase; color:#8f8f8f; cursor:default; user-select:none;}
+  .seat-lbl input[type=range]{-webkit-appearance:none; appearance:none; width:68px; height:3px;
+    background:linear-gradient(90deg,#4a4a4a,#262626); border-radius:2px; outline:none; cursor:pointer; margin:0;}
+  .seat-lbl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:11px;
+    height:11px; border-radius:50%; background:#cfcfcf; border:1px solid #000; box-shadow:0 0 0 1px #555; cursor:grab;}
+  .seat-lbl input[type=range]::-moz-range-thumb{width:11px; height:11px; border-radius:50%; background:#cfcfcf;
+    border:1px solid #000; box-shadow:0 0 0 1px #555; cursor:grab;}
+  .seat-lbl input[type=range]:focus{border-color:#888;}
+  .seat-val{font-size:10px; color:#e2e2e2; min-width:30px; text-align:right; letter-spacing:.02em;}
+
+  /* ---- experimenter chat: floating bottom-right, black/gray kiosk ------ */
+  .xp-chat{position:absolute; right:14px; bottom:14px; z-index:9;
+    display:flex; flex-direction:column; align-items:flex-end; gap:8px; pointer-events:none;}
+  .xp-fab{pointer-events:auto; width:38px; height:38px; border-radius:50%;
+    background:rgba(12,12,14,.9); border:1px solid #3a3a3a; color:#cfcfcf; font-size:15px;
+    line-height:1; cursor:pointer; backdrop-filter:blur(3px); transition:all .16s; padding:0;}
+  .xp-fab:hover{background:#cfcfcf; color:#000; border-color:#cfcfcf;}
+  .xp-panel{pointer-events:auto; display:none; width:272px; max-width:calc(100vw - 28px);
+    flex-direction:column; background:rgba(10,10,12,.94); border:1px solid #333;
+    border-radius:10px; overflow:hidden; box-shadow:0 14px 34px rgba(0,0,0,.55);
+    backdrop-filter:blur(6px); font:11px/1.45 ui-monospace, Consolas, monospace;}
+  .xp-chat.open .xp-panel{display:flex;}
+  .xp-head{display:flex; align-items:center; justify-content:space-between; padding:7px 10px;
+    border-bottom:1px solid #2c2c2c; font-size:9px; letter-spacing:.22em;
+    text-transform:uppercase; color:#8f8f8f; user-select:none;}
+  .xp-close{background:none; border:0; color:#8f8f8f; font-size:12px; cursor:pointer; padding:0 2px;}
+  .xp-close:hover{color:#e6e6e6;}
+  .xp-log{display:flex; flex-direction:column; gap:5px; min-height:60px; max-height:196px;
+    overflow-y:auto; padding:8px 10px; scrollbar-width:thin; scrollbar-color:#444 transparent;}
+  .xp-log:empty::before{content:"no messages yet — type below to reach the agent";
+    color:#555; font-size:10px; letter-spacing:.03em;}
+  .xp-msg{font-size:11px; color:#c8c8c8; word-break:break-word; white-space:pre-wrap;}
+  .xp-msg b{color:#e8e8e8; font-weight:600; letter-spacing:.04em;}
+  .xp-msg.xp-ag{color:#a9aab2;}
+  .xp-msg.xp-ag b{color:#8f9099;}
+  .xp-row{display:flex; gap:6px; padding:8px; border-top:1px solid #2c2c2c;}
+  .xp-in{flex:1; min-width:0; background:#0b0b0d; border:1px solid #3a3a3a; color:#ddd;
+    border-radius:5px; padding:6px 8px; font:inherit;}
+  .xp-in::placeholder{color:#666;}
+  .xp-in:focus{outline:none; border-color:#888;}
+  .xp-send{background:#141416; border:1px solid #3a3a3a; color:#cfcfcf; border-radius:5px;
+    padding:0 10px; font:inherit; letter-spacing:.06em; cursor:pointer; transition:all .15s;}
+  .xp-send:hover{background:#cfcfcf; color:#000; border-color:#cfcfcf;}
+
+  /* ---- seat portal overlay: minimal corner panel, black/gray kiosk ---- */
+  .seat-portal{position:fixed; right:16px; bottom:16px; z-index:30;
+    display:flex; flex-direction:column; align-items:flex-end; pointer-events:none;}
+  .seat-portal .sp-chip{pointer-events:auto; font-size:10px; letter-spacing:.24em; text-transform:uppercase;
+    color:#9a9a9a; background:rgba(10,10,10,.72); border:1px solid #2c2c2c; border-radius:8px;
+    padding:7px 12px; cursor:pointer; backdrop-filter:blur(3px); user-select:none; transition:all .18s;}
+  .seat-portal .sp-chip:hover{color:#e6e6e6; border-color:#555;}
+  .seat-portal.open .sp-chip{display:none;}
+  .seat-portal .sp-panel{pointer-events:none; opacity:0; visibility:hidden; transform:translateY(6px);
+    width:248px; margin-bottom:8px; background:rgba(12,12,12,.78); border:1px solid #333;
+    border-radius:10px; padding:10px 12px 9px; box-shadow:0 14px 34px rgba(0,0,0,.55);
+    backdrop-filter:blur(6px); transition:opacity .18s, transform .18s, visibility .18s;}
+  .seat-portal:hover .sp-panel, .seat-portal.open .sp-panel{pointer-events:auto; opacity:1;
+    visibility:visible; transform:translateY(0);}
+  .seat-portal .sp-title{display:flex; justify-content:space-between; align-items:baseline;
+    font-size:9.5px; letter-spacing:.26em; color:#8a8a8a; text-transform:uppercase; margin-bottom:8px;}
+  .seat-portal .sp-title b{color:#d6d6d6; font-weight:600; letter-spacing:.3em;}
+  .seat-portal .sp-keys{letter-spacing:.04em; text-transform:none; font-size:8.5px; color:#555;}
+  .seat-portal .sp-row{display:grid; grid-template-columns:44px 1fr 52px; align-items:center; gap:8px; margin-top:7px;}
+  .seat-portal .sp-row .sp-lbl{font-size:9.5px; letter-spacing:.18em; color:#8f8f8f; text-transform:uppercase;}
+  .seat-portal .sp-row .sp-val{font-size:11px; color:#e2e2e2; text-align:right; white-space:nowrap;}
+  .seat-portal .sp-rng{-webkit-appearance:none; appearance:none; height:3px; border-radius:2px; outline:none;
+    background:linear-gradient(90deg,#4a4a4a,#262626); cursor:pointer; margin:0;}
+  .seat-portal .sp-rng::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:11px; height:11px;
+    border-radius:50%; background:#cfcfcf; border:1px solid #000; box-shadow:0 0 0 1px #555; cursor:grab;}
+  .seat-portal .sp-rng::-moz-range-thumb{width:11px; height:11px; border-radius:50%; background:#cfcfcf;
+    border:1px solid #000; box-shadow:0 0 0 1px #555; cursor:grab;}
 </style>
 </head>
 <body>
@@ -293,12 +412,45 @@
       <div class="viewer-tools">
         <button class="btn on" id="vRoof" type="button">roof</button>
         <button class="btn" id="vPhoto" type="button">photo</button>
+        <button class="btn" id="vCam" type="button">walk-out</button>
         <button class="btn" id="vReset" type="button">reset view</button>
       </div>
       <div class="viewer-status" id="viewerStatus">drawing the cabin shell…</div>
       <div class="viewer-hint" id="viewerHint">
-        drag · orbit &nbsp;|&nbsp; wheel · zoom &nbsp;|&nbsp; right-drag · pan<br>
-        <kbd>W</kbd><kbd>S</kbd> travel fwd/back &nbsp; <kbd>Q</kbd><kbd>E</kbd> travel left/right &nbsp; <kbd>[</kbd><kbd>]</kbd> recline
+        drag · orbit &nbsp;|&nbsp; wheel · zoom &nbsp;|&nbsp; right-drag · pan &nbsp;|&nbsp; <kbd>H</kbd> seat panel<br>
+        <kbd>W</kbd><kbd>S</kbd> travel fwd/back &nbsp; <kbd>Q</kbd><kbd>E</kbd> travel left/right &nbsp; <kbd>[</kbd><kbd>]</kbd> recline &nbsp; <kbd>C</kbd> walk out / back in
+      </div>
+      <div class="sim-bar" id="simBar" role="group" aria-label="simulation controls">
+        <button class="kbtn on" id="simToggle" type="button" title="start / stop the simulation loop">stop</button>
+        <span class="sim-clock mono" id="simClock" title="simulation time — mm:ss">00:00</span>
+        <input class="sim-jump" id="simJump" type="text" inputmode="numeric" maxlength="7" placeholder="mm:ss" aria-label="jump to simulation time, mm:ss">
+        <button class="kbtn" id="simGo" type="button" title="jump to the typed time">go</button>
+        <select class="sim-speed" id="simSpeed" aria-label="simulation speed multiplier" title="simulation speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+        <button class="kbtn" id="simSeat" type="button" title="interior view, camera focused on the driver seat">seat</button>
+        <button class="kbtn on" id="seatVis" type="button" title="show / hide the adjustable seat and its sliders">seat on</button>
+        <div class="seat-sys" id="seatSys" role="group" aria-label="seat adjustments">
+          <label class="seat-lbl" title="seat height: 38–46 cm above the floor">h<input type="range" id="seatHgt" min="38" max="46" step="1" value="38" aria-label="seat height, 38 to 46 cm"><span class="seat-val" id="seatHgtV">38</span></label>
+          <label class="seat-lbl" title="seat swivel: 0–355°, 5° steps">rot<input type="range" id="seatRot" min="0" max="355" step="5" value="0" aria-label="seat rotation, 0 to 355 degrees"><span class="seat-val" id="seatRotV">0°</span></label>
+          <label class="seat-lbl" title="lateral rail: 0 = centre, −50 cm = left (no right travel)">lat<input type="range" id="seatLat" min="-50" max="0" step="1" value="0" aria-label="lateral rail, 0 to minus 50 centimetres"><span class="seat-val" id="seatLatV">0</span></label>
+          <label class="seat-lbl" title="longitudinal rail: −20 cm back … +10 cm forward">lng<input type="range" id="seatLng" min="-20" max="10" step="1" value="0" aria-label="longitudinal rail, minus 20 to plus 10 centimetres"><span class="seat-val" id="seatLngV">0</span></label>
+        </div>
+      </div>
+      <!-- experimenter chat: floating bottom-right, collapsible ---------- -->
+      <div class="xp-chat" id="xpChat">
+        <div class="xp-panel" id="xpPanel" role="dialog" aria-label="Experimenter chat with the agent">
+          <div class="xp-head"><span>experimenter ↔ agent</span><button class="xp-close" id="xpClose" type="button" aria-label="collapse chat">✕</button></div>
+          <div class="xp-log" id="xpLog" role="log" aria-live="polite"></div>
+          <form class="xp-row" id="xpForm">
+            <input class="xp-in" id="xpIn" type="text" autocomplete="off" placeholder="message the agent…" aria-label="message to the agent">
+            <button class="xp-send" type="submit" title="send this message to the agent">send</button>
+          </form>
+        </div>
+        <button class="xp-fab" id="xpFab" type="button" aria-expanded="false" aria-controls="xpPanel" title="experimenter chat with the agent">💬</button>
       </div>
       <div class="event-banner" id="eventBanner"></div>
       <div class="speed-streaks" id="streaks">
@@ -543,6 +695,73 @@
     <div style="margin-top:10px; font-size:10px; color:#5C5749; line-height:1.5;">Privacy boundary · aggregates only (trust / comfort / suspicion) → next-ride priors. If an LLM hook (window.lavish) is present, Phill's remark is queued there; no keys are stored and no personal data leaves this page. Without a hook, speech falls back to Phill's own lines.</div>
   </div>
 </div>
+<!-- seat portal overlay: minimal corner seat controls · H pin · hover to preview -->
+<div class="seat-portal" id="seatPortal" aria-label="Seat controls">
+  <div class="sp-panel" role="group" aria-label="Seat adjustments">
+    <div class="sp-title"><b>driver&nbsp;seat</b><span class="sp-keys">H pin · ←→ rot · ↑↓ hgt · A/D slide · [ ] recl</span></div>
+    <div class="sp-row"><span class="sp-lbl">recline</span><input class="sp-rng mono" id="spRecline" type="range" min="10" max="40" step="1" value="24" aria-label="Seatback recline"><span class="sp-val mono" id="spReclineV">24°</span></div>
+    <div class="sp-row"><span class="sp-lbl">rotate</span><input class="sp-rng mono" id="spRot" type="range" min="0" max="355" step="5" value="0" aria-label="Seat rotation"><span class="sp-val mono" id="spRotV">0°</span></div>
+    <div class="sp-row"><span class="sp-lbl">slide</span><input class="sp-rng mono" id="spSl" type="range" min="-8" max="8" step="1" value="0" aria-label="Seat slide"><span class="sp-val mono" id="spSlV">0 cm</span></div>
+    <div class="sp-row"><span class="sp-lbl">height</span><input class="sp-rng mono" id="spHgt" type="range" min="38" max="46" step="1" value="38" aria-label="Seat height"><span class="sp-val mono" id="spHgtV">38 cm</span></div>
+  </div>
+  <button type="button" class="sp-chip" id="spChip" aria-controls="seatPortal">seat ▸</button>
+</div>
+<!-- experimenter chat: UI + global hook. window.__EXPERIMENTER_CHAT__
+     .send(text) posts an "Experimenter:" line and schedules the stub
+     agent, which answers "Agent received: <text>" after 500 ms;
+     .onAgentReply(cb) registers callbacks fired with each agent reply
+     (cognitive.js can take over the reply side later). This classic
+     script runs during parse, before the module bundle, so the hook
+     always exists by the time the agent code boots. -->
+<script>
+(function () {
+  var root = document.getElementById("xpChat");
+  var log = document.getElementById("xpLog");
+  var form = document.getElementById("xpForm");
+  var input = document.getElementById("xpIn");
+  var fab = document.getElementById("xpFab");
+  var replyCbs = [];
+  function setOpen(open) {
+    root.classList.toggle("open", open);
+    fab.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) input.focus();
+  }
+  function line(who, text) {
+    var el = document.createElement("div");
+    el.className = "xp-msg " + (who === "Experimenter" ? "xp-xp" : "xp-ag");
+    var b = document.createElement("b");
+    b.textContent = who + ":";
+    el.appendChild(b);
+    el.appendChild(document.createTextNode(" " + text));
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+  }
+  function send(msg) {
+    msg = String(msg === null || msg === undefined ? "" : msg).trim();
+    if (!msg) return false;
+    setOpen(true);
+    line("Experimenter", msg);
+    setTimeout(function () {
+      var reply = "Agent received: " + msg;
+      line("Agent", reply);
+      replyCbs.forEach(function (cb) {
+        try { cb(reply); } catch (e) { console.error("[xp-chat]", e); }
+      });
+    }, 500);
+    return true;
+  }
+  fab.addEventListener("click", function () { setOpen(!root.classList.contains("open")); });
+  document.getElementById("xpClose").addEventListener("click", function () { setOpen(false); });
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (send(input.value)) input.value = "";
+  });
+  window.__EXPERIMENTER_CHAT__ = {
+    send: send,
+    onAgentReply: function (cb) { if (typeof cb === "function") replyCbs.push(cb); }
+  };
+})();
+</script>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>

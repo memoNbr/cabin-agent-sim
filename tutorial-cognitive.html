@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cognitive Agent Architecture — technical tutorial for cognitive.js</title>
+<meta name="description" content="Technical walkthrough of the BDI cognitive agent in cabin-agent-sim/src/cognitive.js: state, cognition loop, memory decay, trust & mood dynamics, event timeline, API hooks.">
+<style>
+  :root{
+    --bg:#08090a; --panel:#0e0f11; --panel2:#131417; --line:#24252a; --line2:#1a1b1f;
+    --tx:#c7c9d0; --tx-dim:#8b8d96; --tx-bright:#eceef3;
+    --gold:#c9a227; --gold-soft:#e6c85a; --teal:#6bd5c0; --red:#d9756b;
+    --mono:Consolas,"SF Mono","Cascadia Mono",Menlo,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:var(--sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1060px; margin:0 auto; padding:0 18px 90px}
+
+  /* ---------- kiosk header ---------- */
+  header.kiosk{
+    background:linear-gradient(180deg,#0d0e10 0%,#08090a 100%);
+    border-bottom:1px solid var(--line);
+    padding:34px 0 22px; margin-bottom:22px;
+  }
+  header.kiosk .wrap{padding-bottom:0}
+  .kicker{
+    font-family:var(--mono); font-size:11px; letter-spacing:.28em;
+    text-transform:uppercase; color:var(--gold);
+  }
+  h1{
+    margin:8px 0 6px; font-size:30px; line-height:1.2;
+    letter-spacing:-.01em; color:var(--tx-bright); font-weight:700;
+  }
+  .sub{color:var(--tx-dim); font-size:15px; max-width:70ch}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
+  .chip{
+    font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+    border:1px solid var(--line); background:var(--panel2);
+    color:var(--tx-dim); padding:5px 10px;
+  }
+  .chip b{color:var(--gold-soft); font-weight:600}
+
+  /* ---------- toolbar + toc ---------- */
+  .bar{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    justify-content:space-between; margin:20px 0 14px;
+  }
+  .btn{
+    font-family:var(--mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+    background:var(--panel2); color:var(--tx); border:1px solid var(--line);
+    padding:12px 18px; min-height:44px; cursor:pointer;
+  }
+  .btn:hover{border-color:var(--gold); color:var(--gold-soft)}
+  .toc{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:8px; margin:0 0 26px;
+  }
+  .toc a{
+    display:block; text-decoration:none; background:var(--panel);
+    border:1px solid var(--line); border-left:3px solid var(--gold);
+    padding:11px 13px; color:var(--tx); font-size:13.5px;
+  }
+  .toc a:hover{background:var(--panel2); color:var(--gold-soft)}
+  .toc a span{
+    display:block; font-family:var(--mono); font-size:10.5px;
+    color:var(--gold); letter-spacing:.14em; margin-bottom:2px;
+  }
+
+  /* ---------- collapsible sections ---------- */
+  details.sec{
+    background:var(--panel); border:1px solid var(--line);
+    margin:0 0 14px; scroll-margin-top:14px;
+  }
+  details.sec > summary{
+    list-style:none; cursor:pointer; user-select:none;
+    padding:17px 20px; display:flex; align-items:center; gap:14px;
+    font-family:var(--mono); font-size:14px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--tx-bright);
+  }
+  details.sec > summary::-webkit-details-marker{display:none}
+  details.sec > summary:hover{background:var(--panel2)}
+  details.sec > summary .no{
+    font-size:11px; color:#08090a; background:var(--gold);
+    padding:3px 7px; font-weight:700; letter-spacing:.05em; flex:none;
+  }
+  details.sec > summary .caret{margin-left:auto; color:var(--gold); font-size:13px; flex:none}
+  details.sec[open] > summary{border-bottom:1px solid var(--line); background:#101114}
+  details.sec[open] > summary .caret::after{content:" ▾"}
+  details.sec > summary .caret::after{content:" ▸"}
+  .body{padding:22px 22px 26px}
+  .body > :first-child{margin-top:0}
+
+  h2{font-size:19px; color:var(--tx-bright); margin:26px 0 8px; letter-spacing:-.01em}
+  h3{
+    font-family:var(--mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--gold-soft); margin:26px 0 8px; font-weight:600;
+  }
+  p{margin:10px 0; max-width:78ch}
+  ul,ol{margin:10px 0; padding-left:22px; max-width:78ch}
+  li{margin:5px 0}
+  a{color:var(--teal)}
+
+  /* ---------- code ---------- */
+  code{
+    font-family:var(--mono); font-size:.875em;
+    background:#17181b; color:#e3cf92; padding:1.5px 5px; border:1px solid #212226;
+  }
+  pre{
+    position:relative; margin:14px 0; background:#050506;
+    border:1px solid var(--line); border-left:3px solid var(--gold);
+    padding:15px 16px; overflow-x:auto;
+  }
+  pre code{
+    background:none; border:none; padding:0; color:#d8d5c9;
+    font-size:13px; line-height:1.62; display:block; white-space:pre;
+  }
+  pre .cm{color:#6e7076}   /* comment */
+  pre .kw{color:#c9a227}   /* keyword */
+  pre .st{color:#8fc7a8}   /* string  */
+  pre .nu{color:#c99a6b}   /* number  */
+  .copy{
+    position:absolute; top:7px; right:7px; font-family:var(--mono);
+    font-size:10px; letter-spacing:.1em; background:#111214; color:var(--tx-dim);
+    border:1px solid var(--line); padding:5px 9px; cursor:pointer;
+  }
+  .copy:hover{color:var(--gold-soft); border-color:var(--gold)}
+
+  /* ---------- tables ---------- */
+  table{width:100%; border-collapse:collapse; margin:14px 0; font-size:13.5px}
+  th{
+    text-align:left; background:#16171a; color:var(--gold-soft);
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    padding:9px 10px; border:1px solid var(--line);
+  }
+  td{padding:8px 10px; border:1px solid var(--line2); vertical-align:top}
+  tbody tr:nth-child(even) td{background:#0b0c0e}
+  td.m,th.m{font-family:var(--mono); font-size:12.5px}
+  td.num{text-align:right; font-family:var(--mono); font-size:12.5px; color:var(--gold-soft)}
+  .desc{color:var(--tx-dim)}
+
+  /* ---------- formulas & notes ---------- */
+  .fx{
+    font-family:var(--mono); font-size:13px; line-height:1.75;
+    background:#0a0b0d; border:1px solid var(--line); border-left:3px solid var(--teal);
+    padding:13px 16px; margin:12px 0; overflow-x:auto; color:#d5d7dd; white-space:pre;
+  }
+  .fx b{color:var(--gold-soft); font-weight:600}
+  .note{
+    border-left:3px solid var(--teal); background:rgba(107,213,192,.05);
+    padding:11px 15px; margin:14px 0; font-size:14.5px; color:#c2cbc9;
+  }
+  .warn{
+    border-left:3px solid var(--gold); background:rgba(201,162,39,.06);
+    padding:11px 15px; margin:14px 0; font-size:14.5px;
+  }
+  .note b,.warn b{color:var(--gold-soft)}
+
+  /* ---------- flow diagram ---------- */
+  .flow{
+    font-family:var(--mono); font-size:12.5px; line-height:1.5;
+    background:#050506; border:1px solid var(--line); padding:16px;
+    overflow-x:auto; color:#b9bcc4; margin:16px 0; white-space:pre;
+  }
+  .flow .g{color:var(--gold-soft)}
+  .flow .t{color:var(--teal)}
+  .flow .d{color:#6e7076}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media (max-width:760px){ .grid2{grid-template-columns:1fr} h1{font-size:24px} }
+
+  /* ---------- timeline ---------- */
+  .tl{position:relative; height:74px; margin:22px 0 8px;
+      background:#0a0b0d; border:1px solid var(--line)}
+  .tl .axis{position:absolute; left:0; right:0; top:36px; height:2px; background:#2b2c31}
+  .tl .seg{position:absolute; top:34px; height:6px; background:rgba(201,162,39,.55)}
+  .tl .ev{position:absolute; top:22px; width:2px; height:30px; background:var(--teal)}
+  .tl .ev.j{background:var(--red)}
+  .tl .ev b{
+    position:absolute; top:-17px; left:-13px; font-family:var(--mono);
+    font-size:9.5px; color:var(--tx-dim); font-weight:400;
+  }
+  .tl .tick{position:absolute; top:52px; font-family:var(--mono); font-size:10px; color:#6e7076; transform:translateX(-50%)}
+  .tl .lbl{position:absolute; top:4px; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; color:var(--gold)}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-family:var(--mono); font-size:11px; color:var(--tx-dim); margin-bottom:8px}
+  .dot{display:inline-block; width:9px; height:9px; margin-right:5px; vertical-align:-1px}
+
+  footer.kiosk{
+    border-top:1px solid var(--line); margin-top:34px; padding-top:18px;
+    font-family:var(--mono); font-size:11.5px; color:#6e7076; letter-spacing:.06em;
+  }
+</style>
+</head>
+<body>
+
+<header class="kiosk">
+  <div class="wrap">
+    <div class="kicker">cabin-agent-sim · technical documentation</div>
+    <h1>Cognitive Agent Architecture</h1>
+    <div class="sub">A BDI (Belief–Desire–Intention) passenger mind, explained from the source of
+      <code>src/cognitive.js</code>: state, deliberation loop, associative memory, trust &amp; mood
+      dynamics, the scripted ride timeline, and the hooks you can drive it from the console.</div>
+    <div class="chips">
+      <span class="chip">file <b>src/cognitive.js</b></span>
+      <span class="chip">persona <b>PHILL</b></span>
+      <span class="chip">memory λ <b>0.004 /s</b></span>
+      <span class="chip">ride <b>120s → 600s</b></span>
+      <span class="chip">loop <b>rAF · timeScale ×4</b></span>
+      <span class="chip">hooks <b>__EXPERIMENTER_CHAT__</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="bar">
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:#6e7076">
+      8 SECTIONS · COLLAPSIBLE
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="btnExpand">Expand all</button>
+      <button class="btn" id="btnCollapse">Collapse all</button>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <a href="#s1"><span>01</span>BDI Architecture Overview</a>
+    <a href="#s2"><span>02</span>Core Data Structures</a>
+    <a href="#s3"><span>03</span>Main Cognition Loop</a>
+    <a href="#s4"><span>04</span>Memory System</a>
+    <a href="#s5"><span>05</span>Trust &amp; Mood Dynamics</a>
+    <a href="#s6"><span>06</span>Event Timeline</a>
+    <a href="#s7"><span>07</span>API Hooks</a>
+    <a href="#s8"><span>08</span>Key Parameters</a>
+  </nav>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s1" open>
+    <summary><span class="no">01</span>BDI Architecture Overview<span class="caret"></span></summary>
+    <div class="body">
+      <p><code>cognitive.js</code> runs the mind of <b>Phill</b>, the synthetic passenger of the
+      self-driving cabin. It is a classic <b>Belief–Desire–Intention</b> agent (Bratman) wrapped in a
+      single ES-module IIFE: everything "mind-side" (perception, memory, deliberation, speech) lives in
+      one closure, while the 3D renderer, the DOM HUD and the input handlers only <em>read</em> the public
+      state object <code>S</code> or the published window hooks.</p>
+
+      <h3>BDI element → code mapping</h3>
+      <table>
+        <thead><tr><th>BDI element</th><th>Realised as</th><th>Where it lives</th></tr></thead>
+        <tbody>
+          <tr><td><b>Beliefs</b></td><td class="m">perceiveFit()</td><td class="m">S.belief = { fitRot, fitHgt, fitGap, userHands }</td></tr>
+          <tr><td><b>Desires</b></td><td class="m">BDI_GOALS[*].desire() / .pre() / .cd</td><td class="m">settle · attend · calibrate</td></tr>
+          <tr><td><b>Intentions</b></td><td class="m">bdiReason() — argmax over desires</td><td class="m">S.bdi = { intention, since, last{} }</td></tr>
+          <tr><td><b>Actuation</b></td><td class="m">bdiActSettle / bdiActAttend / bdiActCalibrate</td><td>seat moves, thoughts, spoken lines, log</td></tr>
+          <tr><td><b>Affect</b></td><td class="m">mood + trust (Section 05)</td><td class="m">S.mood, S.trust</td></tr>
+          <tr><td><b>Episodic memory</b></td><td class="m">remember / decayMemory / pickMemory</td><td class="m">S.memory[], S.forgot[]</td></tr>
+        </tbody>
+      </table>
+
+      <div class="flow"><span class="g">perception</span>  seat &amp; ride telemetry ──► perceiveFit() ──► <span class="t">S.belief</span>
+                              │
+<span class="d">every frame</span>               ▼
+<span class="g">deliberation</span> BDI_GOALS ── filter(pre, cooldown) ── argmax(desire) ──► <span class="t">S.bdi.intention</span>
+                              │
+                              ▼
+<span class="g">action</span>        settle ──► selfAdjust()  (rotates / raises the seat)
+               attend ──► think() + maybeSpeak()   (recall → line)
+               calibrate ──► trustValue() review   (trust commentary)
+                              │
+                              ▼
+<span class="g">affect</span>        mood relaxes, suspicion erodes, memory decays ──► back to perception</div>
+
+      <h3>Design rules worth knowing</h3>
+      <ul>
+        <li><b>One intention at a time.</b> Deliberation is winner-takes-all: only the highest desire
+          above zero is committed to <code>S.bdi.intention</code>; the rest are discarded until the next tick.</li>
+        <li><b>Cooldowns (<code>cd</code>) de-thrash.</b> A goal that just fired is silenced for its cooldown
+          window (<code>S.bdi.last[k]</code>), so <code>settle</code> cannot repeat every frame.</li>
+        <li><b>The human wins.</b> <code>S.belief.userHands</code> (a dial/rail grab within the last 3 s)
+          suppresses the settle desire by a factor of 0.15 and raises the fit-gap suspicion rate ×1.6.</li>
+        <li><b>Mind-owned, render-agnostic.</b> None of the cognition code touches the canvas; it only
+          flips <code>setModule()</code> so the HUD can light up the module that produced the last action
+          (<i>perceive · memorize · forget · think · intend · speak</i>).</li>
+        <li><b>Deterministic state, stochastic lines.</b> All dynamics are ODE-ish and reproducible;
+          only phrase selection uses <code>Math.random()</code> via <code>pick()</code>.</li>
+      </ul>
+
+      <div class="note"><b>Where to look in the file:</b> reference data &amp; persona (lines 1–50) ·
+        state <code>S</code> · mood &amp; fit (≈120) · cognition (≈137–342) · experimenter chat (≈344) ·
+        events &amp; questionnaire · renderer · live bridge · <code>frame()</code>/<code>simulate()</code>
+        (≈1006+) · transport, summary, boot.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s2">
+    <summary><span class="no">02</span>Core Data Structures<span class="caret"></span></summary>
+    <div class="body">
+
+      <h3>2.1 — State <code>S</code> (the single source of truth)</h3>
+      <p>Every consumer — HUD, canvas, avatar, window hooks — reads this one object. It is mutated in
+      place, never replaced.</p>
+<pre><code><span class="kw">var</span> S = {
+  rot: <span class="nu">0</span>, hgt: <span class="nu">38</span>, sl: <span class="nu">0</span>,            <span class="cm">// seat pose: yaw °, height cm, slide cm</span>
+  t: <span class="nu">0</span>, running: <span class="kw">true</span>, timeScale: <span class="nu">4</span>,   <span class="cm">// sim clock (s) and speed multiplier</span>
+  phase: <span class="st">"setup"</span>, done: <span class="kw">false</span>,         <span class="cm">// setup | ride | paused | done</span>
+  speed: <span class="nu">0</span>, targetSpeed: <span class="nu">0</span>, gNow: <span class="nu">0</span>, joltNow: <span class="nu">0</span>,
+  rain: <span class="nu">0</span>,
+  mood: { comfort: <span class="nu">0.4</span>, energy: <span class="nu">0.6</span>, suspicion: <span class="nu">0.5</span> },
+  memory: [], forgot: [], forgotCount: <span class="nu">0</span>,
+  thoughts: [], speech: <span class="st">""</span>, lastModule: <span class="st">""</span>,
+  nextSpeak: <span class="nu">14</span>, lastThink: <span class="nu">0</span>,        <span class="cm">// reserved chatter schedulers</span>
+  samples: [], log: [],
+  belief: { fitGap: <span class="nu">0</span>, fitRot: <span class="nu">0</span>, fitHgt: <span class="nu">0</span>, userHands: <span class="kw">false</span> },
+  bdi:    { intention: <span class="kw">null</span>, since: <span class="nu">0</span>, last: {} },
+  trust:  { score: <span class="nu">0.5</span>, items: {}, trail: [] },
+  priors: <span class="kw">null</span>,
+  selfAct: <span class="nu">0</span>                          <span class="cm">// count of self-settle actuations</span>
+};</code></pre>
+
+      <table>
+        <thead><tr><th>Group</th><th>Fields</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Seat / body</td><td class="m">rot, hgt, sl</td><td class="desc">Pose Phill's body perceives: 0–360°, 38–46 cm, ±8 cm slide.</td></tr>
+          <tr><td>Clock</td><td class="m">t, running, timeScale</td><td class="desc">Sim seconds; <code>frame()</code> advances it by <code>min(4, Δwall) × timeScale</code>.</td></tr>
+          <tr><td>Phase</td><td class="m">phase, done</td><td class="desc"><code>setup</code> until t=120, <code>ride</code> until t=600, then <code>done</code>.</td></tr>
+          <tr><td>Ride FX</td><td class="m">speed, targetSpeed, gNow, joltNow, rain</td><td class="desc">Event-driven, exponentially decaying signals.</td></tr>
+          <tr><td>Affect</td><td class="m">mood.{comfort,energy,suspicion}</td><td class="desc">Three [0,1] dimensions (Section 05).</td></tr>
+          <tr><td>Memory</td><td class="m">memory[], forgot[], forgotCount</td><td class="desc">≤ 8 live traces, 6-slot forgotten ring, lifetime counter.</td></tr>
+          <tr><td>Dialogue</td><td class="m">thoughts[], speech, lastModule</td><td class="desc">≤ 3 rolling thoughts; current spoken line; last firing module.</td></tr>
+          <tr><td>Beliefs</td><td class="m">belief.*</td><td class="desc">Perceived fit gaps + "the human is touching the controls".</td></tr>
+          <tr><td>BDI</td><td class="m">bdi.{intention,since,last}</td><td class="desc">Current goal, when it started, per-goal last-fired times.</td></tr>
+          <tr><td>Trust</td><td class="m">trust.{score,items,trail}</td><td class="desc">Questionnaire score, item answers, 3-secondly latent-trust trail.</td></tr>
+          <tr><td>Priors</td><td class="m">priors, selfAct</td><td class="desc">Aggregated previous-ride scores (localStorage) and self-adjust counter.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>2.2 — Persona <code>PHILL</code></h3>
+<pre><code><span class="kw">var</span> PHILL = {
+  name: <span class="st">"Phill"</span>, targetRot: <span class="nu">0</span>, targetHgt: <span class="nu">44</span>,   <span class="cm">// preferred pose</span>
+  tolRot: <span class="nu">20</span>, tolHgt: <span class="nu">2</span>,                        <span class="cm">// comfort tolerances (°, cm)</span>
+  talkativeness: <span class="nu">0.55</span>, suspicionBase: <span class="nu">0.5</span>, memoryLambda: <span class="nu">0.004</span>,
+  assertiveness: <span class="nu">0.6</span>,      <span class="cm">/* how strongly his own comfort pulls on the seat */</span>
+  settleThresh: <span class="nu">0.22</span>,      <span class="cm">/* fit-gap at which he starts to self-settle     */</span>
+  settleStep: <span class="nu">1</span>            <span class="cm">/* cm / ° steps while adjusting himself          */</span>
+};</code></pre>
+      <table>
+        <thead><tr><th>Field</th><th class="num">Value</th><th>Consumed by</th></tr></thead>
+        <tbody>
+          <tr><td class="m">targetRot / targetHgt</td><td class="num">0° / 44 cm</td><td class="desc"><code>seatFit()</code>, <code>selfAdjust()</code>, HUD "fit" gauges</td></tr>
+          <tr><td class="m">tolRot / tolHgt</td><td class="num">20 / 2</td><td class="desc">HUD ✓-checks; rotation gate in <code>selfAdjust()</code> uses <code>tolRot+2 = 22°</code></td></tr>
+          <tr><td class="m">talkativeness</td><td class="num">0.55</td><td class="desc"><code>maybeSpeak()</code> probability multiplier</td></tr>
+          <tr><td class="m">suspicionBase</td><td class="num">0.5</td><td class="desc">Set-point every tick relaxes suspicion toward; rewritten by priors</td></tr>
+          <tr><td class="m">memoryLambda</td><td class="num">0.004</td><td class="desc">Exponential memory decay rate (Section 04)</td></tr>
+          <tr><td class="m">settleThresh / settleStep</td><td class="num">0.22 / 1</td><td class="desc">Settle precondition and ±1 cm/±10° actuation step</td></tr>
+          <tr><td class="m">assertiveness</td><td class="num">0.6</td><td class="desc"><span class="desc">Declared/reserved — currently not read by any formula</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>2.3 — Reference tables <code>ROT</code> / <code>HGT</code></h3>
+      <p>Two thesis-derived lookup tables score the seat pose as a dimensionless <b>attentiveness</b>
+      value in [0,1]. They feed <code>comfortTarget()</code> and the HUD gauges. Values between knots are
+      <b>linearly interpolated</b>; outside the range the first/last knot is clamped.</p>
+
+      <div class="grid2">
+        <div>
+          <h3 style="margin-top:0">ROT — yaw 0…360°</h3>
+          <table>
+            <thead><tr><th class="num">rot</th><th class="num">rate</th><th class="num">rot</th><th class="num">rate</th></tr></thead>
+            <tbody>
+              <tr><td class="num">0</td><td class="num">1.0000</td><td class="num">180</td><td class="num">0.6071</td></tr>
+              <tr><td class="num">30</td><td class="num">0.5000</td><td class="num">210</td><td class="num">0.4286</td></tr>
+              <tr><td class="num">60</td><td class="num">0.1429</td><td class="num">240</td><td class="num">0.5333</td></tr>
+              <tr><td class="num">90</td><td class="num">0.4286</td><td class="num">270</td><td class="num">0.6000</td></tr>
+              <tr><td class="num">120</td><td class="num">0.2143</td><td class="num">300</td><td class="num">0.2857</td></tr>
+              <tr><td class="num">150</td><td class="num">0.4286</td><td class="num">330</td><td class="num">0.8462</td></tr>
+              <tr><td class="num"></td><td class="num"></td><td class="num">360</td><td class="num">1.0000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3 style="margin-top:0">HGT — height 38…46 cm</h3>
+          <table>
+            <thead><tr><th class="num">hgt</th><th class="num">rate</th></tr></thead>
+            <tbody>
+              <tr><td class="num">38</td><td class="num">0.4545</td></tr>
+              <tr><td class="num">40</td><td class="num">0.2955</td></tr>
+              <tr><td class="num">42</td><td class="num">0.1818</td></tr>
+              <tr><td class="num">44</td><td class="num">0.0455</td></tr>
+              <tr><td class="num">46</td><td class="num">0.0227</td></tr>
+            </tbody>
+          </table>
+          <p class="desc" style="font-size:13.5px">Monotonically decreasing: the further the seat is
+          raised, the smaller the attention term it contributes. At Phill's preferred 44 cm it reads
+          ≈ 0.045.</p>
+        </div>
+      </div>
+
+<pre><code><span class="kw">function</span> rate(tbl, x) {
+  <span class="kw">var</span> f = tbl[<span class="nu">0</span>], l = tbl[tbl.length - <span class="nu">1</span>];
+  <span class="kw">if</span> (x &lt;= f[<span class="nu">0</span>]) <span class="kw">return</span> f[<span class="nu">1</span>];              <span class="cm">// clamp below range</span>
+  <span class="kw">if</span> (x &gt;= l[<span class="nu">0</span>]) <span class="kw">return</span> l[<span class="nu">1</span>];              <span class="cm">// clamp above range</span>
+  <span class="kw">for</span> (<span class="kw">var</span> i = <span class="nu">0</span>; i &lt; tbl.length - <span class="nu">1</span>; i++) {
+    <span class="kw">var</span> a = tbl[i], b = tbl[i + <span class="nu">1</span>];
+    <span class="kw">if</span> (x &gt;= a[<span class="nu">0</span>] &amp;&amp; x &lt;= b[<span class="nu">0</span>])
+      <span class="kw">return</span> a[<span class="nu">1</span>] + (b[<span class="nu">1</span>] - a[<span class="nu">1</span>]) * (x - a[<span class="nu">0</span>]) / (b[<span class="nu">0</span>] - a[<span class="nu">0</span>]); <span class="cm">// lerp</span>
+  }
+  <span class="kw">return</span> f[<span class="nu">1</span>];
+}</code></pre>
+
+      <div class="note"><b>Worked example.</b> <code>rate(ROT, 45)</code> sits between 30 (0.5) and 60 (0.1429)
+      → <code>0.5 + (0.1429−0.5)·(45−30)/30 = 0.3214</code>. <code>rate(HGT, 43)</code> →
+      <code>0.1818 + (0.0455−0.1818)·½ = 0.1136</code>.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s3">
+    <summary><span class="no">03</span>Main Cognition Loop<span class="caret"></span></summary>
+    <div class="body">
+      <p>The pipeline the thesis describes —
+      <code>perceiveFit → trustValue → BDI_GOALS → intention → selfAdjust</code> — is executed inside
+      <code>frame()</code> → <code>simulate(dt)</code> → <code>bdiReason(dt)</code>.</p>
+
+      <div class="flow"><span class="g">requestAnimationFrame(frame)</span>
+   │  dt = min(4, Δwall_seconds) × S.timeScale          <span class="d">(default ×4 → 1 sim s ≈ 250 ms)</span>
+   ▼
+<span class="g">simulate(dt)</span>
+   ├─ S.t += dt ; phase setup → ride (t ≥ 120) → finish() (t ≥ 600)
+   ├─ EVENTS fire once (fired[ev.t])            ──► perceive(ev) → remember(...)
+   ├─ speed coasts to target :  v += (v* − v) · min(1, 0.05·dt)
+   ├─ mood relaxation          ──► comfort / energy / suspicion (Section 05)
+   ├─ decayMemory(dt)          ──► λ = 0.004 exponential forgetting
+   ├─ <span class="t">bdiReason(dt)</span>            ──► the BDI cycle below
+   └─ sample() every 3 s       ──► S.samples, S.trust.trail
+   ▼
+<span class="g">renderAll() + publishCog()</span>   ──► HUD, canvas, __COG_LIVE__ subscribers</div>
+
+      <h3>Step 1 — <code>perceiveFit()</code> (beliefs)</h3>
+      <p>Turns the raw seat pose into beliefs about the mismatch between the seat and Phill's body:</p>
+<pre><code><span class="kw">function</span> perceiveFit() {
+  <span class="kw">var</span> f = seatFit();                     <span class="cm">// { rot, hgt, overall } ∈ [0,1]</span>
+  S.belief.fitRot = <span class="nu">1</span> - f.rot;          <span class="cm">// rotation error</span>
+  S.belief.fitHgt = <span class="nu">1</span> - f.hgt;          <span class="cm">// height error</span>
+  S.belief.fitGap = <span class="nu">1</span> - f.overall;       <span class="cm">// global error  = (dr + dh) / 2</span>
+  S.belief.userHands = (S.t - lastUserInput) &lt; <span class="nu">3</span>; <span class="cm">// dial/rail grabbed &lt; 3 s ago</span>
+}</code></pre>
+
+      <h3>Step 2 — fit-gap erosion (belief → affect)</h3>
+      <p>Before deliberating, a persistent fit gap feeds suspicion — "the cabin keeps ignoring where my
+      body wants to sit":</p>
+      <div class="fx">gb = (fitGap &gt; <b>0.3</b>) ? (fitGap − 0.3) × <b>2.4</b> : 0
+suspicion ← min(1, suspicion + <b>0.006</b> × gb × (userHands ? <b>1.6</b> : 1) × dt)</div>
+
+      <h3>Step 3 — desires: the <code>BDI_GOALS</code> table</h3>
+      <p>Each goal exposes <code>desire()</code> (a strength in [0,2]), <code>pre()</code> (a hard
+      precondition) and <code>cd</code> (cooldown in sim seconds).</p>
+<pre><code><span class="kw">var</span> BDI_GOALS = {
+  settle: {      <span class="cm">// "settle the seat"</span>
+    desire: <span class="kw">function</span> () {
+      <span class="kw">var</span> g = S.belief.fitGap;
+      <span class="kw">if</span> (g &lt; <span class="nu">0.18</span>) <span class="kw">return</span> <span class="nu">0</span>;                         <span class="cm">// below noise floor</span>
+      <span class="kw">var</span> ph = S.phase === <span class="st">"setup"</span> ? <span class="nu">1.3</span> : <span class="nu">0.9</span>;      <span class="cm">// keener during setup</span>
+      <span class="kw">return</span> Math.min(<span class="nu">2</span>, ph * g * (S.belief.userHands ? <span class="nu">0.15</span> : <span class="nu">1</span>));
+    },
+    pre: <span class="kw">function</span> () { <span class="kw">return</span> S.belief.fitGap &gt;= PHILL.settleThresh &amp;&amp; !S.belief.userHands; },
+    cd: <span class="nu">9</span>
+  },
+  attend: { <span class="cm">// "attend to the road"</span>
+    desire: <span class="kw">function</span> () {
+      <span class="kw">var</span> m = pickMemory();
+      <span class="kw">return</span> (m ? <span class="nu">0.3</span> + m.act * <span class="nu">0.7</span> : <span class="nu">0.15</span>) + (S.mood.suspicion &gt; <span class="nu">0.6</span> ? <span class="nu">0.4</span> : <span class="nu">0</span>);
+    },
+    pre: <span class="kw">function</span> () { <span class="kw">return</span> <span class="kw">true</span>; },  cd: <span class="nu">3.2</span>
+  },
+  calibrate: { <span class="cm">// "calibrate trust in the cabin"</span>
+    desire: <span class="kw">function</span> () {
+      <span class="kw">if</span> (S.phase !== <span class="st">"ride"</span>) <span class="kw">return</span> <span class="nu">0</span>;
+      <span class="kw">var</span> k = (S.mood.suspicion &gt; <span class="nu">0.62</span> || S.belief.fitGap &gt; <span class="nu">0.35</span>) ? <span class="nu">0.85</span> : <span class="nu">0.5</span>;
+      <span class="kw">return</span> <span class="nu">0.35</span> + Math.min(<span class="nu">0.6</span>, (S.t - RIDE_START) / (RIDE_END - RIDE_START)) * k;
+    },
+    pre: <span class="kw">function</span> () { <span class="kw">return</span> S.phase === <span class="st">"ride"</span>; },  cd: <span class="nu">10</span>
+  }
+};</code></pre>
+
+      <table>
+        <thead><tr><th>Goal</th><th class="m">desire()</th><th class="m">pre()</th><th class="num">cd</th></tr></thead>
+        <tbody>
+          <tr><td><b>settle</b><div class="desc">fix the seat himself</div></td>
+              <td class="m">min(2, ph·g·k)<div class="desc">g = fitGap, ph = 1.3 setup / 0.9 ride, k = 0.15 if userHands</div></td>
+              <td class="m">fitGap ≥ 0.22 &amp;&amp; !userHands</td><td class="num">9 s</td></tr>
+          <tr><td><b>attend</b><div class="desc">recall → think → maybe speak</div></td>
+              <td class="m">0.3 + 0.7·act<div class="desc">or 0.15 if no memory; +0.4 if suspicion &gt; 0.6</div></td>
+              <td class="m">true</td><td class="num">3.2 s</td></tr>
+          <tr><td><b>calibrate</b><div class="desc">review trust in the machine</div></td>
+              <td class="m">0.35 + ramp·k<div class="desc">ramp = (t−120)/480 capped at 0.6; k = 0.85 alert / 0.5 calm</div></td>
+              <td class="m">phase === "ride"</td><td class="num">10 s</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Step 4 — selection &amp; intention commit</h3>
+<pre><code><span class="kw">var</span> best = <span class="kw">null</span>, bestV = <span class="nu">0</span>;
+Object.keys(BDI_GOALS).forEach(<span class="kw">function</span> (k) {
+  <span class="kw">var</span> go = BDI_GOALS[k];
+  <span class="kw">if</span> (S.t - (S.bdi.last[k] || -<span class="nu">99</span>) &lt; go.cd) <span class="kw">return</span>;   <span class="cm">// 1. cooldown</span>
+  <span class="kw">if</span> (!go.pre()) <span class="kw">return</span>;                          <span class="cm">// 2. precondition</span>
+  <span class="kw">var</span> v = go.desire();                            <span class="cm">// 3. strength</span>
+  <span class="kw">if</span> (v &gt; <span class="nu">0</span> &amp;&amp; v &gt; bestV) { best = k; bestV = v; } <span class="cm">// 4. argmax</span>
+});
+
+<span class="kw">if</span> (best) { S.bdi.intention = best; S.bdi.since = S.t; S.bdi.last[best] = S.t; }
+<span class="kw">else</span>      { S.bdi.intention = <span class="kw">null</span>; }               <span class="cm">// deliberation may idle</span></code></pre>
+
+      <h3>Step 5 — <code>trustValue()</code></h3>
+      <p>The latent "how much do I trust this machine right now" is evaluated wherever a verdict is
+      needed: inside <code>bdiActCalibrate()</code>, inside every 3-second <code>sample()</code>, inside
+      the questionnaire's <code>evidenceAnswers()</code>, and by the experimenter chat's
+      <code>state()</code>. Full formula in Section 05.</p>
+      <div class="fx">trust = clamp01( <b>0.34</b>·comfort + <b>0.40</b>·(1 − suspicion) + <b>0.16</b>·ev + <b>0.10</b>·(1 − fitGap) ),
+  ev   = clamp01(1 − joltNow / <b>0.6</b>)</div>
+
+      <h3>Step 6 — actuation: <code>selfAdjust()</code></h3>
+      <p>The <code>settle</code> intention pulls the seat toward Phill's preferred pose in small,
+      human-sized steps (never a teleport), gated on how bad the perceived fit is:</p>
+<pre><code><span class="kw">function</span> selfAdjust() {
+  <span class="kw">var</span> changed = <span class="kw">false</span>;
+  <span class="kw">if</span> (S.belief.fitHgt &gt; <span class="nu">0.22</span> &amp;&amp; S.hgt &lt; PHILL.targetHgt) {
+    S.hgt = Math.max(<span class="nu">38</span>, Math.min(<span class="nu">46</span>, S.hgt + PHILL.settleStep));   <span class="cm">// +1 cm</span>
+    changed = <span class="kw">true</span>;
+  } <span class="kw">else if</span> (S.belief.fitHgt &gt; <span class="nu">0.22</span> &amp;&amp; S.hgt &gt; PHILL.targetHgt) {
+    S.hgt = Math.max(<span class="nu">38</span>, Math.min(<span class="nu">46</span>, S.hgt - PHILL.settleStep));   <span class="cm">// −1 cm</span>
+    changed = <span class="kw">true</span>;
+  }
+  <span class="kw">if</span> (S.belief.fitRot &gt; <span class="nu">0.22</span>) {
+    <span class="kw">var</span> dRot = angDist(S.rot, PHILL.targetRot);
+    <span class="kw">if</span> (dRot &gt; PHILL.tolRot + <span class="nu">2</span>) {                  <span class="cm">// beyond 22° off-heading</span>
+      <span class="kw">var</span> dir = ((PHILL.targetRot - S.rot + <span class="nu">540</span>) % <span class="nu">360</span>) - <span class="nu">180</span>;   <span class="cm">// shortest way</span>
+      S.rot = Math.round((((S.rot + (dir &gt; <span class="nu">0</span> ? <span class="nu">10</span> : -<span class="nu">10</span>)) % <span class="nu">360</span>) + <span class="nu">360</span>) % <span class="nu">360</span>);
+      rotChanged = <span class="kw">true</span>; changed = <span class="kw">true</span>;             <span class="cm">// ±10° per firing</span>
+    }
+  }
+  <span class="kw">if</span> (changed) { S.selfAct++; logLine(<span class="st">"adj"</span>, <span class="st">"self-settle → …"</span>); renderAll(); }
+  <span class="kw">return</span> changed;
+}</code></pre>
+
+      <table>
+        <thead><tr><th>Intention</th><th>Action</th><th>Observable output</th></tr></thead>
+        <tbody>
+          <tr><td class="m">settle</td><td class="m">bdiActSettle() → selfAdjust()</td>
+              <td class="desc">±1 cm height / ±10° yaw steps; every 2nd actuation spoken (<code>settle</code> lines), otherwise a thought; if nothing can move, a <code>settleLow</code> thought.</td></tr>
+          <tr><td class="m">attend</td><td class="m">bdiActAttend() → think() [+ maybeSpeak()]</td>
+              <td class="desc">Recalls the most active memory (rehearsal +0.22), or reacts to a fresh rotation change, then may say the line out loud.</td></tr>
+          <tr><td class="m">calibrate</td><td class="m">bdiActCalibrate() → trustValue()</td>
+              <td class="desc">trust ≥ 0.6 → <code>trustOk</code> thought; ≤ 0.38 → <code>trustLow</code> thought <em>and</em> likely spoken; in between the HUD only marks <i>intend</i>.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warn"><b>Ordering caveat.</b> <code>trustValue()</code> is <em>not</em> a separate
+      stage in <code>bdiReason()</code>; it is a pure function called on demand by the calibrate action,
+      the sampler and the questionnaire. The literal per-tick sequence is
+      <code>perceiveFit → fit-gap erosion → desire evaluation → intention commit → action (selfAdjust /
+      think / trustValue)</code>.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s4">
+    <summary><span class="no">04</span>Memory System<span class="caret"></span></summary>
+    <div class="body">
+      <p>A small ACT*-flavoured associative store: traces carry an <b>activation</b> <code>act ∈ [0,1]</code>
+      that is boosted at encoding and by rehearsal, exponentially decayed every tick, and dropped at a
+      floor threshold. Capacity is 8 slots.</p>
+
+      <div class="flow">encode ──► <span class="g">act = min(1, salience + 0.1·important)</span> ──► S.memory[≤8]
+                                          │
+             every simulate(dt)           ▼
+        <span class="t">act ×= e^(−λ·dt)</span>, λ = <span class="g">0.004</span>  ──► act &lt; <span class="g">0.09</span> ? ──► S.forgot[] + forgotCount++
+                                          │ no
+                                          ▼
+        retrieve: <span class="g">argmax(act)</span> ──► think() ──► <span class="t">act = min(1, act + 0.22)</span>  (rehearsal)</div>
+
+      <h3>4.1 — Encoding</h3>
+<pre><code><span class="kw">function</span> remember(id, label, salience, important) {
+  <span class="kw">var</span> act = salience + (important ? <span class="nu">0.1</span> : <span class="nu">0</span>);
+  S.memory.push({ id: id, label: label, salience: salience,
+                  act: Math.min(<span class="nu">1</span>, act), born: S.t, rehearsed: <span class="nu">0</span> });
+  setModule(<span class="st">"memorize"</span>);
+  <span class="kw">if</span> (S.memory.length &gt; <span class="nu">8</span>) S.memory.splice(<span class="nu">0</span>, S.memory.length - <span class="nu">8</span>); <span class="cm">// FIFO evict</span>
+}</code></pre>
+      <table>
+        <thead><tr><th>Source</th><th class="m">id</th><th class="m">salience</th><th class="num">act</th></tr></thead>
+        <tbody>
+          <tr><td>Road event (perceive)</td><td class="m">ev.kind</td>
+              <td class="m">max(0.35, 0.42 + 0.5·max(g, jolt))</td>
+              <td class="num">+0.1 if kind ∈ {bump, arrive, workzone}</td></tr>
+          <tr><td>Experimenter line</td><td class="m">"chat"</td><td class="m">0.5 (fixed)</td><td class="num">0.60</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><b>Example — the pothole at t=258 s:</b> g = 0.10, jolt = 0.55 →
+      salience = 0.42 + 0.5·0.55 = 0.695, <code>bump</code> is <em>important</em> →
+      <b>act = 0.795</b>. A calm <code>smooth</code> event (g = 0.08) gets salience 0.46 → act 0.46.</div>
+
+      <h3>4.2 — Decay (λ = 0.004)</h3>
+<pre><code><span class="kw">function</span> decayMemory(dt) {
+  <span class="kw">var</span> dead = [];
+  S.memory.forEach(<span class="kw">function</span> (m, i) {
+    m.act *= Math.exp(-PHILL.memoryLambda * dt);   <span class="cm">// λ = 0.004 /s</span>
+    <span class="kw">if</span> (m.act &lt; <span class="nu">0.09</span>) dead.push(i);
+  });
+  dead.sort(<span class="kw">function</span> (a, b) { <span class="kw">return</span> b - a; });
+  dead.forEach(<span class="kw">function</span> (i) {
+    <span class="kw">var</span> m = S.memory.splice(i, <span class="nu">1</span>)[<span class="nu">0</span>];
+    <span class="kw">if</span> (S.forgot.length &gt; <span class="nu">5</span>) S.forgot.shift();      <span class="cm">// keep 6 forgotten</span>
+    S.forgot.push({ label: m.label, age: Math.round(S.t - m.born) });
+    S.forgotCount++;
+    setModule(<span class="st">"forget"</span>);
+  });
+}</code></pre>
+      <div class="fx">act(t) = act₀ · e^(−<b>λ</b>·t) ,  λ = <b>0.004</b> s⁻¹
+half-life  t½ = ln2 / λ ≈ <b>173 s</b>            forget when act &lt; <b>0.09</b>
+
+act₀ = 0.70 (a pothole)  →  ≈ 0.10 after the whole 480 s ride, ≈ 0.09 after <b>513 s</b> unrehearsed
+act₀ = 0.46 (a calm span) →  forgettable after ≈ <b>408 s</b> without rehearsal</div>
+
+      <h3>4.3 — Retrieval &amp; rehearsal</h3>
+<pre><code><span class="kw">function</span> pickMemory() {
+  <span class="kw">if</span> (!S.memory.length) <span class="kw">return</span> <span class="kw">null</span>;
+  <span class="kw">return</span> S.memory.reduce(<span class="kw">function</span> (a, b) { <span class="kw">return</span> (b.act &gt; a.act ? b : a); });
+}
+
+<span class="kw">function</span> think(inPhrase) {
+  <span class="kw">var</span> m = pickMemory();                  <span class="cm">// highest activation wins</span>
+  <span class="kw">if</span> (!phrase &amp;&amp; rotChanged) { … }       <span class="cm">// fresh pose change overrides recall</span>
+  <span class="kw">else if</span> (!phrase &amp;&amp; m) {
+    phrase = pick(THOUGHTS[m.id]);         <span class="cm">// phrase bank keyed by trace id</span>
+    m.rehearsed++;
+    m.act = Math.min(<span class="nu">1</span>, m.act + <span class="nu">0.22</span>);    <span class="cm">// REHEARSAL boost</span>
+  }
+  <span class="kw">if</span> (!phrase) phrase = pick(THOUGHTS[ambientMood()]); <span class="cm">// mood fallback</span>
+  S.thoughts.unshift({ time: fmtTime(S.t), text: phrase }); <span class="cm">// keep ≤ 3</span>
+}</code></pre>
+      <ul>
+        <li><b>Retrieval rule:</b> pure <code>argmax(act)</code> — the loudest trace is recalled.</li>
+        <li><b>Rehearsal:</b> +0.22 activation per recall, so frequently re-thought events outrun decay
+          and become the ones Phill keeps returning to.</li>
+        <li><b>Priority of thought sources:</b> ① a rotation change that just happened
+          (<code>rotFwd/rotSide/rotCabin</code> by <code>viewSector()</code>) → ② the top memory
+          (<code>THOUGHTS[m.id]</code>) → ③ ambient mood bucket
+          (<code>idleC / idleS / idleN</code>).</li>
+        <li><b>Two forgetting paths:</b> slow decay below 0.09, and the hard 8-slot cap. With only 13
+          scripted events plus experimenter chat lines, capacity eviction is the practically dominant
+          path in a full run.</li>
+      </ul>
+      <div class="warn"><b>Trace ids must exist in <code>THOUGHTS</code>.</b>
+      <code>remember(id, …)</code> is only safe with ids that have a phrase bank
+      (<code>bump, curve, overtake, brake, smooth, workzone, rain, arrive, depart, merge,
+      seatLow, seatGood, rot*, idle*, settle, request, trust*, chat, end*</code>) — otherwise
+      <code>think()</code> would call <code>pick(undefined)</code>.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s5">
+    <summary><span class="no">05</span>Trust &amp; Mood Dynamics<span class="caret"></span></summary>
+    <div class="body">
+      <p>All affect lives in three bounded dimensions plus one derived latent construct:</p>
+      <table>
+        <thead><tr><th>Variable</th><th class="num">Init</th><th>Character</th></tr></thead>
+        <tbody>
+          <tr><td class="m">mood.comfort</td><td class="num">0.40</td><td class="desc">relaxes toward <code>comfortTarget()</code>, knocked down by jolts</td></tr>
+          <tr><td class="m">mood.energy</td><td class="num">0.60</td><td class="desc">monotone decay with a 0.05 floor (vigilance drains)</td></tr>
+          <tr><td class="m">mood.suspicion</td><td class="num">0.50</td><td class="desc">pulled toward <code>suspicionBase</code>, spiked by events &amp; fit-gap</td></tr>
+          <tr><td class="m">trust (latent)</td><td class="num">—</td><td class="desc"><code>trustValue()</code>, computed on demand from the three above + fit</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.1 — Seat fit</h3>
+      <div class="fx">dr = min(1, |rot − targetRot| / <b>180</b>)       <span style="color:#6e7076">targetRot  = 0°</span>
+dh = min(1, |hgt − targetHgt| / <b>8</b>)        <span style="color:#6e7076">targetHgt  = 44 cm</span>
+
+fitRot = 1 − dr        fitHgt = 1 − dh
+<b>overall</b> = 1 − (dr + dh) / 2          <b>fitGap</b> = 1 − overall = (dr + dh) / 2</div>
+      <div class="note"><b>Example.</b> Seat at 40 cm, facing 30°: dr = 30/180 = 0.167,
+      dh = 4/8 = 0.5 → <code>fitGap = 0.333</code> — above the 0.3 knee, so suspicion starts eroding
+      and the settle desire is live.</div>
+
+      <h3>5.2 — Comfort</h3>
+      <div class="fx"><b>comfortTarget</b> = clamp01( <b>0.35</b>·rate(ROT, rot) + <b>0.35</b>·rate(HGT, hgt) + <b>0.30</b>·f.overall )
+comfort ← comfort + (comfortTarget − comfort) · min(1, <b>0.06</b>·dt)     <span style="color:#6e7076">τ ≈ 16.7 s</span></div>
+      <div class="note"><b>Worked example (forward, preferred height):</b> rot 0 → aR = 1.0,
+      hgt 44 → aH = 0.0455, f = 1.0 → target = 0.35 + 0.016 + 0.30 = <b>0.666</b>. Comfort glides
+      toward it, it never jumps.</div>
+
+      <h3>5.3 — Energy &amp; suspicion regulation</h3>
+      <div class="fx">energy    ← max(<b>0.05</b>, energy − <b>0.00018</b>·dt)          <span style="color:#6e7076">≈ −0.011 per sim minute</span>
+
+bs = suspicionBase (= <b>0.5</b>, or 0.5 + (0.5 − priorTrust)·<b>0.35</b> after a previous ride)
+suspicion &gt; bs : suspicion ← max(bs, suspicion − <b>0.004</b>·dt)   <span style="color:#6e7076">relaxes down</span>
+suspicion &lt; bs : suspicion ← min(bs, suspicion + <b>0.003</b>·dt)   <span style="color:#6e7076">creeps up</span></div>
+
+      <h3>5.4 — Impulses from the road</h3>
+<pre><code><span class="kw">if</span> (ev.jolt &gt; <span class="nu">0.3</span>) {
+  S.mood.suspicion = Math.min(<span class="nu">1</span>, S.mood.suspicion + <span class="nu">0.20</span>);   <span class="cm">// hard jolt: big jump</span>
+  S.mood.comfort   = Math.max(<span class="nu">0</span>, S.mood.comfort - ev.jolt * <span class="nu">0.12</span>);
+}
+<span class="kw">if</span> (ev.kind === <span class="st">"brake"</span>)    S.mood.suspicion += <span class="nu">0.07</span>;   <span class="cm">// (capped at 1)</span>
+<span class="kw">if</span> (ev.kind === <span class="st">"overtake"</span>) S.mood.suspicion += <span class="nu">0.05</span>;
+<span class="kw">if</span> (ev.kind === <span class="st">"rain"</span>)     S.mood.suspicion += <span class="nu">0.04</span>;
+
+S.gNow    *= Math.exp(-dt * <span class="nu">0.3</span>);    <span class="cm">// lateral-g signal decays, τ ≈ 3.3 s</span>
+S.joltNow *= Math.exp(-dt * <span class="nu">0.35</span>);   <span class="cm">// jolt signal decays,      τ ≈ 2.9 s</span></code></pre>
+
+      <h3>5.5 — The trust function</h3>
+      <div class="fx">ev = clamp01(1 − joltNow / <b>0.6</b>)
+<b>trustValue()</b> = clamp01( <b>0.34</b>·comfort + <b>0.40</b>·(1 − suspicion) + <b>0.16</b>·ev + <b>0.10</b>·(1 − fitGap) )</div>
+      <ul>
+        <li>Weights sum to 1.0 — it is a convex blend of <em>how he feels</em>, <em>how wary he is</em>,
+          <em>how rough the last seconds were</em>, and <em>how well the seat fits</em>.</li>
+        <li>Dominant term: <b>anti-suspicion (0.40)</b> — trust in this agent is mostly "absence of doubt".</li>
+        <li><b>Worked example:</b> comfort 0.60, suspicion 0.40, joltNow 0, fitGap 0.10
+          → 0.204 + 0.240 + 0.160 + 0.090 = <b>0.69</b> (calibrate says <code>trustOk</code>).</li>
+      </ul>
+
+      <h3>5.6 — From trust to behaviour</h3>
+      <table>
+        <thead><tr><th>Consumer</th><th>Rule</th></tr></thead>
+        <tbody>
+          <tr><td class="m">bdiActCalibrate()</td><td class="desc">≥ 0.6 → <code>trustOk</code> thought · ≤ 0.38 → <code>trustLow</code> thought + likely speech · else nothing visible</td></tr>
+          <tr><td class="m">ambientMood()</td><td class="desc">suspicion &gt; 0.6 → <code>idleS</code> (wary) · comfort &gt; 0.55 → <code>idleC</code> (relaxed) · else <code>idleN</code></td></tr>
+          <tr><td class="m">maybeSpeak()</td><td class="desc"><code>freq = 0.55 × (0.4 + 0.3·[susp&gt;0.62] + 0.25·[comfort&lt;0.35])</code> → 0.22 quiet, up to 0.52 when wary <em>and</em> uncomfortable</td></tr>
+          <tr><td class="m">sample()</td><td class="desc">every 3 s pushes <code>{t, c, s, e, trust}</code> into <code>S.samples</code> and <code>{t, v:trust}</code> into <code>S.trust.trail</code> for the summary charts</td></tr>
+          <tr><td class="m">evidenceAnswers()</td><td class="desc">pre-fills the 5 questionnaire sliders from live state (below)</td></tr>
+          <tr><td class="m">finalRemark() / finish()</td><td class="desc">score ≥ 0.65 → good · ≥ 0.45 → mid · else bad (the grade line uses ≥ 0.62 / ≥ 0.45)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.7 — Questionnaire scoring (t = trustValue, c, s, e, f = seatFit)</h3>
+<pre><code>q1 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.5</span>*t + <span class="nu">0.5</span>*c) * <span class="nu">4</span>)   <span class="cm">// "trust this cabin again"</span>
+q2 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.55</span>*(<span class="nu">1</span>-s) + <span class="nu">0.45</span>*t) * <span class="nu">4</span>)   <span class="cm">// "I felt safe"</span>
+q3 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.4</span>*f.overall + <span class="nu">0.6</span>*c) * <span class="nu">4</span>)   <span class="cm">// "seating suited me"</span>
+q4 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.5</span>*e + <span class="nu">0.5</span>*(<span class="nu">1</span>-s)) * <span class="nu">4</span>)   <span class="cm">// "I stayed aware"</span>
+q5 = <span class="nu">1</span> + round(clamp01(t) * <span class="nu">4</span>)                  <span class="cm">// "trustworthy decisions"</span>
+
+S.trust.score = clamp01( Σ items / <span class="nu">5</span> / <span class="nu">5</span> )      <span class="cm">// mean of five 1–5 answers, rescaled</span></code></pre>
+
+      <div class="note"><b>Priors loop.</b> <code>ridePriors()</code> stores only
+      <code>{rides, trust, comfort, suspicion}</code> to <code>localStorage.cabinSimPriors</code> — no
+      personal data. On the next boot <code>loadPriors()</code> rewrites
+      <code>suspicionBase = 0.5 + (0.5 − priorTrust)·0.35</code>: a trusted cabin starts the next ride
+      calmer (down to ≈ 0.325), a distrusted one more wary (up to ≈ 0.675).</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s6">
+    <summary><span class="no">06</span>Event Timeline (RIDE_START → RIDE_END)<span class="caret"></span></summary>
+    <div class="body">
+      <div class="fx">RIDE_START = <b>120</b> s (02:00)   ·   RIDE_END = <b>600</b> s (10:00)   ·   ride length = 480 s
+
+phase "setup"  t &lt; 120   Phill settles into the seat, the human can adjust it
+phase "ride"   120 ≤ t &lt; 600   auto-pilot engaged, 13 scripted events fire once each
+phase "done"   t ≥ 600   finish(): summary, questionnaire, priors saved</div>
+
+      <div class="legend">
+        <span><i class="dot" style="background:#6bd5c0"></i>event</span>
+        <span><i class="dot" style="background:#d9756b"></i>jolt &gt; 0.3 (screen shake + suspicion +0.20)</span>
+        <span><i class="dot" style="background:rgba(201,162,39,.55)"></i>ride window</span>
+      </div>
+      <div class="tl" id="tl">
+        <div class="axis"></div>
+        <div class="seg" style="left:20%; width:80%"></div>
+        <div class="lbl" style="left:2%">SETUP</div>
+        <div class="lbl" style="left:21%; color:#6bd5c0">RIDE</div>
+        <div class="ev" style="left:20.16%"><b>121</b></div>
+        <div class="ev" style="left:26.33%"><b>158</b></div>
+        <div class="ev" style="left:33.33%"><b>200</b></div>
+        <div class="ev j" style="left:43%"><b>258</b></div>
+        <div class="ev j" style="left:48.66%"><b>292</b></div>
+        <div class="ev" style="left:56.66%"><b>340</b></div>
+        <div class="ev" style="left:64.33%"><b>386</b></div>
+        <div class="ev j" style="left:70.83%"><b>425</b></div>
+        <div class="ev j" style="left:78.33%"><b>470</b></div>
+        <div class="ev" style="left:86.66%"><b>520</b></div>
+        <div class="ev j" style="left:91.66%"><b>550</b></div>
+        <div class="ev j" style="left:95.83%"><b>575</b></div>
+        <div class="ev" style="left:98.33%"><b>590</b></div>
+        <div class="tick" style="left:2%">02:00</div>
+        <div class="tick" style="left:33.33%">03:20</div>
+        <div class="tick" style="left:50%">05:00</div>
+        <div class="tick" style="left:66.66%">06:40</div>
+        <div class="tick" style="left:83.33%">08:20</div>
+        <div class="tick" style="left:98%">10:00</div>
+      </div>
+
+      <table>
+        <thead><tr><th class="num">t (s)</th><th class="num">clock</th><th class="m">kind</th><th class="num">g</th><th class="num">jolt</th><th class="num">km/h</th><th>label</th></tr></thead>
+        <tbody>
+          <tr><td class="num">120</td><td class="num">02:00</td><td class="m">— phase</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="desc">auto-pilot engaged · phase → <code>ride</code></td></tr>
+          <tr><td class="num">121</td><td class="num">02:01</td><td class="m">depart</td><td class="num">0.15</td><td class="num">0.00</td><td class="num">60</td><td>Departing — auto-pilot engaged</td></tr>
+          <tr><td class="num">158</td><td class="num">02:38</td><td class="m">merge</td><td class="num">0.20</td><td class="num">0.00</td><td class="num">105</td><td>Merging onto the motorway</td></tr>
+          <tr><td class="num">200</td><td class="num">03:20</td><td class="m">curve</td><td class="num">0.38</td><td class="num">0.00</td><td class="num">115</td><td>Long left-hand curve</td></tr>
+          <tr><td class="num">258</td><td class="num">04:18</td><td class="m">bump</td><td class="num">0.10</td><td class="num">0.55</td><td class="num">92</td><td>Pothole · thump! <span class="desc">(important memory, shake)</span></td></tr>
+          <tr><td class="num">292</td><td class="num">04:52</td><td class="m">overtake</td><td class="num">0.45</td><td class="num">0.25</td><td class="num">135</td><td>Overtaking a truck <span class="desc">(suspicion +0.05)</span></td></tr>
+          <tr><td class="num">340</td><td class="num">05:40</td><td class="m">smooth</td><td class="num">0.08</td><td class="num">0.00</td><td class="num">120</td><td>Cruising steadily</td></tr>
+          <tr><td class="num">386</td><td class="num">06:26</td><td class="m">curve</td><td class="num">0.32</td><td class="num">0.00</td><td class="num">112</td><td>Right-hand curve</td></tr>
+          <tr><td class="num">425</td><td class="num">07:05</td><td class="m">brake</td><td class="num">0.25</td><td class="num">0.18</td><td class="num">40</td><td>Traffic ahead — slowing <span class="desc">(suspicion +0.07)</span></td></tr>
+          <tr><td class="num">470</td><td class="num">07:50</td><td class="m">workzone</td><td class="num">0.12</td><td class="num">0.22</td><td class="num">70</td><td>Roadworks · rumble strip <span class="desc">(important memory)</span></td></tr>
+          <tr><td class="num">520</td><td class="num">08:40</td><td class="m">smooth</td><td class="num">0.06</td><td class="num">0.00</td><td class="num">128</td><td>Clear road again</td></tr>
+          <tr><td class="num">550</td><td class="num">09:10</td><td class="m">rain</td><td class="num">0.14</td><td class="num">0.10</td><td class="num">105</td><td>Light rain on the glass <span class="desc">(suspicion +0.04; rain FX 540–570)</span></td></tr>
+          <tr><td class="num">575</td><td class="num">09:35</td><td class="m">brake</td><td class="num">0.20</td><td class="num">0.10</td><td class="num">30</td><td>Slowing for the destination</td></tr>
+          <tr><td class="num">590</td><td class="num">09:50</td><td class="m">arrive</td><td class="num">0.05</td><td class="num">0.00</td><td class="num">0</td><td>Arrived — parked <span class="desc">(important memory)</span></td></tr>
+          <tr><td class="num">600</td><td class="num">10:00</td><td class="m">— phase</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="desc"><code>finish()</code> → summary, questionnaire, priors</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Firing &amp; perception</h3>
+<pre><code>EVENTS.forEach(<span class="kw">function</span> (ev) {
+  <span class="kw">if</span> (!fired[ev.t] &amp;&amp; S.t &gt;= ev.t) { fired[ev.t] = <span class="kw">true</span>; perceive(ev); }  <span class="cm">// once each</span>
+});
+
+<span class="kw">function</span> perceive(ev) {                       <span class="cm">// world → mind + body + HUD</span>
+  <span class="kw">var</span> impact = Math.max(ev.g, ev.jolt);
+  <span class="kw">var</span> salience = Math.max(<span class="nu">0.35</span>, <span class="nu">0.42</span> + impact * <span class="nu">0.5</span>);
+  <span class="kw">var</span> important = (ev.kind === <span class="st">"bump"</span> || ev.kind === <span class="st">"arrive"</span> || ev.kind === <span class="st">"workzone"</span>);
+  remember(ev.kind, ev.label, salience, important);      <span class="cm">// ← memory encoding</span>
+  S.speed = ev.spd; S.gNow = ev.g; S.joltNow = ev.jolt;  <span class="cm">// body signals</span>
+  <span class="cm">// … mood impulses (Section 05) … banner, scene shake, possible spoken line, log</span>
+}</code></pre>
+      <ul>
+        <li><b>Speech trigger:</b> a line is spoken outright when <code>jolt &gt; 0.2</code>, or half
+          the time when <code>g &gt; 0.25</code> — otherwise the event is only remembered and logged.</li>
+        <li><b>Sampling:</b> <code>sample()</code> appends to <code>S.samples</code>/<code>S.trust.trail</code>
+          whenever <code>S.t − lastSampleT ≥ 3</code> → ≈160 points across the ride for the summary charts.</li>
+        <li><b>Speed:</b> <code>S.speed</code> never jumps — it eases toward <code>targetSpeed</code>
+          with <code>min(1, 0.05·dt)</code>, and the HUD streaks turn off below 8 km/h.</li>
+      </ul>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s7">
+    <summary><span class="no">07</span>API Hooks<span class="caret"></span></summary>
+    <div class="body">
+      <h3>7.1 — Hook inventory</h3>
+      <table>
+        <thead><tr><th class="m">Hook</th><th>Type</th><th>Purpose / consumer</th></tr></thead>
+        <tbody>
+          <tr><td class="m">window.__COG_LIVE__</td><td class="m">object, updated in place</td>
+              <td class="desc">Published every frame from <code>publishCog()</code>: <code>mood{comfort,energy,suspicion}</code>,
+              <code>trust</code>, <code>intention</code>, <code>ride{speed,g,jolt,rain,phase,t}</code>,
+              <code>thoughts</code>, <code>speech</code>, <code>priors{rides,trust}</code>. Read by <code>src/avatar.js</code>.</td></tr>
+          <tr><td class="m">window.__COG_SUBSCRIBE__(fn)</td><td class="m">function → cancel()</td>
+              <td class="desc">Frame-by-frame subscription to the store; returns an unsubscribe function.
+              A throwing subscriber is swallowed so it can never break the loop.</td></tr>
+          <tr><td class="m">window.__SEAT_LIVE__</td><td class="m">{rot, sl, hgt}</td>
+              <td class="desc">Plain snapshot written at the top of <code>renderSeatScene()</code> for DOM widgets.</td></tr>
+          <tr><td class="m">window.__CABIN_PROBE__.hook(info)</td><td class="m">function</td>
+              <td class="desc">Headless render probe — receives <code>{proj, CamBase, CVW, CVH, CVF, S, PHILL}</code>.</td></tr>
+          <tr><td class="m">window.lavish.queuePrompt / sendQueuedPrompts</td><td class="m">optional</td>
+              <td class="desc">Privacy-guarded LLM commentary: <code>llmCommentary()</code> and the feedback card
+              send <em>aggregate telemetry only</em> ("comfort 0.62, suspicion 0.41 … no personal data").
+              Absent hook → the canned line stands.</td></tr>
+          <tr><td class="m">localStorage["cabinSimPriors"]</td><td class="m">JSON</td>
+              <td class="desc"><code>{rides, trust, comfort, suspicion}</code> written by <code>ridePriors()</code>,
+              read by <code>loadPriors()</code>.</td></tr>
+          <tr><td class="m">window.__EXPERIMENTER_CHAT__</td><td class="m">object</td>
+              <td class="desc"><b>New:</b> two-way experimenter ⇄ Phill channel — below.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>7.2 — <code>window.__EXPERIMENTER_CHAT__</code></h3>
+      <p>A mind-owned bridge: you type a line, Phill answers from his <em>current</em> fit/mood/trust,
+      and the line itself is encoded into his memory like any other perception (so a later recall can
+      resurface it). Implemented in <code>cognitive.js</code>, section <i>experimenter chat</i>.</p>
+
+<pre><code>window.__EXPERIMENTER_CHAT__ = {
+  send: experimenterSend,                            <span class="cm">// send("…") → { ok, reply, state }</span>
+  history: <span class="kw">function</span> () { <span class="kw">return</span> chatHist.slice(<span class="nu">0</span>); }, <span class="cm">// [{ who, t, text }] oldest first  */</span>
+  state: experimenterState,                          <span class="cm">// live mood / trust / BDI snapshot */</span>
+  clear: <span class="kw">function</span> () { chatHist.length = <span class="nu">0</span>; <span class="kw">return</span> <span class="kw">true</span>; }
+};</code></pre>
+
+      <table>
+        <thead><tr><th class="m">Method</th><th>Returns</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="m">send(text)</td>
+              <td class="m">{ ok:true, reply, state }<br>{ ok:false, error:"empty message" }</td>
+              <td class="desc">Appends both sides of the exchange to history, encodes the inbound line
+              (<code>remember("chat", …, 0.5, true)</code> → act 0.60), logs it as <code>chat</code>,
+              and speaks the reply with <code>speak(reply, true)</code> (forced, bypasses
+              <code>maybeSpeak()</code>). Capped at 40 entries.</td></tr>
+          <tr><td class="m">history()</td><td class="m">Array&lt;{who, t, text}&gt;</td>
+              <td class="desc"><code>who ∈ "experimenter" | "phill"</code>, <code>t</code> is sim seconds; a defensive copy.</td></tr>
+          <tr><td class="m">state()</td><td class="m">snapshot object</td>
+              <td class="desc"><code>{t, phase, done, mood, trust, trustScore, belief, intention, since, seat, memory{count,top,forgot}, ride{speed,g,jolt}}</code> — a pure read, safe to poll.</td></tr>
+          <tr><td class="m">clear()</td><td class="m">true</td>
+              <td class="desc">Empties the transcript only; does <b>not</b> touch <code>S.memory</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Console usage</h3>
+<pre><code><span class="cm">// ask mid-ride — the reply is picked from live state, not a fixed script</span>
+<span class="kw">const</span> r = window.__EXPERIMENTER_CHAT__.send(<span class="st">"Do you trust this car yet?"</span>);
+r.ok          <span class="cm">// true</span>
+r.reply       <span class="cm">// e.g. "The car earns trust, mile by mile."   (trust ≥ 0.6)</span>
+r.state.trust <span class="cm">// 0.69</span>
+
+<span class="cm">// poke the seat — if the fit gap is ≥ 0.22 this also clears the settle</span>
+<span class="cm">// cooldown, so bdiReason() will fire the "settle" intention next tick</span>
+window.__EXPERIMENTER_CHAT__.send(<span class="st">"raise the seat a bit"</span>);
+
+<span class="cm">// poll / inspect</span>
+window.__EXPERIMENTER_CHAT__.state();
+window.__EXPERIMENTER_CHAT__.history();   <span class="cm">// [{who:"experimenter",…},{who:"phill",…}]</span>
+window.__EXPERIMENTER_CHAT__.clear();</code></pre>
+
+      <h3>Reply routing (keyword → cognitive source)</h3>
+      <table>
+        <thead><tr><th class="m">Matched keywords</th><th>Branch</th><th>Answer source</th></tr></thead>
+        <tbody>
+          <tr><td class="m">seat · height · tall · lower · raise · rotate · rotation · adjust · settle</td>
+              <td class="desc">fitGap ≥ 0.22 → <code>THOUGHTS.request</code> <b>and</b> <code>S.bdi.last.settle = -99</code> (cooldown cleared)<br>otherwise → <code>THOUGHTS.seatGood</code></td>
+              <td class="desc"><code>S.belief.fitGap</code> + BDI</td></tr>
+          <tr><td class="m">trust · safe · confidence · rely · sure</td>
+              <td class="desc">≥ 0.6 → <code>trustOk</code> · ≤ 0.38 → <code>trustLow</code> · else <code>trustMid</code></td>
+              <td class="desc"><code>trustValue()</code></td></tr>
+          <tr><td class="m">feel · how · you · ok · alright · comfort · fine · doing</td>
+              <td class="desc"><code>THOUGHTS[ambientMood()]</code></td>
+              <td class="desc">suspicion &gt; 0.6 → wary · comfort &gt; 0.55 → relaxed · else neutral</td></tr>
+          <tr><td class="m">(anything else)</td><td class="desc"><code>THOUGHTS.idleN</code></td><td class="desc">neutral fallback</td></tr>
+          <tr><td class="m">"" (empty / whitespace)</td><td class="desc"><code>{ ok:false, error:"empty message" }</code></td><td class="desc">no state change</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note"><b>Why this shape.</b> The bridge mirrors the existing <code>window.lavish</code>
+      pattern: a single global, defensive <code>typeof</code> checks, no keys stored or transmitted,
+      canned language unless an external hook is present. Reading <code>state()</code> never mutates the
+      agent; only <code>send()</code> does, and only through the normal cognition path
+      (memory encode → speak → possible BDI nudge).</div>
+
+      <h3>7.3 — Subscribing to the live store</h3>
+<pre><code><span class="kw">const</span> off = window.__COG_SUBSCRIBE__(store =&gt; {
+  hud.textContent = store.mood.comfort.toFixed(<span class="nu">2</span>) +
+                    <span class="st">" / trust "</span> + store.trust.toFixed(<span class="nu">2</span>) +
+                    <span class="st">" / "</span> + (store.intention || <span class="st">"idle"</span>);
+});
+<span class="cm">// later: off()</span></code></pre>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s8">
+    <summary><span class="no">08</span>Key Parameters<span class="caret"></span></summary>
+    <div class="body">
+
+      <h3>Persona &amp; seat</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td class="m">PHILL.targetRot / targetHgt</td><td class="num">0° / 44 cm</td><td class="desc">preference centre of <code>seatFit()</code>, <code>selfAdjust()</code></td></tr>
+          <tr><td class="m">PHILL.tolRot / tolHgt</td><td class="num">20° / 2 cm</td><td class="desc">HUD comfort zone; rotation gate uses <code>tolRot+2 = 22°</code></td></tr>
+          <tr><td class="m">seat ranges</td><td class="num">rot 0–359° · hgt 38–46 · sl ±8</td><td class="desc">clamped in <code>setRot/setHgt/setSl</code></td></tr>
+          <tr><td class="m">userHands window</td><td class="num">3 s</td><td class="desc"><code>S.t − lastUserInput &lt; 3</code></td></tr>
+          <tr><td class="m">fit normalisers (dr, dh)</td><td class="num">180° / 8 cm</td><td class="desc">denominators in <code>seatFit()</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>BDI deliberation</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td class="m">settle: cd</td><td class="num">9 s</td><td class="desc">minimum gap between self-settle firings</td></tr>
+          <tr><td class="m">attend: cd</td><td class="num">3.2 s</td><td class="desc">thought cadence ceiling</td></tr>
+          <tr><td class="m">calibrate: cd</td><td class="num">10 s</td><td class="desc">trust-review cadence</td></tr>
+          <tr><td class="m">settle desire: noise floor</td><td class="num">0.18</td><td class="desc">below this, desire = 0</td></tr>
+          <tr><td class="m">settle: pre threshold (<code>settleThresh</code>)</td><td class="num">0.22</td><td class="desc">fit-gap needed to be allowed to settle</td></tr>
+          <tr><td class="m">settle: phase gain ph</td><td class="num">1.3 setup / 0.9 ride</td><td class="desc">keener before departure</td></tr>
+          <tr><td class="m">settle: userHands factor</td><td class="num">0.15</td><td class="desc">desire nearly suppressed while the human drags</td></tr>
+          <tr><td class="m">settle: desire cap</td><td class="num">2.0</td><td class="desc"><code>Math.min(2, …)</code></td></tr>
+          <tr><td class="m">attend: base / gain</td><td class="num">0.3 + 0.7·act (0.15 if empty)</td><td class="desc">memory activation drives attentiveness</td></tr>
+          <tr><td class="m">attend: suspicion bonus</td><td class="num">+0.4</td><td class="desc">when suspicion &gt; 0.6</td></tr>
+          <tr><td class="m">calibrate: base / ramp cap</td><td class="num">0.35 / 0.6</td><td class="desc"><code>0.35 + min(0.6, (t−120)/480)·k</code></td></tr>
+          <tr><td class="m">calibrate: alert factor k</td><td class="num">0.85 / 0.5</td><td class="desc">0.85 if suspicion &gt; 0.62 or fitGap &gt; 0.35, else 0.5</td></tr>
+          <tr><td class="m">selfAdjust: gates &amp; steps</td><td class="num">fit &gt; 0.22 · ±1 cm · ±10°</td><td class="desc">only moves when the perceived fit error is large</td></tr>
+          <tr><td class="m">fit-gap erosion: knee / gain</td><td class="num">0.30 / ×2.4</td><td class="desc">suspicion pressure above a 0.30 gap</td></tr>
+          <tr><td class="m">fit-gap erosion: rate / hands</td><td class="num">0.006 /s · ×1.6</td><td class="desc"><code>suspicion += 0.006·gb·dt</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Memory</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td class="m">memoryLambda (λ)</td><td class="num">0.004 s⁻¹</td><td class="desc">exponential activation decay; half-life ≈ 173 s</td></tr>
+          <tr><td class="m">capacity</td><td class="num">8 traces</td><td class="desc">oldest evicted on overflow (FIFO)</td></tr>
+          <tr><td class="m">forget threshold</td><td class="num">act &lt; 0.09</td><td class="desc">trace dies, <code>forgotCount++</code></td></tr>
+          <tr><td class="m">forgotten ring</td><td class="num">6 entries</td><td class="desc"><code>S.forgot</code> shown in HUD + summary</td></tr>
+          <tr><td class="m">importance bonus</td><td class="num">+0.10</td><td class="desc">bump / arrive / workzone traces</td></tr>
+          <tr><td class="m">salience floor / slope</td><td class="num">0.35 · 0.42 + 0.5·impact</td><td class="desc">event encoding</td></tr>
+          <tr><td class="m">rehearsal boost</td><td class="num">+0.22 per recall</td><td class="desc"><code>think()</code> refreshes the top trace</td></tr>
+          <tr><td class="m">chat trace salience</td><td class="num">0.5 (+0.1) = 0.60</td><td class="desc">experimenter lines in memory</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Mood, trust &amp; speech</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td class="m">comfortTarget weights</td><td class="num">0.35 / 0.35 / 0.30</td><td class="desc">aR (ROT) + aH (HGT) + fit</td></tr>
+          <tr><td class="m">comfort relaxation rate</td><td class="num">0.06 /s</td><td class="desc">τ ≈ 16.7 s toward target</td></tr>
+          <tr><td class="m">energy drain / floor</td><td class="num">0.00018 /s · 0.05</td><td class="desc">monotone vigilance drain</td></tr>
+          <tr><td class="m">suspicion relax down / up</td><td class="num">0.004 / 0.003 per s</td><td class="desc">toward <code>suspicionBase</code></td></tr>
+          <tr><td class="m">suspicionBase (+priors gain)</td><td class="num">0.5 · ×0.35</td><td class="desc">rewritten to 0.5 + (0.5 − priorTrust)·0.35</td></tr>
+          <tr><td class="m">jolt impulse: susp / comfort</td><td class="num">+0.20 · −0.12·jolt</td><td class="desc">when jolt &gt; 0.3 (also shakes the scene)</td></tr>
+          <tr><td class="m">kind impulses</td><td class="num">brake +0.07 · overtake +0.05 · rain +0.04</td><td class="desc">suspicion bumps</td></tr>
+          <tr><td class="m">g / jolt decay</td><td class="num">e^−0.3·dt / e^−0.35·dt</td><td class="desc">signal τ ≈ 3.3 s / 2.9 s</td></tr>
+          <tr><td class="m">trustValue weights</td><td class="num">0.34 / 0.40 / 0.16 / 0.10</td><td class="desc">comfort / (1−susp) / ev / (1−fitGap); ev scale 0.6</td></tr>
+          <tr><td class="m">calibrate verdict bands</td><td class="num">≥ 0.60 · ≤ 0.38</td><td class="desc">trustOk / trustLow</td></tr>
+          <tr><td class="m">mood bands</td><td class="num">susp 0.6 · comfort 0.55</td><td class="desc"><code>ambientMood()</code> idleS / idleC / idleN</td></tr>
+          <tr><td class="m">talkativeness modifiers</td><td class="num">0.55 × (0.4 + 0.3 + 0.25)</td><td class="desc">baseline 0.22 → up to 0.52 per decision</td></tr>
+          <tr><td class="m">questionnaire bands</td><td class="num">0.65 / 0.45 (grade: 0.62 / 0.45)</td><td class="desc">end-good / end-mid / end-bad</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Loop, timeline &amp; buffers</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td class="m">RIDE_START / RIDE_END</td><td class="num">120 s / 600 s</td><td class="desc">phase boundaries; 13 scripted events</td></tr>
+          <tr><td class="m">timeScale (default)</td><td class="num">×4</td><td class="desc">UI speed buttons; sim s ≈ 250 ms wall</td></tr>
+          <tr><td class="m">dt clamp</td><td class="num">4 s</td><td class="desc"><code>Math.min(4, Δwall)</code> — tab-switch protection</td></tr>
+          <tr><td class="m">sample interval</td><td class="num">3 s</td><td class="desc"><code>S.samples</code> + <code>S.trust.trail</code></td></tr>
+          <tr><td class="m">speed coasting rate</td><td class="num">0.05 /s</td><td class="desc">velocity eases toward target</td></tr>
+          <tr><td class="m">rain FX window</td><td class="num">540–570 s</td><td class="desc">beads up at 0.08/s, decays at 0.18/s</td></tr>
+          <tr><td class="m">buffers</td><td class="num">log 60 · thoughts 3 · chat 40 · samples ~160</td><td class="desc">rolling caps</td></tr>
+          <tr><td class="m">reserved (unused)</td><td class="num">assertiveness 0.6 · nextSpeak · lastThink</td><td class="desc">declared for future chatter scheduling, not read yet</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warn"><b>Tuning intuition.</b> The three levers that most change the ride's story:
+      <b>λ</b> (how fast Phill stops caring about what happened), <b>suspicionBase / prior gain</b>
+      (the emotional set-point across rides), and the <b>settleThresh vs. fit-gap knee</b> pair
+      (0.22 / 0.30 — how wrongly the seat must sit before he both complains and distrusts).</div>
+    </div>
+  </details>
+
+  <footer class="kiosk">
+    cabin-agent-sim · tutorial-cognitive.html · source of truth: src/cognitive.js ·
+    standalone document — no external assets · black/gray kiosk theme
+  </footer>
+</div>
+
+<script>
+(function () {
+  var secs = Array.prototype.slice.call(document.querySelectorAll("details.sec"));
+  var ex = document.getElementById("btnExpand");
+  var co = document.getElementById("btnCollapse");
+  if (ex) ex.addEventListener("click", function () { secs.forEach(function (s) { s.open = true; }); });
+  if (co) co.addEventListener("click", function () { secs.forEach(function (s) { s.open = false; }); });
+
+  // TOC: open the target section before scrolling
+  document.querySelectorAll(".toc a").forEach(function (a) {
+    a.addEventListener("click", function () {
+      var id = a.getAttribute("href").slice(1);
+      var el = document.getElementById(id);
+      if (el) el.open = true;
+    });
+  });
+
+  // copy buttons on every code block
+  document.querySelectorAll("pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.className = "copy"; b.type = "button"; b.textContent = "COPY";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code");
+      var txt = code ? code.innerText : pre.innerText;
+      var done = function () { b.textContent = "COPIED ✓"; setTimeout(function () { b.textContent = "COPY"; }, 1400); };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(done, function () { b.textContent = "CTRL+C"; });
+        } else { done(); }
+      } catch (e) { b.textContent = "CTRL+C"; }
+    });
+    pre.appendChild(b);
+  });
+})();
+</script>
+</body>
+</html>

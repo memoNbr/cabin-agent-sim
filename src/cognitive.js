@@ -73,6 +73,8 @@
     trustOk:  ["The car earns trust, mile by mile.", "It reads the road and I read it back. Alright.", "Starting to relax into this."],
     trustLow: ["I'm not sure it sees everything.", "The more it twitches, the less I trust it.", "It handles things, but I stay awake."],
     settleLow:["Lower again. Maybe I came back wrong.", "I keep wanting to sit up straighter."],
+    chat:     ["Someone's asking me things again.", "Experimenter on the line — I'll answer straight.", "That question's still sitting with me."],
+    trustMid: ["It's done right so far, mostly.", "Cautious is the sensible way to ride.", "Ask me again when we park."],
     endGood:  ["I'd take another ride.", "That's a keeper, honestly."],
     endMid:   ["Mostly fine. A few minutes were iffy.", "Decent enough ride."],
     endBad:   ["I'd rather drive myself next time.", "Got out a little wary."]
@@ -338,6 +340,66 @@
     else if (best === "attend") bdiActAttend();
     else if (best === "calibrate") bdiActCalibrate();
   }
+
+  /* ================= experimenter chat (mind-owned) =================
+     window.__EXPERIMENTER_CHAT__ — a two-way bridge so an experimenter can
+     talk to Phill mid-ride and read the state his answers come from.
+     Inbound lines are encoded into memory like any other perception, so a
+     later recall can resurface them; replies are picked from the CURRENT
+     fit / mood / trust values, never from a fixed script. */
+  var chatHist = [];
+  function chatReply(text) {
+    var q = String(text).toLowerCase(), tw = trustValue();
+    /* seat talk → he answers from his body's fit, and clears the settle
+       cooldown so the BDI loop can act on the request straight away */
+    if (/(seat|height|tall|lower|raise|rotate|rotation|adjust|settle)/.test(q)) {
+      if (S.belief.fitGap >= PHILL.settleThresh) {
+        S.bdi.last.settle = -99;
+        return pick(THOUGHTS.request);
+      }
+      return pick(THOUGHTS.seatGood);
+    }
+    /* trust talk → answered from the live latent trust value */
+    if (/(trust|safe|confidence|rely|sure)/.test(q)) {
+      if (tw >= 0.6) return pick(THOUGHTS.trustOk);
+      if (tw <= 0.38) return pick(THOUGHTS.trustLow);
+      return pick(THOUGHTS.trustMid);
+    }
+    /* wellbeing talk → answered from the current ambient mood */
+    if (/(feel|how|you|ok|okay|alright|comfort|fine|doing)/.test(q)) return pick(THOUGHTS[ambientMood()]);
+    return pick(THOUGHTS.idleN);
+  }
+  function experimenterState() {
+    var top = pickMemory();
+    return {
+      t: S.t, phase: S.phase, done: S.done,
+      mood: { comfort: S.mood.comfort, energy: S.mood.energy, suspicion: S.mood.suspicion },
+      trust: trustValue(), trustScore: S.trust.score,
+      belief: { fitGap: S.belief.fitGap, fitRot: S.belief.fitRot, fitHgt: S.belief.fitHgt, userHands: S.belief.userHands },
+      intention: S.bdi.intention, since: S.bdi.since,
+      seat: { rot: S.rot, hgt: S.hgt, sl: S.sl },
+      memory: { count: S.memory.length, top: top ? top.label : null, forgot: S.forgotCount },
+      ride: { speed: S.speed, g: S.gNow, jolt: S.joltNow }
+    };
+  }
+  function experimenterSend(raw) {
+    var text = String(raw == null ? "" : raw).trim();
+    if (!text) return { ok: false, error: "empty message" };
+    chatHist.push({ who: "experimenter", t: S.t, text: text });
+    logLine("chat", "experimenter · " + text);
+    remember("chat", "Experimenter: " + text, 0.5, true);
+    var reply = chatReply(text);
+    chatHist.push({ who: "phill", t: S.t, text: reply });
+    if (chatHist.length > 40) chatHist.splice(0, chatHist.length - 40);
+    speak(reply, true);
+    return { ok: true, reply: reply, state: experimenterState() };
+  }
+  window.__EXPERIMENTER_CHAT__ = {
+    send: experimenterSend,                            /* send("…") → { ok, reply, state } */
+    history: function () { return chatHist.slice(0); }, /* [{ who, t, text }] oldest first  */
+    state: experimenterState,                          /* live mood / trust / BDI snapshot */
+    clear: function () { chatHist.length = 0; return true; }
+  };
 
   /* ================= trust questionnaire (privacy-guarded) ================= */
   var TRUST_ITEMS = [
