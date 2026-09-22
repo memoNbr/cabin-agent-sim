@@ -18,12 +18,12 @@ class GroqProvider:
 
     name = "groq"
 
-    def __init__(self):
+    def __init__(self, model=None):
         import httpx
 
         self.client = httpx.Client(base_url="https://api.groq.com/openai/v1")
         self.key = os.environ["GROQ_API_KEY"]
-        self.model = os.environ.get("GROQ_MODEL", "allam-2-7b")
+        self.model = model or os.environ.get("GROQ_MODEL", "allam-2-7b")
 
     def complete(self, messages):
         resp = self.client.post(
@@ -46,18 +46,40 @@ class OllamaProvider:
 
     name = "ollama"
 
-    def __init__(self):
+    def __init__(self, model=None, keep_alive=None):
         import httpx
 
         base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
         self.client = httpx.Client(base_url=base)
-        self.model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+        self.model = model or os.environ.get("OLLAMA_MODEL", "llama3.2")
+        # seconds the weights stay resident after a call (None = Ollama's
+        # default 5 min). The hybrid CHAT provider sets a short one so its
+        # model leaves 16 GB-box RAM soon after the experimenter stops typing.
+        self.keep_alive = keep_alive
 
     def complete(self, messages):
+        # num_ctx caps the KV cache: 8b @ the default 4096 ctx allocates
+        # ~1.2 GB of RAM this 16 GB box does not have to spare; 1536 fits
+        # every prompt with ~0.75 GB saved. Generation speed is model-bound,
+        # not ctx-bound, so nothing is lost but RAM.
+        num_ctx = int(os.environ.get("OLLAMA_NUM_CTX", "1536"))
+        # Qwen3-family models 'think' before answering; unbounded on a
+        # CPU-only box that meant minutes per call (measured: 19 s of
+        # thinking for zero output vs 0.75 s with it off). Off by default;
+        # OLLAMA_THINK=1 re-enables it on hardware that can afford it.
+        think = os.environ.get("OLLAMA_THINK", "0").lower() in ("1", "true", "yes")
+        # hard cap on generated tokens so a runaway reply stalls one tick
+        # at worst; over-long/garbled JSON degrades to rules (never crashes).
+        num_predict = int(os.environ.get("OLLAMA_NUM_PREDICT", "160"))
+        body = {"model": self.model, "messages": messages, "stream": False,
+                "think": think,
+                "options": {"num_ctx": num_ctx, "num_predict": num_predict}}
+        if self.keep_alive is not None:
+            body["keep_alive"] = self.keep_alive
         resp = self.client.post(
             "/api/chat",
-            json={"model": self.model, "messages": messages, "stream": False},
-            timeout=120,
+            json=body,
+            timeout=300,   # 8b on CPU: one call can legitimately take minutes
         )
         resp.raise_for_status()
         return resp.json()["message"]["content"]
@@ -80,16 +102,18 @@ class ScriptedProvider:
         self.agent = agent
 
 
-def create_provider(name=None):
+def create_provider(name=None, model=None, keep_alive=None):
+    """Build a backend. `model` overrides its default so split setups work:
+    hybrid = small/fast model drives ticks, a bigger one writes chat."""
     name = (name or os.environ.get("LLM_PROVIDER", "scripted")).lower()
     if name == "groq":
         if not os.environ.get("GROQ_API_KEY"):
             print("No GROQ_API_KEY set - using the scripted provider.", file=sys.stderr)
         else:
-            return GroqProvider()
+            return GroqProvider(model=model)
     if name == "ollama":
         try:
-            return OllamaProvider()
+            return OllamaProvider(model=model, keep_alive=keep_alive)
         except Exception as exc:  # noqa: BLE001 - surface and fall through
             print(f"Could not start Ollama provider ({exc}) - using scripted.",
                   file=sys.stderr)

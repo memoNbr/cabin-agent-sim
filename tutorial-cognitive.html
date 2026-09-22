@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cognitive Agent Architecture — technical tutorial for cognitive.js</title>
-<meta name="description" content="Technical walkthrough of the BDI cognitive agent in cabin-agent-sim/src/cognitive.js: state, cognition loop, memory decay, trust & mood dynamics, event timeline, API hooks.">
+<title>Cognitive Agent Architecture — technical tutorial (Python mind, JS view)</title>
+<meta name="description" content="Technical walkthrough of the BDI cognitive agent after the Python port: cabin_sim/cognition.py (Mind), SimEngine clock, schema snapshot, HTTP transport, and the cognitive.js view adapter.">
 <style>
   :root{
     --bg:#08090a; --panel:#0e0f11; --panel2:#131417; --line:#24252a; --line2:#1a1b1f;
@@ -120,10 +120,10 @@
     background:none; border:none; padding:0; color:#d8d5c9;
     font-size:13px; line-height:1.62; display:block; white-space:pre;
   }
-  pre .cm{color:#6e7076}   /* comment */
-  pre .kw{color:#c9a227}   /* keyword */
-  pre .st{color:#8fc7a8}   /* string  */
-  pre .nu{color:#c99a6b}   /* number  */
+  pre .cm{color:#6e7076}
+  pre .kw{color:#c9a227}
+  pre .st{color:#8fc7a8}
+  pre .nu{color:#c99a6b}
   .copy{
     position:absolute; top:7px; right:7px; font-family:var(--mono);
     font-size:10px; letter-spacing:.1em; background:#111214; color:var(--tx-dim);
@@ -200,18 +200,22 @@
 
 <header class="kiosk">
   <div class="wrap">
-    <div class="kicker">cabin-agent-sim · technical documentation</div>
+    <div class="kicker">cabin-agent-sim · technical documentation · v2 (python port)</div>
     <h1>Cognitive Agent Architecture</h1>
-    <div class="sub">A BDI (Belief–Desire–Intention) passenger mind, explained from the source of
-      <code>src/cognitive.js</code>: state, deliberation loop, associative memory, trust &amp; mood
-      dynamics, the scripted ride timeline, and the hooks you can drive it from the console.</div>
+    <div class="sub">A BDI (Belief–Desire–Intention) passenger mind — now authored in Python.
+      This walkthrough follows the source of <code>cabin_sim/cognition.py</code>: state, the
+      deliberation loop, associative memory, trust &amp; mood dynamics, the scripted ride timeline,
+      the HTTP hooks, and how the thinned-out <code>src/cognitive.js</code> merely draws it.</div>
     <div class="chips">
-      <span class="chip">file <b>src/cognitive.js</b></span>
-      <span class="chip">persona <b>PHILL</b></span>
+      <span class="chip">mind <b>cabin_sim/cognition.py</b></span>
+      <span class="chip">view <b>src/cognitive.js (adapter)</b></span>
+      <span class="chip">persona <b>Phill</b></span>
       <span class="chip">memory λ <b>0.004 /s</b></span>
       <span class="chip">ride <b>120s → 600s</b></span>
-      <span class="chip">loop <b>rAF · timeScale ×4</b></span>
-      <span class="chip">hooks <b>__EXPERIMENTER_CHAT__</b></span>
+      <span class="chip">loop <b>engine tick · poll 700ms</b></span>
+      <span class="chip">hooks <b>/api/* + __EXPERIMENTER_CHAT__</b></span>
+      <span class="chip">reasoning <b>rules | llm (qwen · groq)</b></span>
+      <span class="chip">tests <b>81 pytest · 0 fail</b></span>
     </div>
   </div>
 </header>
@@ -243,57 +247,77 @@
   <details class="sec" id="s1" open>
     <summary><span class="no">01</span>BDI Architecture Overview<span class="caret"></span></summary>
     <div class="body">
-      <p><code>cognitive.js</code> runs the mind of <b>Phill</b>, the synthetic passenger of the
-      self-driving cabin. It is a classic <b>Belief–Desire–Intention</b> agent (Bratman) wrapped in a
-      single ES-module IIFE: everything "mind-side" (perception, memory, deliberation, speech) lives in
-      one closure, while the 3D renderer, the DOM HUD and the input handlers only <em>read</em> the public
-      state object <code>S</code> or the published window hooks.</p>
+      <p><code>cabin_sim/cognition.py</code> runs the mind of <b>Phill</b>, the synthetic passenger of the
+      self-driving cabin. It is a classic <b>Belief–Desire–Intention</b> agent (Bratman) — but after the
+      port it is no longer embedded in the browser. The Python package is authoritative: it owns state,
+      decides, and publishes a versioned snapshot. The three.js/canvas page became a <b>view adapter</b>
+      (<code>src/cognitive.js</code>) that polls, draws and forwards input; the pre-port mind is archived
+      unchanged in <code>src/cognitive.legacy.js</code>.</p>
 
-      <h3>BDI element → code mapping</h3>
+      <div class="flow"><span class="d">                    ┌──────────────────────────────────────────────┐</span>
+                    │  <span class="g">VIEW</span>  src/cognitive.js  (thin adapter)         │
+                    │  canvas + HUD render V · input dials · rAF loop │
+                    └───────▲───────────────────────┬──────────────────┘
+                            │ <span class="t">GET /api/snapshot</span>     │ <span class="t">POST /api/seat · /api/chat · /api/control</span>
+                    ┌───────┴───────────────────────▼──────────────────┐
+                    │  <span class="g">TRANSPORT</span>  cabin_sim/server.py (stdlib HTTP)   │
+                    │  ticker thread → engine.tick(1) every interval    │
+                    └───────▲───────────────────────────────────────────┘
+                            │ build_snapshot(engine)
+                    ┌───────┴───────────────────────────────────────────┐
+                    │  <span class="g">CLOCK + CONTRACT</span>  sim.py · schema.py          │
+                    │  engine.t · phase machine · seeded rng · priors   │
+                    └───────▲───────────────────────────────────────────┘
+                            │ session.step_once() → mind.step(dt)
+      ┌─────────────────────┴───────────────────────────────────────────────┐
+      │  <span class="g">CORE (authoritative)</span>                                              │
+      │  cognition.Mind  ← world.Seat · actions gate · agent · provider     │
+      │  perceive → desire → intention → act, once per decision step        │
+      └──────────────────────────────────────────────────────────────────────┘</div>
+
+      <h2>The three-layer rule</h2>
+      <ul>
+        <li><b>Only <code>SimEngine</code> advances the clock.</b> The server's ticker thread calls
+            <code>engine.tick(1)</code>; the browser never simulates time. <code>engine.t</code> and
+            <code>mind.t</code> advance together by <code>tick_dt</code> each decision step.</li>
+        <li><b>Only <code>schema.build_snapshot</code> produces state.</b> Everything the view knows
+            arrives in one JSON document; it never reads module internals.</li>
+        <li><b>The view never decides.</b> It may compute <em>display-only</em> figures (rate-table
+            gauges, fit text, timeline markers), but nothing feeds back: seat input goes through
+            <code>POST /api/seat</code>, which is clamped by <code>world.Seat</code> and sets the mind's
+            <code>belief.user_hands</code>.</li>
+      </ul>
+
+      <h2>What moved where</h2>
       <table>
-        <thead><tr><th>BDI element</th><th>Realised as</th><th>Where it lives</th></tr></thead>
+        <thead><tr><th>Concern</th><th>Before (JS)</th><th>Now (authoritative)</th></tr></thead>
         <tbody>
-          <tr><td><b>Beliefs</b></td><td class="m">perceiveFit()</td><td class="m">S.belief = { fitRot, fitHgt, fitGap, userHands }</td></tr>
-          <tr><td><b>Desires</b></td><td class="m">BDI_GOALS[*].desire() / .pre() / .cd</td><td class="m">settle · attend · calibrate</td></tr>
-          <tr><td><b>Intentions</b></td><td class="m">bdiReason() — argmax over desires</td><td class="m">S.bdi = { intention, since, last{} }</td></tr>
-          <tr><td><b>Actuation</b></td><td class="m">bdiActSettle / bdiActAttend / bdiActCalibrate</td><td>seat moves, thoughts, spoken lines, log</td></tr>
-          <tr><td><b>Affect</b></td><td class="m">mood + trust (Section 05)</td><td class="m">S.mood, S.trust</td></tr>
-          <tr><td><b>Episodic memory</b></td><td class="m">remember / decayMemory / pickMemory</td><td class="m">S.memory[], S.forgot[]</td></tr>
+          <tr><td>BDI deliberation</td><td class="m">bdiReason() / BDI_GOALS</td><td class="m">Mind.bdi_reason / _desire / _pre</td></tr>
+          <tr><td>Associative memory</td><td class="m">remember/decay/pickMemory</td><td class="m">cognition.Memory</td></tr>
+          <tr><td>Mood + trust</td><td class="m">comfortTarget/trustValue</td><td class="m">Mind.comfort_target / trust_value</td></tr>
+          <tr><td>Ride script (EVENTS)</td><td class="m">simulate() firing table</td><td class="m">cognition.EVENTS + Mind._fire_events</td></tr>
+          <tr><td>Seat self-adjust</td><td class="m">selfAdjust() writing S.rot/hgt</td><td class="m">Mind.self_adjust → actions.apply (whitelisted)</td></tr>
+          <tr><td>Experimenter chat</td><td class="m">__EXPERIMENTER_CHAT__ (in-page)</td><td class="m">Mind.chat_send over POST /api/chat (hook shape kept)</td></tr>
+          <tr><td>Priors</td><td class="m">localStorage</td><td class="m">JSON file via SimEngine(priors_path=…)</td></tr>
+          <tr><td>Rendering / HUD / input</td><td class="m">mixed into the same file</td><td class="m">src/cognitive.js — the only thing left there</td></tr>
         </tbody>
       </table>
 
-      <div class="flow"><span class="g">perception</span>  seat &amp; ride telemetry ──► perceiveFit() ──► <span class="t">S.belief</span>
-                              │
-<span class="d">every frame</span>               ▼
-<span class="g">deliberation</span> BDI_GOALS ── filter(pre, cooldown) ── argmax(desire) ──► <span class="t">S.bdi.intention</span>
-                              │
-                              ▼
-<span class="g">action</span>        settle ──► selfAdjust()  (rotates / raises the seat)
-               attend ──► think() + maybeSpeak()   (recall → line)
-               calibrate ──► trustValue() review   (trust commentary)
-                              │
-                              ▼
-<span class="g">affect</span>        mood relaxes, suspicion erodes, memory decays ──► back to perception</div>
+      <div class="note"><b>Who reasons (new):</b> <code>cabin_sim/reasoning.py</code>
+      plugs an LLM into three points — the <b>intention choice</b> (only among
+      Python-legal goals), the <b>inner-monologue thought</b>, and <b>chat replies</b>.
+      <code>--reasoning auto|rules|llm</code>: <code>auto</code> enables the model whenever the
+      provider is real — by default the <b>Groq free tier</b>
+      (<code>allam-2-7b</code>, ~300&nbsp;ms/call, key in <code>.env</code>) — or a
+      <b>local Qwen 3</b> via Ollama (<code>--provider ollama</code>, offline
+      fallback) — while <code>rules</code>
+      keeps the deterministic phrase banks (pytest). Any illegal choice, bad JSON,
+      rate limit or network error falls back to rules for that tick: the ride never breaks.</div>
 
-      <h3>Design rules worth knowing</h3>
-      <ul>
-        <li><b>One intention at a time.</b> Deliberation is winner-takes-all: only the highest desire
-          above zero is committed to <code>S.bdi.intention</code>; the rest are discarded until the next tick.</li>
-        <li><b>Cooldowns (<code>cd</code>) de-thrash.</b> A goal that just fired is silenced for its cooldown
-          window (<code>S.bdi.last[k]</code>), so <code>settle</code> cannot repeat every frame.</li>
-        <li><b>The human wins.</b> <code>S.belief.userHands</code> (a dial/rail grab within the last 3 s)
-          suppresses the settle desire by a factor of 0.15 and raises the fit-gap suspicion rate ×1.6.</li>
-        <li><b>Mind-owned, render-agnostic.</b> None of the cognition code touches the canvas; it only
-          flips <code>setModule()</code> so the HUD can light up the module that produced the last action
-          (<i>perceive · memorize · forget · think · intend · speak</i>).</li>
-        <li><b>Deterministic state, stochastic lines.</b> All dynamics are ODE-ish and reproducible;
-          only phrase selection uses <code>Math.random()</code> via <code>pick()</code>.</li>
-      </ul>
-
-      <div class="note"><b>Where to look in the file:</b> reference data &amp; persona (lines 1–50) ·
-        state <code>S</code> · mood &amp; fit (≈120) · cognition (≈137–342) · experimenter chat (≈344) ·
-        events &amp; questionnaire · renderer · live bridge · <code>frame()</code>/<code>simulate()</code>
-        (≈1006+) · transport, summary, boot.</div>
+      <div class="note"><b>Determinism:</b> with <code>--provider scripted</code>, the only randomness is
+      <code>Mind.rng</code> (a <code>random.Random(seed)</code> created with the session seed) plus the
+      engine's own seeded rng. Two engines with the same seed produce byte-identical snapshots — guarded
+      by <code>tests/test_determinism.py</code> and <code>test_cognition.py</code>.</div>
     </div>
   </details>
 
@@ -302,120 +326,80 @@
     <summary><span class="no">02</span>Core Data Structures<span class="caret"></span></summary>
     <div class="body">
 
-      <h3>2.1 — State <code>S</code> (the single source of truth)</h3>
-      <p>Every consumer — HUD, canvas, avatar, window hooks — reads this one object. It is mutated in
-      place, never replaced.</p>
-<pre><code><span class="kw">var</span> S = {
-  rot: <span class="nu">0</span>, hgt: <span class="nu">38</span>, sl: <span class="nu">0</span>,            <span class="cm">// seat pose: yaw °, height cm, slide cm</span>
-  t: <span class="nu">0</span>, running: <span class="kw">true</span>, timeScale: <span class="nu">4</span>,   <span class="cm">// sim clock (s) and speed multiplier</span>
-  phase: <span class="st">"setup"</span>, done: <span class="kw">false</span>,         <span class="cm">// setup | ride | paused | done</span>
-  speed: <span class="nu">0</span>, targetSpeed: <span class="nu">0</span>, gNow: <span class="nu">0</span>, joltNow: <span class="nu">0</span>,
-  rain: <span class="nu">0</span>,
-  mood: { comfort: <span class="nu">0.4</span>, energy: <span class="nu">0.6</span>, suspicion: <span class="nu">0.5</span> },
-  memory: [], forgot: [], forgotCount: <span class="nu">0</span>,
-  thoughts: [], speech: <span class="st">""</span>, lastModule: <span class="st">""</span>,
-  nextSpeak: <span class="nu">14</span>, lastThink: <span class="nu">0</span>,        <span class="cm">// reserved chatter schedulers</span>
-  samples: [], log: [],
-  belief: { fitGap: <span class="nu">0</span>, fitRot: <span class="nu">0</span>, fitHgt: <span class="nu">0</span>, userHands: <span class="kw">false</span> },
-  bdi:    { intention: <span class="kw">null</span>, since: <span class="nu">0</span>, last: {} },
-  trust:  { score: <span class="nu">0.5</span>, items: {}, trail: [] },
-  priors: <span class="kw">null</span>,
-  selfAct: <span class="nu">0</span>                          <span class="cm">// count of self-settle actuations</span>
-};</code></pre>
-
+      <h3>Seat — canonical units, full swivel</h3>
+      <p>The port reconciled the two old seat models (Python ±8° trim vs. JS 0–360°) onto
+      <b>one full-swivel model</b> in <code>world.Seat</code>. Units are canonical: millimetres for
+      slide/height, degrees for recline/rotation. The view converts for display only.</p>
       <table>
-        <thead><tr><th>Group</th><th>Fields</th><th>Meaning</th></tr></thead>
+        <thead><tr><th class="m">Axis</th><th class="num">Range</th><th class="m">Default ("as found")</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td>Seat / body</td><td class="m">rot, hgt, sl</td><td class="desc">Pose Phill's body perceives: 0–360°, 38–46 cm, ±8 cm slide.</td></tr>
-          <tr><td>Clock</td><td class="m">t, running, timeScale</td><td class="desc">Sim seconds; <code>frame()</code> advances it by <code>min(4, Δwall) × timeScale</code>.</td></tr>
-          <tr><td>Phase</td><td class="m">phase, done</td><td class="desc"><code>setup</code> until t=120, <code>ride</code> until t=600, then <code>done</code>.</td></tr>
-          <tr><td>Ride FX</td><td class="m">speed, targetSpeed, gNow, joltNow, rain</td><td class="desc">Event-driven, exponentially decaying signals.</td></tr>
-          <tr><td>Affect</td><td class="m">mood.{comfort,energy,suspicion}</td><td class="desc">Three [0,1] dimensions (Section 05).</td></tr>
-          <tr><td>Memory</td><td class="m">memory[], forgot[], forgotCount</td><td class="desc">≤ 8 live traces, 6-slot forgotten ring, lifetime counter.</td></tr>
-          <tr><td>Dialogue</td><td class="m">thoughts[], speech, lastModule</td><td class="desc">≤ 3 rolling thoughts; current spoken line; last firing module.</td></tr>
-          <tr><td>Beliefs</td><td class="m">belief.*</td><td class="desc">Perceived fit gaps + "the human is touching the controls".</td></tr>
-          <tr><td>BDI</td><td class="m">bdi.{intention,since,last}</td><td class="desc">Current goal, when it started, per-goal last-fired times.</td></tr>
-          <tr><td>Trust</td><td class="m">trust.{score,items,trail}</td><td class="desc">Questionnaire score, item answers, 3-secondly latent-trust trail.</td></tr>
-          <tr><td>Priors</td><td class="m">priors, selfAct</td><td class="desc">Aggregated previous-ride scores (localStorage) and self-adjust counter.</td></tr>
+          <tr><td class="m">rotation_deg</td><td class="num">0 … 359</td><td class="m">90 (turned to the door)</td><td class="desc">clamped, <b>no wrap</b> — travel stops at the 0/359 seam; 10° actuation steps</td></tr>
+          <tr><td class="m">height_mm</td><td class="num">380 … 460</td><td class="m">380 (38 cm, bottom)</td><td class="desc">38–46 cm travel, the same axis as the old JS <code>hgt</code>; ±10 mm steps</td></tr>
+          <tr><td class="m">slider_mm</td><td class="num">260 … 460</td><td class="m">390</td><td class="desc">centre 360; the view shows ±cm around that centre</td></tr>
+          <tr><td class="m">recline_deg</td><td class="num">80 … 110</td><td class="m">103</td><td class="desc">backrest, untouched by the port</td></tr>
         </tbody>
       </table>
+      <p><code>schema.SEAT_LIMITS</code> mirrors these constants exactly; <code>tests/test_world.py</code>
+      fails if the two ever drift. Phill's persona targets are <code>rotation_deg 0</code>,
+      <code>height_mm 440</code>, tolerances <code>20° / 20 mm</code>.</p>
 
-      <h3>2.2 — Persona <code>PHILL</code></h3>
-<pre><code><span class="kw">var</span> PHILL = {
-  name: <span class="st">"Phill"</span>, targetRot: <span class="nu">0</span>, targetHgt: <span class="nu">44</span>,   <span class="cm">// preferred pose</span>
-  tolRot: <span class="nu">20</span>, tolHgt: <span class="nu">2</span>,                        <span class="cm">// comfort tolerances (°, cm)</span>
-  talkativeness: <span class="nu">0.55</span>, suspicionBase: <span class="nu">0.5</span>, memoryLambda: <span class="nu">0.004</span>,
-  assertiveness: <span class="nu">0.6</span>,      <span class="cm">/* how strongly his own comfort pulls on the seat */</span>
-  settleThresh: <span class="nu">0.22</span>,      <span class="cm">/* fit-gap at which he starts to self-settle     */</span>
-  settleStep: <span class="nu">1</span>            <span class="cm">/* cm / ° steps while adjusting himself          */</span>
-};</code></pre>
-      <table>
-        <thead><tr><th>Field</th><th class="num">Value</th><th>Consumed by</th></tr></thead>
-        <tbody>
-          <tr><td class="m">targetRot / targetHgt</td><td class="num">0° / 44 cm</td><td class="desc"><code>seatFit()</code>, <code>selfAdjust()</code>, HUD "fit" gauges</td></tr>
-          <tr><td class="m">tolRot / tolHgt</td><td class="num">20 / 2</td><td class="desc">HUD ✓-checks; rotation gate in <code>selfAdjust()</code> uses <code>tolRot+2 = 22°</code></td></tr>
-          <tr><td class="m">talkativeness</td><td class="num">0.55</td><td class="desc"><code>maybeSpeak()</code> probability multiplier</td></tr>
-          <tr><td class="m">suspicionBase</td><td class="num">0.5</td><td class="desc">Set-point every tick relaxes suspicion toward; rewritten by priors</td></tr>
-          <tr><td class="m">memoryLambda</td><td class="num">0.004</td><td class="desc">Exponential memory decay rate (Section 04)</td></tr>
-          <tr><td class="m">settleThresh / settleStep</td><td class="num">0.22 / 1</td><td class="desc">Settle precondition and ±1 cm/±10° actuation step</td></tr>
-          <tr><td class="m">assertiveness</td><td class="num">0.6</td><td class="desc"><span class="desc">Declared/reserved — currently not read by any formula</span></td></tr>
-        </tbody>
-      </table>
+      <h3>Mind — the ported state object</h3>
+      <pre><code>class Mind:
+    def __init__(self, persona, cabin, seed=1):
+        self.rng      = random.Random(seed)   # ALL randomness lives here
+        self.t        = 0.0                   # sim seconds (steps with tick_dt)
+        self.mood     = {"comfort": 0.4, "energy": 0.6, "suspicion": 0.5}
+        self.ride     = {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0}
+        self.memory   = Memory(lam=0.004, cap=8, floor=0.09, rehearsal=0.22)
+        self.belief   = {"fit_gap": 0.0, "fit_rot": 0.0,
+                         "fit_hgt": 0.0, "user_hands": False}
+        self.bdi      = {"intention": None, "since": 0.0, "last": {}}
+        self.thoughts = []          # cap 3, newest first
+        self.speech   = ""          # last spoken line
+        self.module   = ""          # perceive|memorize|think|speak|forget|intend
+        self.log      = []          # cap 60, newest first
+        self.chat     = []          # experimenter chat, oldest first
+        self.samples  = []          # mood/trust samples every ~3 s
+        self.trail    = []          # live-trust trail for the summary chart</code></pre>
 
-      <h3>2.3 — Reference tables <code>ROT</code> / <code>HGT</code></h3>
-      <p>Two thesis-derived lookup tables score the seat pose as a dimensionless <b>attentiveness</b>
-      value in [0,1]. They feed <code>comfortTarget()</code> and the HUD gauges. Values between knots are
-      <b>linearly interpolated</b>; outside the range the first/last knot is clamped.</p>
-
-      <div class="grid2">
-        <div>
-          <h3 style="margin-top:0">ROT — yaw 0…360°</h3>
-          <table>
-            <thead><tr><th class="num">rot</th><th class="num">rate</th><th class="num">rot</th><th class="num">rate</th></tr></thead>
-            <tbody>
-              <tr><td class="num">0</td><td class="num">1.0000</td><td class="num">180</td><td class="num">0.6071</td></tr>
-              <tr><td class="num">30</td><td class="num">0.5000</td><td class="num">210</td><td class="num">0.4286</td></tr>
-              <tr><td class="num">60</td><td class="num">0.1429</td><td class="num">240</td><td class="num">0.5333</td></tr>
-              <tr><td class="num">90</td><td class="num">0.4286</td><td class="num">270</td><td class="num">0.6000</td></tr>
-              <tr><td class="num">120</td><td class="num">0.2143</td><td class="num">300</td><td class="num">0.2857</td></tr>
-              <tr><td class="num">150</td><td class="num">0.4286</td><td class="num">330</td><td class="num">0.8462</td></tr>
-              <tr><td class="num"></td><td class="num"></td><td class="num">360</td><td class="num">1.0000</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <h3 style="margin-top:0">HGT — height 38…46 cm</h3>
-          <table>
-            <thead><tr><th class="num">hgt</th><th class="num">rate</th></tr></thead>
-            <tbody>
-              <tr><td class="num">38</td><td class="num">0.4545</td></tr>
-              <tr><td class="num">40</td><td class="num">0.2955</td></tr>
-              <tr><td class="num">42</td><td class="num">0.1818</td></tr>
-              <tr><td class="num">44</td><td class="num">0.0455</td></tr>
-              <tr><td class="num">46</td><td class="num">0.0227</td></tr>
-            </tbody>
-          </table>
-          <p class="desc" style="font-size:13.5px">Monotonically decreasing: the further the seat is
-          raised, the smaller the attention term it contributes. At Phill's preferred 44 cm it reads
-          ≈ 0.045.</p>
-        </div>
-      </div>
-
-<pre><code><span class="kw">function</span> rate(tbl, x) {
-  <span class="kw">var</span> f = tbl[<span class="nu">0</span>], l = tbl[tbl.length - <span class="nu">1</span>];
-  <span class="kw">if</span> (x &lt;= f[<span class="nu">0</span>]) <span class="kw">return</span> f[<span class="nu">1</span>];              <span class="cm">// clamp below range</span>
-  <span class="kw">if</span> (x &gt;= l[<span class="nu">0</span>]) <span class="kw">return</span> l[<span class="nu">1</span>];              <span class="cm">// clamp above range</span>
-  <span class="kw">for</span> (<span class="kw">var</span> i = <span class="nu">0</span>; i &lt; tbl.length - <span class="nu">1</span>; i++) {
-    <span class="kw">var</span> a = tbl[i], b = tbl[i + <span class="nu">1</span>];
-    <span class="kw">if</span> (x &gt;= a[<span class="nu">0</span>] &amp;&amp; x &lt;= b[<span class="nu">0</span>])
-      <span class="kw">return</span> a[<span class="nu">1</span>] + (b[<span class="nu">1</span>] - a[<span class="nu">1</span>]) * (x - a[<span class="nu">0</span>]) / (b[<span class="nu">0</span>] - a[<span class="nu">0</span>]); <span class="cm">// lerp</span>
-  }
-  <span class="kw">return</span> f[<span class="nu">1</span>];
+      <h3>Snapshot — the contract</h3>
+      <p><code>empty_snapshot()</code> is the neutral template (PORT slots still <code>None</code>),
+      <code>build_snapshot(engine)</code> fills it from the mind. The view consumes exactly this shape:</p>
+      <pre><code>{
+  "version": 1, "schema": "cabin-agent.v1",
+  "t": 160.0, "phase": "ride", "step": 80, "running": true, "done": false,
+  "world": { "seat": { "slider_mm": 350, "height_mm": 440,
+                       "recline_deg": 97, "rotation_deg": 0 }, ... },
+  "ride":  { "speed": 61.2554, "g": 0.0602, "jolt": 0.0, "rain": 0.0 },
+  "agent": {
+    "mood": { "comfort": 0.6658, "energy": 0.5712, "suspicion": 0.5 },
+    "trust": { "score": null, "live": 0.6864 },
+    "intention": "attend", "intentionSince": 158.0,
+    "speech": "It reads the road and I read it back. Alright.",
+    "thoughts": [ { "time": "02:40", "text": "…" }, ... ],   // cap 3
+    "memory":  [ { "id": "depart", "act": 0.992, "age": 39, ... } ],
+    "forgot":  [ { "label": "…", "age": 512 } ], "forgotCount": 3,
+    "module": "think", "chat": [], "log": [ ... ],
+    "samples": [ { "t": 0, "c": .4, "s": .5, "e": .6, "trust": .5 }, ... ],
+    "trail":   [ { "t": 0, "v": 0.50 }, ... ],
+    "prefs":   { "rot": 0, "hgt": 44, "tolRot": 20, "tolHgt": 2 }
+  },
+  "priors": { "rides": 1, "trust": 0.62, "comfort": 0.61, "suspicion": 0.49 },
+  "log": [ ... ]                       // session activity (provider decisions)
 }</code></pre>
+      <div class="note"><b>Two instruments, one frame:</b> <code>trust.live</code> is the continuously
+      computed latent value from the ride (§05); <code>trust.score</code> stays the <b>canonical end
+      score</b> from the MDMT questionnaire, available only after the session finishes.</div>
 
-      <div class="note"><b>Worked example.</b> <code>rate(ROT, 45)</code> sits between 30 (0.5) and 60 (0.1429)
-      → <code>0.5 + (0.1429−0.5)·(45−30)/30 = 0.3214</code>. <code>rate(HGT, 43)</code> →
-      <code>0.1818 + (0.0455−0.1818)·½ = 0.1136</code>.</div>
+      <h3>Persona — cognition block</h3>
+      <p>Tunables moved out of hard-coded constants into <code>personas/phill.json</code> (code defaults
+      keep old personas working):</p>
+      <pre><code>"cognition": {
+  "memory_lambda": 0.004,  "memory_cap": 8,     "forget_floor": 0.09,
+  "rehearsal_boost": 0.22, "settle_thresh": 0.22,
+  "settle_step_mm": 10,    "settle_step_deg": 10,
+  "ride_start": 120,       "ride_end": 600
+}</code></pre>
     </div>
   </details>
 
@@ -423,148 +407,92 @@
   <details class="sec" id="s3">
     <summary><span class="no">03</span>Main Cognition Loop<span class="caret"></span></summary>
     <div class="body">
-      <p>The pipeline the thesis describes —
-      <code>perceiveFit → trustValue → BDI_GOALS → intention → selfAdjust</code> — is executed inside
-      <code>frame()</code> → <code>simulate(dt)</code> → <code>bdiReason(dt)</code>.</p>
 
-      <div class="flow"><span class="g">requestAnimationFrame(frame)</span>
-   │  dt = min(4, Δwall_seconds) × S.timeScale          <span class="d">(default ×4 → 1 sim s ≈ 250 ms)</span>
-   ▼
-<span class="g">simulate(dt)</span>
-   ├─ S.t += dt ; phase setup → ride (t ≥ 120) → finish() (t ≥ 600)
-   ├─ EVENTS fire once (fired[ev.t])            ──► perceive(ev) → remember(...)
-   ├─ speed coasts to target :  v += (v* − v) · min(1, 0.05·dt)
-   ├─ mood relaxation          ──► comfort / energy / suspicion (Section 05)
-   ├─ decayMemory(dt)          ──► λ = 0.004 exponential forgetting
-   ├─ <span class="t">bdiReason(dt)</span>            ──► the BDI cycle below
-   └─ sample() every 3 s       ──► S.samples, S.trust.trail
-   ▼
-<span class="g">renderAll() + publishCog()</span>   ──► HUD, canvas, __COG_LIVE__ subscribers</div>
+      <p>There is exactly one loop that matters, and it runs <b>server-side</b>, once per decision step:</p>
+      <div class="flow"><span class="g">ticker thread</span>  every <span class="t">interval</span> wall-s   →   engine.tick(1)
+   └─&gt; session.step_once()
+          ├─ agent.decide()        <span class="d">provider: scripted | groq | ollama</span>
+          ├─ actions.apply(...)    <span class="d">whitelist + Seat clamps</span>
+          ├─ agent.observe(...)    <span class="d">drink/adjust impulses on the shared mood dict</span>
+          └─ <span class="g">mind.step(tick_dt)</span>   <span class="d">the ported cognitive core</span>
+                 ├─ self.t += dt
+                 ├─ _fire_events()       ride script, each event once
+                 ├─ speed coasts to the event's target           (k = dt·0.05)
+                 ├─ mood: comfort → comfortTarget, g/jolt decay, rain window,
+                 │        energy −0.00018·dt, suspicion → set-point
+                 ├─ decay_memory(dt)     traces below 0.09 are forgotten
+                 ├─ <span class="g">bdi_reason(dt)</span>      perceive → desires → argmax → act
+                 └─ sample()             every ≥3 s: mood + trust for charts
+   engine.t += tick_dt   <span class="d">(same dt — the two clocks advance together)</span>
 
-      <h3>Step 1 — <code>perceiveFit()</code> (beliefs)</h3>
-      <p>Turns the raw seat pose into beliefs about the mismatch between the seat and Phill's body:</p>
-<pre><code><span class="kw">function</span> perceiveFit() {
-  <span class="kw">var</span> f = seatFit();                     <span class="cm">// { rot, hgt, overall } ∈ [0,1]</span>
-  S.belief.fitRot = <span class="nu">1</span> - f.rot;          <span class="cm">// rotation error</span>
-  S.belief.fitHgt = <span class="nu">1</span> - f.hgt;          <span class="cm">// height error</span>
-  S.belief.fitGap = <span class="nu">1</span> - f.overall;       <span class="cm">// global error  = (dr + dh) / 2</span>
-  S.belief.userHands = (S.t - lastUserInput) &lt; <span class="nu">3</span>; <span class="cm">// dial/rail grabbed &lt; 3 s ago</span>
-}</code></pre>
+<span class="g">view loop</span> (browser, passive)   GET /api/snapshot every pollMs (700 ms)
+   └─ applySnapshot(s) → V → renderAll() + publishCog()          rAF draws V at 60 fps</div>
 
-      <h3>Step 2 — fit-gap erosion (belief → affect)</h3>
-      <p>Before deliberating, a persistent fit gap feeds suspicion — "the cabin keeps ignoring where my
-      body wants to sit":</p>
-      <div class="fx">gb = (fitGap &gt; <b>0.3</b>) ? (fitGap − 0.3) × <b>2.4</b> : 0
-suspicion ← min(1, suspicion + <b>0.006</b> × gb × (userHands ? <b>1.6</b> : 1) × dt)</div>
+      <h3>The deliberation step</h3>
+      <pre><code>def bdi_reason(self, dt):
+    self.perceive_fit()                      # beliefs from the real seat
 
-      <h3>Step 3 — desires: the <code>BDI_GOALS</code> table</h3>
-      <p>Each goal exposes <code>desire()</code> (a strength in [0,2]), <code>pre()</code> (a hard
-      precondition) and <code>cd</code> (cooldown in sim seconds).</p>
-<pre><code><span class="kw">var</span> BDI_GOALS = {
-  settle: {      <span class="cm">// "settle the seat"</span>
-    desire: <span class="kw">function</span> () {
-      <span class="kw">var</span> g = S.belief.fitGap;
-      <span class="kw">if</span> (g &lt; <span class="nu">0.18</span>) <span class="kw">return</span> <span class="nu">0</span>;                         <span class="cm">// below noise floor</span>
-      <span class="kw">var</span> ph = S.phase === <span class="st">"setup"</span> ? <span class="nu">1.3</span> : <span class="nu">0.9</span>;      <span class="cm">// keener during setup</span>
-      <span class="kw">return</span> Math.min(<span class="nu">2</span>, ph * g * (S.belief.userHands ? <span class="nu">0.15</span> : <span class="nu">1</span>));
-    },
-    pre: <span class="kw">function</span> () { <span class="kw">return</span> S.belief.fitGap &gt;= PHILL.settleThresh &amp;&amp; !S.belief.userHands; },
-    cd: <span class="nu">9</span>
-  },
-  attend: { <span class="cm">// "attend to the road"</span>
-    desire: <span class="kw">function</span> () {
-      <span class="kw">var</span> m = pickMemory();
-      <span class="kw">return</span> (m ? <span class="nu">0.3</span> + m.act * <span class="nu">0.7</span> : <span class="nu">0.15</span>) + (S.mood.suspicion &gt; <span class="nu">0.6</span> ? <span class="nu">0.4</span> : <span class="nu">0</span>);
-    },
-    pre: <span class="kw">function</span> () { <span class="kw">return</span> <span class="kw">true</span>; },  cd: <span class="nu">3.2</span>
-  },
-  calibrate: { <span class="cm">// "calibrate trust in the cabin"</span>
-    desire: <span class="kw">function</span> () {
-      <span class="kw">if</span> (S.phase !== <span class="st">"ride"</span>) <span class="kw">return</span> <span class="nu">0</span>;
-      <span class="kw">var</span> k = (S.mood.suspicion &gt; <span class="nu">0.62</span> || S.belief.fitGap &gt; <span class="nu">0.35</span>) ? <span class="nu">0.85</span> : <span class="nu">0.5</span>;
-      <span class="kw">return</span> <span class="nu">0.35</span> + Math.min(<span class="nu">0.6</span>, (S.t - RIDE_START) / (RIDE_END - RIDE_START)) * k;
-    },
-    pre: <span class="kw">function</span> () { <span class="kw">return</span> S.phase === <span class="st">"ride"</span>; },  cd: <span class="nu">10</span>
-  }
-};</code></pre>
+    # a persistent fit gap erodes trust: the cabin ignores his body
+    gap = self.belief["fit_gap"]
+    gb = (gap - 0.3) * 2.4 if gap &gt; 0.3 else 0.0
+    if gb &gt; 0:
+        hands = 1.6 if self.belief["user_hands"] else 1.0
+        self.mood["suspicion"] = min(1.0, self.mood["suspicion"] + dt * 0.006 * gb * hands)
 
+    best, best_v = None, 0.0
+    for goal in GOAL_CD:                     # settle · attend · calibrate
+        if self.t - self.bdi["last"].get(goal, -99.0) &lt; GOAL_CD[goal]:
+            continue                          # cooldown
+        if not self._pre(goal):
+            continue                          # precondition
+        v = self._desire(goal)
+        if v &gt; 0 and v &gt; best_v:
+            best, best_v = goal, v            # argmax wins the intention
+
+    self.bdi["intention"] = best
+    if best: self.bdi["last"][best] = self.t
+
+    if best == "settle":                      # act on the seat (whitelisted)
+        ...
+    elif best == "attend":                    # recall a trace, maybe say it
+        self.maybe_speak(self.think())
+    elif best == "calibrate":                 # review trust, by live value
+        ...</code></pre>
+
+      <div class="note"><b>LLM mode</b> (<code>--reasoning llm / auto</code>): Python still
+      computes which goals are legal (cooldowns + preconditions above), then <b>one</b>
+      model call picks the intention and words the thought together —
+      <code>{"intention": "…", "thought": "…"}</code>. The answer is re-checked against the
+      legal set (anything else keeps the argmax), throttled to ≥12 sim-seconds between
+      calls, retried once on rate limits, and falls back to rules on any failure.
+      Mood relax, memory decay, seat clamps and cooldowns never come from the model.</div>
+
+      <div class="warn"><b>Why <code>intention</code> is sometimes <code>null</code>:</b> that is faithful
+      behaviour, not a bug. If every goal is inside its cooldown or fails its precondition for this tick,
+      the agent idles with <code>intention = null</code> — exactly the JS <code>bdiReason</code> semantics.
+      With <code>tick_dt = 2</code> you see it clearly: <code>attend</code> (cd 3.2 s) fires every other step.</div>
+
+      <h3>Three goals</h3>
       <table>
-        <thead><tr><th>Goal</th><th class="m">desire()</th><th class="m">pre()</th><th class="num">cd</th></tr></thead>
+        <thead><tr><th class="m">Goal</th><th class="m">Precondition</th><th class="m">Desire</th><th class="num">cd</th></tr></thead>
         <tbody>
-          <tr><td><b>settle</b><div class="desc">fix the seat himself</div></td>
-              <td class="m">min(2, ph·g·k)<div class="desc">g = fitGap, ph = 1.3 setup / 0.9 ride, k = 0.15 if userHands</div></td>
-              <td class="m">fitGap ≥ 0.22 &amp;&amp; !userHands</td><td class="num">9 s</td></tr>
-          <tr><td><b>attend</b><div class="desc">recall → think → maybe speak</div></td>
-              <td class="m">0.3 + 0.7·act<div class="desc">or 0.15 if no memory; +0.4 if suspicion &gt; 0.6</div></td>
-              <td class="m">true</td><td class="num">3.2 s</td></tr>
-          <tr><td><b>calibrate</b><div class="desc">review trust in the machine</div></td>
-              <td class="m">0.35 + ramp·k<div class="desc">ramp = (t−120)/480 capped at 0.6; k = 0.85 alert / 0.5 calm</div></td>
-              <td class="m">phase === "ride"</td><td class="num">10 s</td></tr>
+          <tr><td class="m">settle</td><td class="m">fit_gap ≥ 0.22 and not user_hands</td>
+              <td class="m">min(2, ph·gap·(0.15 if hands else 1)), 0 below gap 0.18 — ph 1.3 setup / 0.9 ride</td><td class="num">9 s</td></tr>
+          <tr><td class="m">attend</td><td class="m">always</td>
+              <td class="m">0.3 + 0.7·act (0.15 if memory empty) + 0.4 if suspicion &gt; 0.6</td><td class="num">3.2 s</td></tr>
+          <tr><td class="m">calibrate</td><td class="m">phase == "ride"</td>
+              <td class="m">0.35 + min(0.6, (t−120)/480)·k,  k ∈ {0.85, 0.5}</td><td class="num">10 s</td></tr>
         </tbody>
       </table>
+      <p><code>settle</code> actuates through the same whitelist a human input uses
+      (<code>actions.apply(cabin, "seat_up"/"rotate_ccw"…)</code>) — the mind gets no privileged path past
+      the clamps. When it can't move (bounds, hands on the controls) it thinks
+      <code>settleLow</code> instead: <em>"Lower again. Maybe I came back wrong."</em></p>
 
-      <h3>Step 4 — selection &amp; intention commit</h3>
-<pre><code><span class="kw">var</span> best = <span class="kw">null</span>, bestV = <span class="nu">0</span>;
-Object.keys(BDI_GOALS).forEach(<span class="kw">function</span> (k) {
-  <span class="kw">var</span> go = BDI_GOALS[k];
-  <span class="kw">if</span> (S.t - (S.bdi.last[k] || -<span class="nu">99</span>) &lt; go.cd) <span class="kw">return</span>;   <span class="cm">// 1. cooldown</span>
-  <span class="kw">if</span> (!go.pre()) <span class="kw">return</span>;                          <span class="cm">// 2. precondition</span>
-  <span class="kw">var</span> v = go.desire();                            <span class="cm">// 3. strength</span>
-  <span class="kw">if</span> (v &gt; <span class="nu">0</span> &amp;&amp; v &gt; bestV) { best = k; bestV = v; } <span class="cm">// 4. argmax</span>
-});
-
-<span class="kw">if</span> (best) { S.bdi.intention = best; S.bdi.since = S.t; S.bdi.last[best] = S.t; }
-<span class="kw">else</span>      { S.bdi.intention = <span class="kw">null</span>; }               <span class="cm">// deliberation may idle</span></code></pre>
-
-      <h3>Step 5 — <code>trustValue()</code></h3>
-      <p>The latent "how much do I trust this machine right now" is evaluated wherever a verdict is
-      needed: inside <code>bdiActCalibrate()</code>, inside every 3-second <code>sample()</code>, inside
-      the questionnaire's <code>evidenceAnswers()</code>, and by the experimenter chat's
-      <code>state()</code>. Full formula in Section 05.</p>
-      <div class="fx">trust = clamp01( <b>0.34</b>·comfort + <b>0.40</b>·(1 − suspicion) + <b>0.16</b>·ev + <b>0.10</b>·(1 − fitGap) ),
-  ev   = clamp01(1 − joltNow / <b>0.6</b>)</div>
-
-      <h3>Step 6 — actuation: <code>selfAdjust()</code></h3>
-      <p>The <code>settle</code> intention pulls the seat toward Phill's preferred pose in small,
-      human-sized steps (never a teleport), gated on how bad the perceived fit is:</p>
-<pre><code><span class="kw">function</span> selfAdjust() {
-  <span class="kw">var</span> changed = <span class="kw">false</span>;
-  <span class="kw">if</span> (S.belief.fitHgt &gt; <span class="nu">0.22</span> &amp;&amp; S.hgt &lt; PHILL.targetHgt) {
-    S.hgt = Math.max(<span class="nu">38</span>, Math.min(<span class="nu">46</span>, S.hgt + PHILL.settleStep));   <span class="cm">// +1 cm</span>
-    changed = <span class="kw">true</span>;
-  } <span class="kw">else if</span> (S.belief.fitHgt &gt; <span class="nu">0.22</span> &amp;&amp; S.hgt &gt; PHILL.targetHgt) {
-    S.hgt = Math.max(<span class="nu">38</span>, Math.min(<span class="nu">46</span>, S.hgt - PHILL.settleStep));   <span class="cm">// −1 cm</span>
-    changed = <span class="kw">true</span>;
-  }
-  <span class="kw">if</span> (S.belief.fitRot &gt; <span class="nu">0.22</span>) {
-    <span class="kw">var</span> dRot = angDist(S.rot, PHILL.targetRot);
-    <span class="kw">if</span> (dRot &gt; PHILL.tolRot + <span class="nu">2</span>) {                  <span class="cm">// beyond 22° off-heading</span>
-      <span class="kw">var</span> dir = ((PHILL.targetRot - S.rot + <span class="nu">540</span>) % <span class="nu">360</span>) - <span class="nu">180</span>;   <span class="cm">// shortest way</span>
-      S.rot = Math.round((((S.rot + (dir &gt; <span class="nu">0</span> ? <span class="nu">10</span> : -<span class="nu">10</span>)) % <span class="nu">360</span>) + <span class="nu">360</span>) % <span class="nu">360</span>);
-      rotChanged = <span class="kw">true</span>; changed = <span class="kw">true</span>;             <span class="cm">// ±10° per firing</span>
-    }
-  }
-  <span class="kw">if</span> (changed) { S.selfAct++; logLine(<span class="st">"adj"</span>, <span class="st">"self-settle → …"</span>); renderAll(); }
-  <span class="kw">return</span> changed;
-}</code></pre>
-
-      <table>
-        <thead><tr><th>Intention</th><th>Action</th><th>Observable output</th></tr></thead>
-        <tbody>
-          <tr><td class="m">settle</td><td class="m">bdiActSettle() → selfAdjust()</td>
-              <td class="desc">±1 cm height / ±10° yaw steps; every 2nd actuation spoken (<code>settle</code> lines), otherwise a thought; if nothing can move, a <code>settleLow</code> thought.</td></tr>
-          <tr><td class="m">attend</td><td class="m">bdiActAttend() → think() [+ maybeSpeak()]</td>
-              <td class="desc">Recalls the most active memory (rehearsal +0.22), or reacts to a fresh rotation change, then may say the line out loud.</td></tr>
-          <tr><td class="m">calibrate</td><td class="m">bdiActCalibrate() → trustValue()</td>
-              <td class="desc">trust ≥ 0.6 → <code>trustOk</code> thought; ≤ 0.38 → <code>trustLow</code> thought <em>and</em> likely spoken; in between the HUD only marks <i>intend</i>.</td></tr>
-        </tbody>
-      </table>
-
-      <div class="warn"><b>Ordering caveat.</b> <code>trustValue()</code> is <em>not</em> a separate
-      stage in <code>bdiReason()</code>; it is a pure function called on demand by the calibrate action,
-      the sampler and the questionnaire. The literal per-tick sequence is
-      <code>perceiveFit → fit-gap erosion → desire evaluation → intention commit → action (selfAdjust /
-      think / trustValue)</code>.</div>
+      <div class="note"><b>Human override:</b> any <code>POST /api/seat</code> stamps
+      <code>mind._last_user_input = mind.t</code>; for the next 3 seconds
+      <code>belief.user_hands</code> suppresses <code>settle</code> and multiplies its desire by 0.15 —
+      the machine waits while you drag the dial.</div>
     </div>
   </details>
 
@@ -572,95 +500,50 @@ Object.keys(BDI_GOALS).forEach(<span class="kw">function</span> (k) {
   <details class="sec" id="s4">
     <summary><span class="no">04</span>Memory System<span class="caret"></span></summary>
     <div class="body">
-      <p>A small ACT*-flavoured associative store: traces carry an <b>activation</b> <code>act ∈ [0,1]</code>
-      that is boosted at encoding and by rehearsal, exponentially decayed every tick, and dropped at a
-      floor threshold. Capacity is 8 slots.</p>
 
-      <div class="flow">encode ──► <span class="g">act = min(1, salience + 0.1·important)</span> ──► S.memory[≤8]
-                                          │
-             every simulate(dt)           ▼
-        <span class="t">act ×= e^(−λ·dt)</span>, λ = <span class="g">0.004</span>  ──► act &lt; <span class="g">0.09</span> ? ──► S.forgot[] + forgotCount++
-                                          │ no
-                                          ▼
-        retrieve: <span class="g">argmax(act)</span> ──► think() ──► <span class="t">act = min(1, act + 0.22)</span>  (rehearsal)</div>
+      <p>Associative traces with exponential decay (ACT*-flavoured, exactly as the JS had it). Ride events,
+      the experimenter's questions and chat lines all enter through the same door:</p>
+      <pre><code>class Memory:
+    def remember(self, trace_id, label, salience, important, t):
+        act = min(1.0, salience + (0.1 if important else 0.0))
+        self.traces.append({... "act": act, "born": t, "rehearsed": 0})
+        if len(self.traces) &gt; self.cap:          # cap 8 — FIFO evict
+            del self.traces[: len(self.traces) - self.cap]
 
-      <h3>4.1 — Encoding</h3>
-<pre><code><span class="kw">function</span> remember(id, label, salience, important) {
-  <span class="kw">var</span> act = salience + (important ? <span class="nu">0.1</span> : <span class="nu">0</span>);
-  S.memory.push({ id: id, label: label, salience: salience,
-                  act: Math.min(<span class="nu">1</span>, act), born: S.t, rehearsed: <span class="nu">0</span> });
-  setModule(<span class="st">"memorize"</span>);
-  <span class="kw">if</span> (S.memory.length &gt; <span class="nu">8</span>) S.memory.splice(<span class="nu">0</span>, S.memory.length - <span class="nu">8</span>); <span class="cm">// FIFO evict</span>
-}</code></pre>
-      <table>
-        <thead><tr><th>Source</th><th class="m">id</th><th class="m">salience</th><th class="num">act</th></tr></thead>
-        <tbody>
-          <tr><td>Road event (perceive)</td><td class="m">ev.kind</td>
-              <td class="m">max(0.35, 0.42 + 0.5·max(g, jolt))</td>
-              <td class="num">+0.1 if kind ∈ {bump, arrive, workzone}</td></tr>
-          <tr><td>Experimenter line</td><td class="m">"chat"</td><td class="m">0.5 (fixed)</td><td class="num">0.60</td></tr>
-        </tbody>
-      </table>
-      <div class="note"><b>Example — the pothole at t=258 s:</b> g = 0.10, jolt = 0.55 →
-      salience = 0.42 + 0.5·0.55 = 0.695, <code>bump</code> is <em>important</em> →
-      <b>act = 0.795</b>. A calm <code>smooth</code> event (g = 0.08) gets salience 0.46 → act 0.46.</div>
+    def decay(self, dt, t):
+        for tr in self.traces:
+            tr["act"] *= math.exp(-self.lam * dt)        # λ = 0.004 /s
+            if tr["act"] &lt; self.floor:                   # floor 0.09
+                dead.append(tr)                          # → forgot ring (6)
 
-      <h3>4.2 — Decay (λ = 0.004)</h3>
-<pre><code><span class="kw">function</span> decayMemory(dt) {
-  <span class="kw">var</span> dead = [];
-  S.memory.forEach(<span class="kw">function</span> (m, i) {
-    m.act *= Math.exp(-PHILL.memoryLambda * dt);   <span class="cm">// λ = 0.004 /s</span>
-    <span class="kw">if</span> (m.act &lt; <span class="nu">0.09</span>) dead.push(i);
-  });
-  dead.sort(<span class="kw">function</span> (a, b) { <span class="kw">return</span> b - a; });
-  dead.forEach(<span class="kw">function</span> (i) {
-    <span class="kw">var</span> m = S.memory.splice(i, <span class="nu">1</span>)[<span class="nu">0</span>];
-    <span class="kw">if</span> (S.forgot.length &gt; <span class="nu">5</span>) S.forgot.shift();      <span class="cm">// keep 6 forgotten</span>
-    S.forgot.push({ label: m.label, age: Math.round(S.t - m.born) });
-    S.forgotCount++;
-    setModule(<span class="st">"forget"</span>);
-  });
-}</code></pre>
-      <div class="fx">act(t) = act₀ · e^(−<b>λ</b>·t) ,  λ = <b>0.004</b> s⁻¹
-half-life  t½ = ln2 / λ ≈ <b>173 s</b>            forget when act &lt; <b>0.09</b>
+    def pick(self):                            # retrieval = highest activation
+        return max(self.traces, key=lambda tr: tr["act"])
 
-act₀ = 0.70 (a pothole)  →  ≈ 0.10 after the whole 480 s ride, ≈ 0.09 after <b>513 s</b> unrehearsed
-act₀ = 0.46 (a calm span) →  forgettable after ≈ <b>408 s</b> without rehearsal</div>
+    def rehearse(self, tr):                    # recalling strengthens
+        tr["act"] = min(1.0, tr["act"] + 0.22)</code></pre>
 
-      <h3>4.3 — Retrieval &amp; rehearsal</h3>
-<pre><code><span class="kw">function</span> pickMemory() {
-  <span class="kw">if</span> (!S.memory.length) <span class="kw">return</span> <span class="kw">null</span>;
-  <span class="kw">return</span> S.memory.reduce(<span class="kw">function</span> (a, b) { <span class="kw">return</span> (b.act &gt; a.act ? b : a); });
-}
+      <h3>Worked example</h3>
+      <div class="fx">remember("bump", salience 0.795)  →  act = 0.795
+after 480 s:  act = 0.795 · e^(−0.004·480) = <b>0.1166</b>   still remembered (&gt; 0.09)
+after 960 s:  act = 0.1166 · e^(−1.92)     = <b>0.0171</b>   &lt; 0.09 → <b>forgotten</b>
+                                                          forgot ring: [{label, age}], count++</div>
 
-<span class="kw">function</span> think(inPhrase) {
-  <span class="kw">var</span> m = pickMemory();                  <span class="cm">// highest activation wins</span>
-  <span class="kw">if</span> (!phrase &amp;&amp; rotChanged) { … }       <span class="cm">// fresh pose change overrides recall</span>
-  <span class="kw">else if</span> (!phrase &amp;&amp; m) {
-    phrase = pick(THOUGHTS[m.id]);         <span class="cm">// phrase bank keyed by trace id</span>
-    m.rehearsed++;
-    m.act = Math.min(<span class="nu">1</span>, m.act + <span class="nu">0.22</span>);    <span class="cm">// REHEARSAL boost</span>
-  }
-  <span class="kw">if</span> (!phrase) phrase = pick(THOUGHTS[ambientMood()]); <span class="cm">// mood fallback</span>
-  S.thoughts.unshift({ time: fmtTime(S.t), text: phrase }); <span class="cm">// keep ≤ 3</span>
-}</code></pre>
       <ul>
-        <li><b>Retrieval rule:</b> pure <code>argmax(act)</code> — the loudest trace is recalled.</li>
-        <li><b>Rehearsal:</b> +0.22 activation per recall, so frequently re-thought events outrun decay
-          and become the ones Phill keeps returning to.</li>
-        <li><b>Priority of thought sources:</b> ① a rotation change that just happened
-          (<code>rotFwd/rotSide/rotCabin</code> by <code>viewSector()</code>) → ② the top memory
-          (<code>THOUGHTS[m.id]</code>) → ③ ambient mood bucket
-          (<code>idleC / idleS / idleN</code>).</li>
-        <li><b>Two forgetting paths:</b> slow decay below 0.09, and the hard 8-slot cap. With only 13
-          scripted events plus experimenter chat lines, capacity eviction is the practically dominant
-          path in a full run.</li>
+        <li><b>Encoding:</b> <code>salience = max(0.35, 0.42 + impact·0.5)</code> where
+            <code>impact = max(g, jolt)</code>; important kinds (<code>bump · arrive · workzone</code>)
+            get +0.1.</li>
+        <li><b>Retrieval:</b> <code>pick()</code> returns the strongest trace; <code>think()</code> then
+            quotes <code>THOUGHTS[trace.id]</code> and rehearses it (+0.22).</li>
+        <li><b>Capacity:</b> 8 traces, oldest evicted silently (FIFO); traces that decay past the floor
+            are remembered <em>as forgotten</em> in the ring of 6 + a counter — the HUD shows both.</li>
+        <li><b>Chat is encoded too:</b> <code>POST /api/chat</code> stores
+            <code>"Experimenter: …"</code> as a trace (salience 0.5, important), so a later recall can
+            resurface what was asked.</li>
       </ul>
-      <div class="warn"><b>Trace ids must exist in <code>THOUGHTS</code>.</b>
-      <code>remember(id, …)</code> is only safe with ids that have a phrase bank
-      (<code>bump, curve, overtake, brake, smooth, workzone, rain, arrive, depart, merge,
-      seatLow, seatGood, rot*, idle*, settle, request, trust*, chat, end*</code>) — otherwise
-      <code>think()</code> would call <code>pick(undefined)</code>.</div>
+
+      <div class="note">At λ = 0.004/s a mid-salience trace stays quotable for roughly 6–10 minutes of ride —
+      long enough that <code>attend</code> keeps re-reading the pothole at 258 s while we're still
+      motorway-bound, and short enough that the summary screen shows real forgetting by 600 s.</div>
     </div>
   </details>
 
@@ -668,177 +551,130 @@ act₀ = 0.46 (a calm span) →  forgettable after ≈ <b>408 s</b> without rehe
   <details class="sec" id="s5">
     <summary><span class="no">05</span>Trust &amp; Mood Dynamics<span class="caret"></span></summary>
     <div class="body">
-      <p>All affect lives in three bounded dimensions plus one derived latent construct:</p>
-      <table>
-        <thead><tr><th>Variable</th><th class="num">Init</th><th>Character</th></tr></thead>
-        <tbody>
-          <tr><td class="m">mood.comfort</td><td class="num">0.40</td><td class="desc">relaxes toward <code>comfortTarget()</code>, knocked down by jolts</td></tr>
-          <tr><td class="m">mood.energy</td><td class="num">0.60</td><td class="desc">monotone decay with a 0.05 floor (vigilance drains)</td></tr>
-          <tr><td class="m">mood.suspicion</td><td class="num">0.50</td><td class="desc">pulled toward <code>suspicionBase</code>, spiked by events &amp; fit-gap</td></tr>
-          <tr><td class="m">trust (latent)</td><td class="num">—</td><td class="desc"><code>trustValue()</code>, computed on demand from the three above + fit</td></tr>
-        </tbody>
-      </table>
 
-      <h3>5.1 — Seat fit</h3>
-      <div class="fx">dr = min(1, |rot − targetRot| / <b>180</b>)       <span style="color:#6e7076">targetRot  = 0°</span>
-dh = min(1, |hgt − targetHgt| / <b>8</b>)        <span style="color:#6e7076">targetHgt  = 44 cm</span>
+      <h3>Seat fit (canonical units)</h3>
+      <div class="fx">rot = seat.rotation_deg mod 360     hgt = seat.height_mm / 10     <span class="d">(mm → cm)</span>
+dr  = min(1, |rot − target_rot| / <b>180</b>)          dh = min(1, |hgt − target_hgt| / <b>8</b>)
+fit = { rot: 1−dr, hgt: 1−dh, overall: 1 − (dr+dh)/2 }
+fitGap = 1 − overall       <span class="d">Phill starts as-found (90° / 38 cm) → gap 0.625</span></div>
 
-fitRot = 1 − dr        fitHgt = 1 − dh
-<b>overall</b> = 1 − (dr + dh) / 2          <b>fitGap</b> = 1 − overall = (dr + dh) / 2</div>
-      <div class="note"><b>Example.</b> Seat at 40 cm, facing 30°: dr = 30/180 = 0.167,
-      dh = 4/8 = 0.5 → <code>fitGap = 0.333</code> — above the 0.3 knee, so suspicion starts eroding
-      and the settle desire is live.</div>
+      <h3>Comfort — attractor blend</h3>
+      <div class="fx">comfortTarget = clamp01( <b>0.35</b>·rate(ROT, rot) + <b>0.35</b>·rate(HGT, hgt) + <b>0.30</b>·fit.overall )
+comfort += (comfortTarget − comfort) · min(1, dt·0.06)</div>
+      <p>With the seat settled forward at 44 cm: <code>0.35·1.0 + 0.35·0.0455 + 0.30·1.0 = 0.6659</code> —
+      the live snapshot converges to exactly that. The rate tables (<code>ROT</code>,
+      <code>HGT</code>) are the thesis reference data, unchanged.</p>
 
-      <h3>5.2 — Comfort</h3>
-      <div class="fx"><b>comfortTarget</b> = clamp01( <b>0.35</b>·rate(ROT, rot) + <b>0.35</b>·rate(HGT, hgt) + <b>0.30</b>·f.overall )
-comfort ← comfort + (comfortTarget − comfort) · min(1, <b>0.06</b>·dt)     <span style="color:#6e7076">τ ≈ 16.7 s</span></div>
-      <div class="note"><b>Worked example (forward, preferred height):</b> rot 0 → aR = 1.0,
-      hgt 44 → aH = 0.0455, f = 1.0 → target = 0.35 + 0.016 + 0.30 = <b>0.666</b>. Comfort glides
-      toward it, it never jumps.</div>
+      <h3>Live trust</h3>
+      <div class="fx">trust.live = clamp01( <b>0.34</b>·comfort + <b>0.40</b>·(1 − suspicion) + <b>0.16</b>·ev + <b>0.10</b>·(1 − fitGap) )
+                 where ev = clamp01(1 − jolt/<b>0.6</b>)
 
-      <h3>5.3 — Energy &amp; suspicion regulation</h3>
-      <div class="fx">energy    ← max(<b>0.05</b>, energy − <b>0.00018</b>·dt)          <span style="color:#6e7076">≈ −0.011 per sim minute</span>
+worked example:  comfort 0.5, susp 0.3, jolt 0.3, fitGap 0.2
+  = 0.34·0.5 + 0.40·0.7 + 0.16·0.5 + 0.10·0.8 = <b>0.61</b></div>
 
-bs = suspicionBase (= <b>0.5</b>, or 0.5 + (0.5 − priorTrust)·<b>0.35</b> after a previous ride)
-suspicion &gt; bs : suspicion ← max(bs, suspicion − <b>0.004</b>·dt)   <span style="color:#6e7076">relaxes down</span>
-suspicion &lt; bs : suspicion ← min(bs, suspicion + <b>0.003</b>·dt)   <span style="color:#6e7076">creeps up</span></div>
-
-      <h3>5.4 — Impulses from the road</h3>
-<pre><code><span class="kw">if</span> (ev.jolt &gt; <span class="nu">0.3</span>) {
-  S.mood.suspicion = Math.min(<span class="nu">1</span>, S.mood.suspicion + <span class="nu">0.20</span>);   <span class="cm">// hard jolt: big jump</span>
-  S.mood.comfort   = Math.max(<span class="nu">0</span>, S.mood.comfort - ev.jolt * <span class="nu">0.12</span>);
-}
-<span class="kw">if</span> (ev.kind === <span class="st">"brake"</span>)    S.mood.suspicion += <span class="nu">0.07</span>;   <span class="cm">// (capped at 1)</span>
-<span class="kw">if</span> (ev.kind === <span class="st">"overtake"</span>) S.mood.suspicion += <span class="nu">0.05</span>;
-<span class="kw">if</span> (ev.kind === <span class="st">"rain"</span>)     S.mood.suspicion += <span class="nu">0.04</span>;
-
-S.gNow    *= Math.exp(-dt * <span class="nu">0.3</span>);    <span class="cm">// lateral-g signal decays, τ ≈ 3.3 s</span>
-S.joltNow *= Math.exp(-dt * <span class="nu">0.35</span>);   <span class="cm">// jolt signal decays,      τ ≈ 2.9 s</span></code></pre>
-
-      <h3>5.5 — The trust function</h3>
-      <div class="fx">ev = clamp01(1 − joltNow / <b>0.6</b>)
-<b>trustValue()</b> = clamp01( <b>0.34</b>·comfort + <b>0.40</b>·(1 − suspicion) + <b>0.16</b>·ev + <b>0.10</b>·(1 − fitGap) )</div>
+      <h3>Suspicion — set-point, not a ratchet</h3>
       <ul>
-        <li>Weights sum to 1.0 — it is a convex blend of <em>how he feels</em>, <em>how wary he is</em>,
-          <em>how rough the last seconds were</em>, and <em>how well the seat fits</em>.</li>
-        <li>Dominant term: <b>anti-suspicion (0.40)</b> — trust in this agent is mostly "absence of doubt".</li>
-        <li><b>Worked example:</b> comfort 0.60, suspicion 0.40, joltNow 0, fitGap 0.10
-          → 0.204 + 0.240 + 0.160 + 0.090 = <b>0.69</b> (calibrate says <code>trustOk</code>).</li>
+        <li>Base set-point <code>0.5</code> (persona <code>mood.suspicion</code>); drifts back at
+            <b>−0.004/s</b> above it, <b>+0.003/s</b> below.</li>
+        <li><b>Priors re-baseline it for the next ride:</b>
+            <code>base = clamp01(0.5 + (0.5 − prior_trust)·0.35)</code> — a wary last ride starts this
+            one slightly more suspicious (persisted as aggregate JSON, no personal data).</li>
+        <li><b>Event impulses:</b> jolt &gt; 0.3 → +0.20 susp &amp; comfort −jolt·0.12; brake +0.07;
+            overtake +0.05; rain +0.04.</li>
+        <li><b>Fit-gap erosion:</b> above a 0.30 gap, <code>+dt·0.006·(gap−0.3)·2.4</code>, ×1.6 while
+            hands are on the controls — the cabin ignoring his body is itself suspicious.</li>
       </ul>
 
-      <h3>5.6 — From trust to behaviour</h3>
+      <h3>Two instruments, one frame</h3>
       <table>
-        <thead><tr><th>Consumer</th><th>Rule</th></tr></thead>
+        <thead><tr><th>Quantity</th><th class="m">Source</th><th>When</th></tr></thead>
         <tbody>
-          <tr><td class="m">bdiActCalibrate()</td><td class="desc">≥ 0.6 → <code>trustOk</code> thought · ≤ 0.38 → <code>trustLow</code> thought + likely speech · else nothing visible</td></tr>
-          <tr><td class="m">ambientMood()</td><td class="desc">suspicion &gt; 0.6 → <code>idleS</code> (wary) · comfort &gt; 0.55 → <code>idleC</code> (relaxed) · else <code>idleN</code></td></tr>
-          <tr><td class="m">maybeSpeak()</td><td class="desc"><code>freq = 0.55 × (0.4 + 0.3·[susp&gt;0.62] + 0.25·[comfort&lt;0.35])</code> → 0.22 quiet, up to 0.52 when wary <em>and</em> uncomfortable</td></tr>
-          <tr><td class="m">sample()</td><td class="desc">every 3 s pushes <code>{t, c, s, e, trust}</code> into <code>S.samples</code> and <code>{t, v:trust}</code> into <code>S.trust.trail</code> for the summary charts</td></tr>
-          <tr><td class="m">evidenceAnswers()</td><td class="desc">pre-fills the 5 questionnaire sliders from live state (below)</td></tr>
-          <tr><td class="m">finalRemark() / finish()</td><td class="desc">score ≥ 0.65 → good · ≥ 0.45 → mid · else bad (the grade line uses ≥ 0.62 / ≥ 0.45)</td></tr>
+          <tr><td>Live trust</td><td class="m">agent.trust.live = Mind.trust_value()</td><td class="desc">every tick — drives chat answers, <code>calibrate</code>, avatar</td></tr>
+          <tr><td>Canonical trust score</td><td class="m">agent.trust.score = MDMT mean / 7</td><td class="desc">end of session questionnaire (Ullman &amp; Malle, 2019)</td></tr>
+          <tr><td>Energy</td><td class="m">−0.00018 /s, floor 0.05</td><td class="desc">slow fatigue; drinks/adjustments push it up via <code>observe()</code></td></tr>
         </tbody>
       </table>
 
-      <h3>5.7 — Questionnaire scoring (t = trustValue, c, s, e, f = seatFit)</h3>
-<pre><code>q1 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.5</span>*t + <span class="nu">0.5</span>*c) * <span class="nu">4</span>)   <span class="cm">// "trust this cabin again"</span>
-q2 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.55</span>*(<span class="nu">1</span>-s) + <span class="nu">0.45</span>*t) * <span class="nu">4</span>)   <span class="cm">// "I felt safe"</span>
-q3 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.4</span>*f.overall + <span class="nu">0.6</span>*c) * <span class="nu">4</span>)   <span class="cm">// "seating suited me"</span>
-q4 = <span class="nu">1</span> + round(clamp01(<span class="nu">0.5</span>*e + <span class="nu">0.5</span>*(<span class="nu">1</span>-s)) * <span class="nu">4</span>)   <span class="cm">// "I stayed aware"</span>
-q5 = <span class="nu">1</span> + round(clamp01(t) * <span class="nu">4</span>)                  <span class="cm">// "trustworthy decisions"</span>
-
-S.trust.score = clamp01( Σ items / <span class="nu">5</span> / <span class="nu">5</span> )      <span class="cm">// mean of five 1–5 answers, rescaled</span></code></pre>
-
-      <div class="note"><b>Priors loop.</b> <code>ridePriors()</code> stores only
-      <code>{rides, trust, comfort, suspicion}</code> to <code>localStorage.cabinSimPriors</code> — no
-      personal data. On the next boot <code>loadPriors()</code> rewrites
-      <code>suspicionBase = 0.5 + (0.5 − priorTrust)·0.35</code>: a trusted cabin starts the next ride
-      calmer (down to ≈ 0.325), a distrusted one more wary (up to ≈ 0.675).</div>
+      <div class="warn"><b>Mood ownership:</b> <code>CognitiveAgent.mood</code> and
+      <code>Mind.mood</code> are <b>the same dict</b> — the mind updates it once per tick, the provider
+      (scripted/LLM) only adds action impulses through <code>observe()</code>. There is no second
+      relaxation model anymore.</div>
     </div>
   </details>
 
   <!-- ================================================================ -->
   <details class="sec" id="s6">
-    <summary><span class="no">06</span>Event Timeline (RIDE_START → RIDE_END)<span class="caret"></span></summary>
+    <summary><span class="no">06</span>Event Timeline<span class="caret"></span></summary>
     <div class="body">
-      <div class="fx">RIDE_START = <b>120</b> s (02:00)   ·   RIDE_END = <b>600</b> s (10:00)   ·   ride length = 480 s
 
-phase "setup"  t &lt; 120   Phill settles into the seat, the human can adjust it
-phase "ride"   120 ≤ t &lt; 600   auto-pilot engaged, 13 scripted events fire once each
-phase "done"   t ≥ 600   finish(): summary, questionnaire, priors saved</div>
+      <p>The ride is scripted in sim-seconds: <code>setup</code> runs 0–120 s, the
+      <code>ride</code> phase 120–600 s, and <code>cognition.EVENTS</code> fires 13 impressions between
+      t = 121 and t = 590. Firing is <b>advance-safe</b>: even one huge tick across the whole ride fires
+      each event exactly once (guarded by <code>tests/test_cognition.py</code>).</p>
 
       <div class="legend">
-        <span><i class="dot" style="background:#6bd5c0"></i>event</span>
-        <span><i class="dot" style="background:#d9756b"></i>jolt &gt; 0.3 (screen shake + suspicion +0.20)</span>
-        <span><i class="dot" style="background:rgba(201,162,39,.55)"></i>ride window</span>
+        <span><i class="dot" style="background:rgba(201,162,39,.7)"></i>ride phase 120–600 s</span>
+        <span><i class="dot" style="background:var(--teal)"></i>event</span>
+        <span><i class="dot" style="background:var(--red)"></i>jolt &gt; 0.2 (shake + speak)</span>
       </div>
-      <div class="tl" id="tl">
+      <div class="tl">
         <div class="axis"></div>
-        <div class="seg" style="left:20%; width:80%"></div>
-        <div class="lbl" style="left:2%">SETUP</div>
-        <div class="lbl" style="left:21%; color:#6bd5c0">RIDE</div>
-        <div class="ev" style="left:20.16%"><b>121</b></div>
-        <div class="ev" style="left:26.33%"><b>158</b></div>
-        <div class="ev" style="left:33.33%"><b>200</b></div>
-        <div class="ev j" style="left:43%"><b>258</b></div>
-        <div class="ev j" style="left:48.66%"><b>292</b></div>
-        <div class="ev" style="left:56.66%"><b>340</b></div>
+        <div class="seg" style="left:20%; right:0"></div>
+        <span class="lbl" style="left:2%">SETUP</span>
+        <span class="lbl" style="left:21%">RIDE</span>
+        <div class="ev" style="left:20.17%"><b>121 depart</b></div>
+        <div class="ev" style="left:26.33%"><b>158 merge</b></div>
+        <div class="ev" style="left:33.33%"><b>200 curve</b></div>
+        <div class="ev j" style="left:43%"><b>258 bump</b></div>
+        <div class="ev j" style="left:48.67%"><b>292 overtake</b></div>
+        <div class="ev" style="left:56.67%"><b>340</b></div>
         <div class="ev" style="left:64.33%"><b>386</b></div>
-        <div class="ev j" style="left:70.83%"><b>425</b></div>
-        <div class="ev j" style="left:78.33%"><b>470</b></div>
-        <div class="ev" style="left:86.66%"><b>520</b></div>
-        <div class="ev j" style="left:91.66%"><b>550</b></div>
-        <div class="ev j" style="left:95.83%"><b>575</b></div>
-        <div class="ev" style="left:98.33%"><b>590</b></div>
-        <div class="tick" style="left:2%">02:00</div>
-        <div class="tick" style="left:33.33%">03:20</div>
-        <div class="tick" style="left:50%">05:00</div>
-        <div class="tick" style="left:66.66%">06:40</div>
-        <div class="tick" style="left:83.33%">08:20</div>
-        <div class="tick" style="left:98%">10:00</div>
+        <div class="ev" style="left:70.83%"><b>425</b></div>
+        <div class="ev j" style="left:78.33%"><b>470 workzone</b></div>
+        <div class="ev" style="left:86.67%"><b>520</b></div>
+        <div class="ev" style="left:91.67%"><b>550 rain</b></div>
+        <div class="ev" style="left:95.83%"><b>575</b></div>
+        <div class="ev" style="left:98.33%"><b>590 arrive</b></div>
+        <span class="tick" style="left:0%">0</span>
+        <span class="tick" style="left:20%">120</span>
+        <span class="tick" style="left:40%">240</span>
+        <span class="tick" style="left:60%">360</span>
+        <span class="tick" style="left:80%">480</span>
+        <span class="tick" style="left:99%">600 s</span>
       </div>
 
+      <h3>What one event does — <code>Mind.perceive_event(ev)</code></h3>
+      <pre><code>salience = max(0.35, 0.42 + max(g, jolt)·0.5)      # encoding strength
+remember(kind, label, salience, important)          # → memory (§04)
+target_speed = spd                                  # speed coasts toward it
+ride.g, ride.jolt = ev.g, ev.jolt                   # decay next ticks
+mood impulses (jolt / brake / overtake / rain)      # §05
+log_line("evt", f"{label}  ({spd} km/h)")           # HUD banner + log
+if jolt &gt; 0.2 or (g &gt; 0.25 and rng &lt; 0.5): maybe_speak(THOUGHTS[kind])</code></pre>
+
+      <h3>The script</h3>
       <table>
-        <thead><tr><th class="num">t (s)</th><th class="num">clock</th><th class="m">kind</th><th class="num">g</th><th class="num">jolt</th><th class="num">km/h</th><th>label</th></tr></thead>
+        <thead><tr><th class="num">t</th><th class="m">kind</th><th class="num">g</th><th class="num">jolt</th><th class="num">km/h</th><th>label</th></tr></thead>
         <tbody>
-          <tr><td class="num">120</td><td class="num">02:00</td><td class="m">— phase</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="desc">auto-pilot engaged · phase → <code>ride</code></td></tr>
-          <tr><td class="num">121</td><td class="num">02:01</td><td class="m">depart</td><td class="num">0.15</td><td class="num">0.00</td><td class="num">60</td><td>Departing — auto-pilot engaged</td></tr>
-          <tr><td class="num">158</td><td class="num">02:38</td><td class="m">merge</td><td class="num">0.20</td><td class="num">0.00</td><td class="num">105</td><td>Merging onto the motorway</td></tr>
-          <tr><td class="num">200</td><td class="num">03:20</td><td class="m">curve</td><td class="num">0.38</td><td class="num">0.00</td><td class="num">115</td><td>Long left-hand curve</td></tr>
-          <tr><td class="num">258</td><td class="num">04:18</td><td class="m">bump</td><td class="num">0.10</td><td class="num">0.55</td><td class="num">92</td><td>Pothole · thump! <span class="desc">(important memory, shake)</span></td></tr>
-          <tr><td class="num">292</td><td class="num">04:52</td><td class="m">overtake</td><td class="num">0.45</td><td class="num">0.25</td><td class="num">135</td><td>Overtaking a truck <span class="desc">(suspicion +0.05)</span></td></tr>
-          <tr><td class="num">340</td><td class="num">05:40</td><td class="m">smooth</td><td class="num">0.08</td><td class="num">0.00</td><td class="num">120</td><td>Cruising steadily</td></tr>
-          <tr><td class="num">386</td><td class="num">06:26</td><td class="m">curve</td><td class="num">0.32</td><td class="num">0.00</td><td class="num">112</td><td>Right-hand curve</td></tr>
-          <tr><td class="num">425</td><td class="num">07:05</td><td class="m">brake</td><td class="num">0.25</td><td class="num">0.18</td><td class="num">40</td><td>Traffic ahead — slowing <span class="desc">(suspicion +0.07)</span></td></tr>
-          <tr><td class="num">470</td><td class="num">07:50</td><td class="m">workzone</td><td class="num">0.12</td><td class="num">0.22</td><td class="num">70</td><td>Roadworks · rumble strip <span class="desc">(important memory)</span></td></tr>
-          <tr><td class="num">520</td><td class="num">08:40</td><td class="m">smooth</td><td class="num">0.06</td><td class="num">0.00</td><td class="num">128</td><td>Clear road again</td></tr>
-          <tr><td class="num">550</td><td class="num">09:10</td><td class="m">rain</td><td class="num">0.14</td><td class="num">0.10</td><td class="num">105</td><td>Light rain on the glass <span class="desc">(suspicion +0.04; rain FX 540–570)</span></td></tr>
-          <tr><td class="num">575</td><td class="num">09:35</td><td class="m">brake</td><td class="num">0.20</td><td class="num">0.10</td><td class="num">30</td><td>Slowing for the destination</td></tr>
-          <tr><td class="num">590</td><td class="num">09:50</td><td class="m">arrive</td><td class="num">0.05</td><td class="num">0.00</td><td class="num">0</td><td>Arrived — parked <span class="desc">(important memory)</span></td></tr>
-          <tr><td class="num">600</td><td class="num">10:00</td><td class="m">— phase</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="desc"><code>finish()</code> → summary, questionnaire, priors</td></tr>
+          <tr><td class="num">121</td><td class="m">depart</td><td class="num">0.15</td><td class="num">0.00</td><td class="num">60</td><td class="desc">Departing — auto-pilot engaged</td></tr>
+          <tr><td class="num">158</td><td class="m">merge</td><td class="num">0.20</td><td class="num">0.00</td><td class="num">105</td><td class="desc">Merging onto the motorway</td></tr>
+          <tr><td class="num">200</td><td class="m">curve</td><td class="num">0.38</td><td class="num">0.00</td><td class="num">115</td><td class="desc">Long left-hand curve</td></tr>
+          <tr><td class="num">258</td><td class="m">bump ⚡</td><td class="num">0.10</td><td class="num">0.55</td><td class="num">92</td><td class="desc">Pothole · thump! (+0.20 susp, comfort −0.066)</td></tr>
+          <tr><td class="num">292</td><td class="m">overtake ⚡</td><td class="num">0.45</td><td class="num">0.25</td><td class="num">135</td><td class="desc">Overtaking a truck (+0.05 susp)</td></tr>
+          <tr><td class="num">340</td><td class="m">smooth</td><td class="num">0.08</td><td class="num">0.00</td><td class="num">120</td><td class="desc">Cruising steadily</td></tr>
+          <tr><td class="num">386</td><td class="m">curve</td><td class="num">0.32</td><td class="num">0.00</td><td class="num">112</td><td class="desc">Right-hand curve</td></tr>
+          <tr><td class="num">425</td><td class="m">brake</td><td class="num">0.25</td><td class="num">0.18</td><td class="num">40</td><td class="desc">Traffic ahead — slowing (+0.07 susp)</td></tr>
+          <tr><td class="num">470</td><td class="m">workzone ⚡</td><td class="num">0.12</td><td class="num">0.22</td><td class="num">70</td><td class="desc">Roadworks · rumble strip</td></tr>
+          <tr><td class="num">520</td><td class="m">smooth</td><td class="num">0.06</td><td class="num">0.00</td><td class="num">128</td><td class="desc">Clear road again</td></tr>
+          <tr><td class="num">550</td><td class="m">rain</td><td class="num">0.14</td><td class="num">0.10</td><td class="num">105</td><td class="desc">Light rain (+0.04 susp; rain beads 540–570 s)</td></tr>
+          <tr><td class="num">575</td><td class="m">brake</td><td class="num">0.20</td><td class="num">0.10</td><td class="num">30</td><td class="desc">Slowing for the destination</td></tr>
+          <tr><td class="num">590</td><td class="m">arrive</td><td class="num">0.05</td><td class="num">0.00</td><td class="num">0</td><td class="desc">Arrived — parked (important trace)</td></tr>
         </tbody>
       </table>
-
-      <h3>Firing &amp; perception</h3>
-<pre><code>EVENTS.forEach(<span class="kw">function</span> (ev) {
-  <span class="kw">if</span> (!fired[ev.t] &amp;&amp; S.t &gt;= ev.t) { fired[ev.t] = <span class="kw">true</span>; perceive(ev); }  <span class="cm">// once each</span>
-});
-
-<span class="kw">function</span> perceive(ev) {                       <span class="cm">// world → mind + body + HUD</span>
-  <span class="kw">var</span> impact = Math.max(ev.g, ev.jolt);
-  <span class="kw">var</span> salience = Math.max(<span class="nu">0.35</span>, <span class="nu">0.42</span> + impact * <span class="nu">0.5</span>);
-  <span class="kw">var</span> important = (ev.kind === <span class="st">"bump"</span> || ev.kind === <span class="st">"arrive"</span> || ev.kind === <span class="st">"workzone"</span>);
-  remember(ev.kind, ev.label, salience, important);      <span class="cm">// ← memory encoding</span>
-  S.speed = ev.spd; S.gNow = ev.g; S.joltNow = ev.jolt;  <span class="cm">// body signals</span>
-  <span class="cm">// … mood impulses (Section 05) … banner, scene shake, possible spoken line, log</span>
-}</code></pre>
-      <ul>
-        <li><b>Speech trigger:</b> a line is spoken outright when <code>jolt &gt; 0.2</code>, or half
-          the time when <code>g &gt; 0.25</code> — otherwise the event is only remembered and logged.</li>
-        <li><b>Sampling:</b> <code>sample()</code> appends to <code>S.samples</code>/<code>S.trust.trail</code>
-          whenever <code>S.t − lastSampleT ≥ 3</code> → ≈160 points across the ride for the summary charts.</li>
-        <li><b>Speed:</b> <code>S.speed</code> never jumps — it eases toward <code>targetSpeed</code>
-          with <code>min(1, 0.05·dt)</code>, and the HUD streaks turn off below 8 km/h.</li>
-      </ul>
+      <div class="note">On the wire the events reach the view inside the snapshot: the adapter watches
+      <code>agent.log</code> for new <code>kind == "evt"</code> lines, pops the banner, shakes the scene on
+      jolts, and animates the camera from <code>ride.g</code> / <code>ride.speed</code>. It holds no copy
+      of the script beyond decorative timeline dots.</div>
     </div>
   </details>
 
@@ -846,110 +682,73 @@ phase "done"   t ≥ 600   finish(): summary, questionnaire, priors saved</div>
   <details class="sec" id="s7">
     <summary><span class="no">07</span>API Hooks<span class="caret"></span></summary>
     <div class="body">
-      <h3>7.1 — Hook inventory</h3>
+
+      <h3>HTTP endpoints (<code>cabin_sim/server.py</code>, stdlib only)</h3>
       <table>
-        <thead><tr><th class="m">Hook</th><th>Type</th><th>Purpose / consumer</th></tr></thead>
+        <thead><tr><th class="m">Endpoint</th><th>Body</th><th>Returns / effect</th></tr></thead>
         <tbody>
-          <tr><td class="m">window.__COG_LIVE__</td><td class="m">object, updated in place</td>
-              <td class="desc">Published every frame from <code>publishCog()</code>: <code>mood{comfort,energy,suspicion}</code>,
-              <code>trust</code>, <code>intention</code>, <code>ride{speed,g,jolt,rain,phase,t}</code>,
-              <code>thoughts</code>, <code>speech</code>, <code>priors{rides,trust}</code>. Read by <code>src/avatar.js</code>.</td></tr>
-          <tr><td class="m">window.__COG_SUBSCRIBE__(fn)</td><td class="m">function → cancel()</td>
-              <td class="desc">Frame-by-frame subscription to the store; returns an unsubscribe function.
-              A throwing subscriber is swallowed so it can never break the loop.</td></tr>
-          <tr><td class="m">window.__SEAT_LIVE__</td><td class="m">{rot, sl, hgt}</td>
-              <td class="desc">Plain snapshot written at the top of <code>renderSeatScene()</code> for DOM widgets.</td></tr>
-          <tr><td class="m">window.__CABIN_PROBE__.hook(info)</td><td class="m">function</td>
-              <td class="desc">Headless render probe — receives <code>{proj, CamBase, CVW, CVH, CVF, S, PHILL}</code>.</td></tr>
-          <tr><td class="m">window.lavish.queuePrompt / sendQueuedPrompts</td><td class="m">optional</td>
-              <td class="desc">Privacy-guarded LLM commentary: <code>llmCommentary()</code> and the feedback card
-              send <em>aggregate telemetry only</em> ("comfort 0.62, suspicion 0.41 … no personal data").
-              Absent hook → the canned line stands.</td></tr>
-          <tr><td class="m">localStorage["cabinSimPriors"]</td><td class="m">JSON</td>
-              <td class="desc"><code>{rides, trust, comfort, suspicion}</code> written by <code>ridePriors()</code>,
-              read by <code>loadPriors()</code>.</td></tr>
-          <tr><td class="m">window.__EXPERIMENTER_CHAT__</td><td class="m">object</td>
-              <td class="desc"><b>New:</b> two-way experimenter ⇄ Phill channel — below.</td></tr>
+          <tr><td class="m">GET /</td><td class="m">—</td><td class="desc">the SVG visual (<code>web/index.html</code>)</td></tr>
+          <tr><td class="m">GET /api/state</td><td class="m">—</td><td class="desc">session feed (legacy shape, polled by the SVG page)</td></tr>
+          <tr><td class="m">GET /api/snapshot</td><td class="m">—</td><td class="desc">the canonical schema snapshot — what the view adapter polls every 700 ms</td></tr>
+          <tr><td class="m">POST /api/chat</td><td class="m">{"text": "…"}</td><td class="desc"><code>{ok, reply, state}</code> from <code>Mind.chat_send</code>; <code>{"clear":true}</code> wipes history</td></tr>
+          <tr><td class="m">POST /api/seat</td><td class="m">{"axis":"rot|hgt|sl|rec","value":n}</td><td class="desc">canonical units, clamped by <code>Seat.move</code>, marks <code>user_hands</code>, logs the adjustment</td></tr>
+          <tr><td class="m">POST /api/control</td><td class="m">{"running":bool}</td><td class="desc">pause / resume the ticker (clock holds, verified by tests)</td></tr>
+          <tr><td class="m">POST /api/control</td><td class="m">{"advance":"ride"}</td><td class="desc">fast-forward the setup phase (the old ⏭ Skip)</td></tr>
+          <tr><td class="m">POST /api/control</td><td class="m">{"reset":true}</td><td class="desc">rebuild session + engine from the same persona/provider/seed (↻ Restart)</td></tr>
         </tbody>
       </table>
 
-      <h3>7.2 — <code>window.__EXPERIMENTER_CHAT__</code></h3>
-      <p>A mind-owned bridge: you type a line, Phill answers from his <em>current</em> fit/mood/trust,
-      and the line itself is encoded into his memory like any other perception (so a later recall can
-      resurface it). Implemented in <code>cognitive.js</code>, section <i>experimenter chat</i>.</p>
+      <h3>Console hook — <code>window.__EXPERIMENTER_CHAT__</code></h3>
+      <p>The bridge survives the port with its <b>exact legacy shape</b>; the adapter forwards it to the
+      Python mind with a synchronous XHR so existing callers keep working:</p>
+      <pre><code>// send a line mid-ride — the reply is chosen server-side from LIVE state
+&gt; window.__EXPERIMENTER_CHAT__.send("Do you trust this car?")
+{ ok: true,
+  reply: "It reads the road and I read it back. Alright.",
+  state: { t: 160, phase: "ride", mood: {...}, trust: 0.6189,
+           trustScore: null,          // MDMT score appears after the ride
+           belief: { fitGap: 0.05, userHands: false },
+           intention: "attend", seat: { rot: 0, hgt: 44, sl: -1 },
+           memory: { count: 3, top: "Merging onto the motorway", forgot: 0 },
+           ride: { speed: 61.2, g: 0.06, jolt: 0 } } }
 
-<pre><code>window.__EXPERIMENTER_CHAT__ = {
-  send: experimenterSend,                            <span class="cm">// send("…") → { ok, reply, state }</span>
-  history: <span class="kw">function</span> () { <span class="kw">return</span> chatHist.slice(<span class="nu">0</span>); }, <span class="cm">// [{ who, t, text }] oldest first  */</span>
-  state: experimenterState,                          <span class="cm">// live mood / trust / BDI snapshot */</span>
-  clear: <span class="kw">function</span> () { chatHist.length = <span class="nu">0</span>; <span class="kw">return</span> <span class="kw">true</span>; }
-};</code></pre>
+&gt; window.__EXPERIMENTER_CHAT__.history()      // [{who, t, text}] oldest first
+&gt; window.__EXPERIMENTER_CHAT__.state()        // live snapshot, no I/O
+&gt; window.__EXPERIMENTER_CHAT__.clear()        // wipes the mind's history
+&gt; await fetch("/api/chat", { method:"POST",
+    body: JSON.stringify({ text:"How do you feel?" }) })   // async alternative</code></pre>
+      <p>Routing inside <code>Mind._chat_reply</code> — never a fixed script:</p>
+      <ul>
+        <li><b>seat words</b> (<em>seat · height · lower · raise · rotate · adjust · settle</em>) →
+            answers from his body's current fit, and if <code>fitGap ≥ 0.22</code> it <b>clears the settle
+            cooldown</b> so the BDI acts on your request immediately;</li>
+        <li><b>trust words</b> → answered from <code>trust_value()</code>: ≥ 0.6 → <em>trustOk</em>,
+            ≤ 0.38 → <em>trustLow</em>, otherwise <em>trustMid</em>;</li>
+        <li><b>wellbeing words</b> → answered from the ambient mood (idleS / idleC / idleN);</li>
+        <li>anything else → a dry <em>idleN</em> line. Every inbound line is also encoded into memory.</li>
+      </ul>
 
+      <div class="note"><b>LLM voice:</b> with reasoning enabled the routing above becomes
+      the <em>fallback</em>. The model receives the same STATE line plus the last four chat
+      turns and writes Phill's answer (JSON-only prompt, validated, ≤240 chars). The
+      seat-question side effect — clearing the settle cooldown so the BDI can act on the
+      request — still runs in every mode: behaviour is Python's, wording is the model's.</div>
+
+      <h3>Window hooks the view still publishes</h3>
       <table>
-        <thead><tr><th class="m">Method</th><th>Returns</th><th>Notes</th></tr></thead>
+        <thead><tr><th class="m">Hook</th><th>Contract (unchanged)</th></tr></thead>
         <tbody>
-          <tr><td class="m">send(text)</td>
-              <td class="m">{ ok:true, reply, state }<br>{ ok:false, error:"empty message" }</td>
-              <td class="desc">Appends both sides of the exchange to history, encodes the inbound line
-              (<code>remember("chat", …, 0.5, true)</code> → act 0.60), logs it as <code>chat</code>,
-              and speaks the reply with <code>speak(reply, true)</code> (forced, bypasses
-              <code>maybeSpeak()</code>). Capped at 40 entries.</td></tr>
-          <tr><td class="m">history()</td><td class="m">Array&lt;{who, t, text}&gt;</td>
-              <td class="desc"><code>who ∈ "experimenter" | "phill"</code>, <code>t</code> is sim seconds; a defensive copy.</td></tr>
-          <tr><td class="m">state()</td><td class="m">snapshot object</td>
-              <td class="desc"><code>{t, phase, done, mood, trust, trustScore, belief, intention, since, seat, memory{count,top,forgot}, ride{speed,g,jolt}}</code> — a pure read, safe to poll.</td></tr>
-          <tr><td class="m">clear()</td><td class="m">true</td>
-              <td class="desc">Empties the transcript only; does <b>not</b> touch <code>S.memory</code>.</td></tr>
+          <tr><td class="m">window.__COG_LIVE__</td><td class="desc">one object updated in place: mood, trust, intention, ride {speed,g,jolt,rain,phase,t}, thoughts, speech, priors — consumed by <code>avatar.js</code></td></tr>
+          <tr><td class="m">window.__COG_SUBSCRIBE__(fn)</td><td class="desc">subscribe to that store; returns an unsubscribe function</td></tr>
+          <tr><td class="m">window.__SEAT_LIVE__</td><td class="desc">{rot, sl, hgt} in view units, refreshed each render</td></tr>
+          <tr><td class="m">window.__CABIN_PROBE__.hook(…)</td><td class="desc">projection/camera handle for external probes (compat <code>S</code>/<code>PHILL</code> shapes kept)</td></tr>
         </tbody>
       </table>
 
-      <h3>Console usage</h3>
-<pre><code><span class="cm">// ask mid-ride — the reply is picked from live state, not a fixed script</span>
-<span class="kw">const</span> r = window.__EXPERIMENTER_CHAT__.send(<span class="st">"Do you trust this car yet?"</span>);
-r.ok          <span class="cm">// true</span>
-r.reply       <span class="cm">// e.g. "The car earns trust, mile by mile."   (trust ≥ 0.6)</span>
-r.state.trust <span class="cm">// 0.69</span>
-
-<span class="cm">// poke the seat — if the fit gap is ≥ 0.22 this also clears the settle</span>
-<span class="cm">// cooldown, so bdiReason() will fire the "settle" intention next tick</span>
-window.__EXPERIMENTER_CHAT__.send(<span class="st">"raise the seat a bit"</span>);
-
-<span class="cm">// poll / inspect</span>
-window.__EXPERIMENTER_CHAT__.state();
-window.__EXPERIMENTER_CHAT__.history();   <span class="cm">// [{who:"experimenter",…},{who:"phill",…}]</span>
-window.__EXPERIMENTER_CHAT__.clear();</code></pre>
-
-      <h3>Reply routing (keyword → cognitive source)</h3>
-      <table>
-        <thead><tr><th class="m">Matched keywords</th><th>Branch</th><th>Answer source</th></tr></thead>
-        <tbody>
-          <tr><td class="m">seat · height · tall · lower · raise · rotate · rotation · adjust · settle</td>
-              <td class="desc">fitGap ≥ 0.22 → <code>THOUGHTS.request</code> <b>and</b> <code>S.bdi.last.settle = -99</code> (cooldown cleared)<br>otherwise → <code>THOUGHTS.seatGood</code></td>
-              <td class="desc"><code>S.belief.fitGap</code> + BDI</td></tr>
-          <tr><td class="m">trust · safe · confidence · rely · sure</td>
-              <td class="desc">≥ 0.6 → <code>trustOk</code> · ≤ 0.38 → <code>trustLow</code> · else <code>trustMid</code></td>
-              <td class="desc"><code>trustValue()</code></td></tr>
-          <tr><td class="m">feel · how · you · ok · alright · comfort · fine · doing</td>
-              <td class="desc"><code>THOUGHTS[ambientMood()]</code></td>
-              <td class="desc">suspicion &gt; 0.6 → wary · comfort &gt; 0.55 → relaxed · else neutral</td></tr>
-          <tr><td class="m">(anything else)</td><td class="desc"><code>THOUGHTS.idleN</code></td><td class="desc">neutral fallback</td></tr>
-          <tr><td class="m">"" (empty / whitespace)</td><td class="desc"><code>{ ok:false, error:"empty message" }</code></td><td class="desc">no state change</td></tr>
-        </tbody>
-      </table>
-
-      <div class="note"><b>Why this shape.</b> The bridge mirrors the existing <code>window.lavish</code>
-      pattern: a single global, defensive <code>typeof</code> checks, no keys stored or transmitted,
-      canned language unless an external hook is present. Reading <code>state()</code> never mutates the
-      agent; only <code>send()</code> does, and only through the normal cognition path
-      (memory encode → speak → possible BDI nudge).</div>
-
-      <h3>7.3 — Subscribing to the live store</h3>
-<pre><code><span class="kw">const</span> off = window.__COG_SUBSCRIBE__(store =&gt; {
-  hud.textContent = store.mood.comfort.toFixed(<span class="nu">2</span>) +
-                    <span class="st">" / trust "</span> + store.trust.toFixed(<span class="nu">2</span>) +
-                    <span class="st">" / "</span> + (store.intention || <span class="st">"idle"</span>);
-});
-<span class="cm">// later: off()</span></code></pre>
+      <div class="note"><b>Dev wiring:</b> <code>npm run dev</code> serves the view on
+      <code>:5173</code> and proxies <code>/api</code> to the Python mind on <code>:8000</code>
+      (<code>vite.config.js → server.proxy</code>). Run the mind with
+      <code>python -m cabin_sim.main --server --provider scripted</code>.</div>
     </div>
   </details>
 
@@ -962,11 +761,12 @@ window.__EXPERIMENTER_CHAT__.clear();</code></pre>
       <table>
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Where</th></tr></thead>
         <tbody>
-          <tr><td class="m">PHILL.targetRot / targetHgt</td><td class="num">0° / 44 cm</td><td class="desc">preference centre of <code>seatFit()</code>, <code>selfAdjust()</code></td></tr>
-          <tr><td class="m">PHILL.tolRot / tolHgt</td><td class="num">20° / 2 cm</td><td class="desc">HUD comfort zone; rotation gate uses <code>tolRot+2 = 22°</code></td></tr>
-          <tr><td class="m">seat ranges</td><td class="num">rot 0–359° · hgt 38–46 · sl ±8</td><td class="desc">clamped in <code>setRot/setHgt/setSl</code></td></tr>
-          <tr><td class="m">userHands window</td><td class="num">3 s</td><td class="desc"><code>S.t − lastUserInput &lt; 3</code></td></tr>
-          <tr><td class="m">fit normalisers (dr, dh)</td><td class="num">180° / 8 cm</td><td class="desc">denominators in <code>seatFit()</code></td></tr>
+          <tr><td class="m">target rotation / height</td><td class="num">0° / 440 mm (44 cm)</td><td class="desc"><code>personas/phill.json → seat</code>, read by <code>Mind.seat_fit</code>, <code>self_adjust</code></td></tr>
+          <tr><td class="m">tolerances</td><td class="num">20° / 20 mm / 90 mm / 12°</td><td class="desc">HUD comfort zone; rotation gate uses <code>tolRot+2 = 22°</code></td></tr>
+          <tr><td class="m">seat ranges</td><td class="num">rot 0–359 · hgt 380–460 mm · sl 260–460 · rec 80–110</td><td class="desc"><code>world.Seat</code> clamps — mirrored by <code>schema.SEAT_LIMITS</code></td></tr>
+          <tr><td class="m">as-found pose</td><td class="num">rot 90 · hgt 380 · sl 390 · rec 103</td><td class="desc">turned toward the door, bottom of travel → immediate settle job</td></tr>
+          <tr><td class="m">userHands window</td><td class="num">3 s</td><td class="desc"><code>mind.t − last_user_input &lt; 3</code></td></tr>
+          <tr><td class="m">fit normalisers (dr, dh)</td><td class="num">180° / 8 cm</td><td class="desc">denominators in <code>seat_fit()</code></td></tr>
         </tbody>
       </table>
 
@@ -974,84 +774,93 @@ window.__EXPERIMENTER_CHAT__.clear();</code></pre>
       <table>
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td class="m">settle: cd</td><td class="num">9 s</td><td class="desc">minimum gap between self-settle firings</td></tr>
-          <tr><td class="m">attend: cd</td><td class="num">3.2 s</td><td class="desc">thought cadence ceiling</td></tr>
-          <tr><td class="m">calibrate: cd</td><td class="num">10 s</td><td class="desc">trust-review cadence</td></tr>
-          <tr><td class="m">settle desire: noise floor</td><td class="num">0.18</td><td class="desc">below this, desire = 0</td></tr>
-          <tr><td class="m">settle: pre threshold (<code>settleThresh</code>)</td><td class="num">0.22</td><td class="desc">fit-gap needed to be allowed to settle</td></tr>
+          <tr><td class="m">settle / attend / calibrate cooldowns</td><td class="num">9 / 3.2 / 10 s</td><td class="desc"><code>GOAL_CD</code> — minimum gap between firings</td></tr>
+          <tr><td class="m">settle: desire noise floor</td><td class="num">0.18</td><td class="desc">below this, desire = 0 (the agent rests at ~0.17 gap)</td></tr>
+          <tr><td class="m">settle: precondition (<code>settle_thresh</code>)</td><td class="num">0.22</td><td class="desc">fit-gap needed to be allowed to settle</td></tr>
           <tr><td class="m">settle: phase gain ph</td><td class="num">1.3 setup / 0.9 ride</td><td class="desc">keener before departure</td></tr>
           <tr><td class="m">settle: userHands factor</td><td class="num">0.15</td><td class="desc">desire nearly suppressed while the human drags</td></tr>
-          <tr><td class="m">settle: desire cap</td><td class="num">2.0</td><td class="desc"><code>Math.min(2, …)</code></td></tr>
+          <tr><td class="m">settle: desire cap</td><td class="num">2.0</td><td class="desc"><code>min(2, …)</code></td></tr>
+          <tr><td class="m">settle actuation gates</td><td class="num">fit_hgt/fit_rot &gt; 0.22</td><td class="desc">only moves when the perceived fit error is large</td></tr>
+          <tr><td class="m">settle steps</td><td class="num">±10 mm · ±10°</td><td class="desc"><code>settle_step_mm / settle_step_deg</code> via whitelisted actions</td></tr>
           <tr><td class="m">attend: base / gain</td><td class="num">0.3 + 0.7·act (0.15 if empty)</td><td class="desc">memory activation drives attentiveness</td></tr>
           <tr><td class="m">attend: suspicion bonus</td><td class="num">+0.4</td><td class="desc">when suspicion &gt; 0.6</td></tr>
           <tr><td class="m">calibrate: base / ramp cap</td><td class="num">0.35 / 0.6</td><td class="desc"><code>0.35 + min(0.6, (t−120)/480)·k</code></td></tr>
           <tr><td class="m">calibrate: alert factor k</td><td class="num">0.85 / 0.5</td><td class="desc">0.85 if suspicion &gt; 0.62 or fitGap &gt; 0.35, else 0.5</td></tr>
-          <tr><td class="m">selfAdjust: gates &amp; steps</td><td class="num">fit &gt; 0.22 · ±1 cm · ±10°</td><td class="desc">only moves when the perceived fit error is large</td></tr>
           <tr><td class="m">fit-gap erosion: knee / gain</td><td class="num">0.30 / ×2.4</td><td class="desc">suspicion pressure above a 0.30 gap</td></tr>
-          <tr><td class="m">fit-gap erosion: rate / hands</td><td class="num">0.006 /s · ×1.6</td><td class="desc"><code>suspicion += 0.006·gb·dt</code></td></tr>
+          <tr><td class="m">fit-gap erosion: rate / hands</td><td class="num">0.006 /s · ×1.6</td><td class="desc"><code>suspicion += dt·0.006·gb</code></td></tr>
         </tbody>
       </table>
 
-      <h3>Memory</h3>
+      <h3>Memory, mood, trust</h3>
       <table>
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td class="m">memoryLambda (λ)</td><td class="num">0.004 s⁻¹</td><td class="desc">exponential activation decay; half-life ≈ 173 s</td></tr>
-          <tr><td class="m">capacity</td><td class="num">8 traces</td><td class="desc">oldest evicted on overflow (FIFO)</td></tr>
-          <tr><td class="m">forget threshold</td><td class="num">act &lt; 0.09</td><td class="desc">trace dies, <code>forgotCount++</code></td></tr>
-          <tr><td class="m">forgotten ring</td><td class="num">6 entries</td><td class="desc"><code>S.forgot</code> shown in HUD + summary</td></tr>
-          <tr><td class="m">importance bonus</td><td class="num">+0.10</td><td class="desc">bump / arrive / workzone traces</td></tr>
-          <tr><td class="m">salience floor / slope</td><td class="num">0.35 · 0.42 + 0.5·impact</td><td class="desc">event encoding</td></tr>
-          <tr><td class="m">rehearsal boost</td><td class="num">+0.22 per recall</td><td class="desc"><code>think()</code> refreshes the top trace</td></tr>
-          <tr><td class="m">chat trace salience</td><td class="num">0.5 (+0.1) = 0.60</td><td class="desc">experimenter lines in memory</td></tr>
+          <tr><td class="m">memory λ (<code>memory_lambda</code>)</td><td class="num">0.004 /s</td><td class="desc">exponential decay of trace activation</td></tr>
+          <tr><td class="m">forget floor / cap / rehearsal</td><td class="num">0.09 / 8 / +0.22</td><td class="desc">forgetting threshold, FIFO capacity, recall strengthening</td></tr>
+          <tr><td class="m">thoughts / log / chat caps</td><td class="num">3 / 60 / 40</td><td class="desc">ring sizes published in the snapshot</td></tr>
+          <tr><td class="m">comfort relax rate</td><td class="num">0.06 /s</td><td class="desc"><code>comfort += (target−comfort)·min(1, dt·0.06)</code></td></tr>
+          <tr><td class="m">energy drain / floor</td><td class="num">0.00018 /s / 0.05</td><td class="desc">slow fatigue over the ride</td></tr>
+          <tr><td class="m">suspicion relax</td><td class="num">−0.004 / +0.003 per s</td><td class="desc">toward the persona/priors set-point</td></tr>
+          <tr><td class="m">trust weights</td><td class="num">0.34 · 0.40 · 0.16 · 0.10</td><td class="desc">comfort · (1−susp) · eventful · (1−fitGap)</td></tr>
+          <tr><td class="m">event salience</td><td class="num">max(0.35, 0.42 + impact·0.5), +0.1 important</td><td class="desc">encoding strength of a ride event</td></tr>
+          <tr><td class="m">speak frequency</td><td class="num">talk·(0.4 + 0.3 susp&gt;0.62 + 0.25 comf&lt;0.35)</td><td class="desc"><code>talkativeness 0.55</code></td></tr>
         </tbody>
       </table>
 
-      <h3>Mood, trust &amp; speech</h3>
+      <h3>Clock, transport, view</h3>
       <table>
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td class="m">comfortTarget weights</td><td class="num">0.35 / 0.35 / 0.30</td><td class="desc">aR (ROT) + aH (HGT) + fit</td></tr>
-          <tr><td class="m">comfort relaxation rate</td><td class="num">0.06 /s</td><td class="desc">τ ≈ 16.7 s toward target</td></tr>
-          <tr><td class="m">energy drain / floor</td><td class="num">0.00018 /s · 0.05</td><td class="desc">monotone vigilance drain</td></tr>
-          <tr><td class="m">suspicion relax down / up</td><td class="num">0.004 / 0.003 per s</td><td class="desc">toward <code>suspicionBase</code></td></tr>
-          <tr><td class="m">suspicionBase (+priors gain)</td><td class="num">0.5 · ×0.35</td><td class="desc">rewritten to 0.5 + (0.5 − priorTrust)·0.35</td></tr>
-          <tr><td class="m">jolt impulse: susp / comfort</td><td class="num">+0.20 · −0.12·jolt</td><td class="desc">when jolt &gt; 0.3 (also shakes the scene)</td></tr>
-          <tr><td class="m">kind impulses</td><td class="num">brake +0.07 · overtake +0.05 · rain +0.04</td><td class="desc">suspicion bumps</td></tr>
-          <tr><td class="m">g / jolt decay</td><td class="num">e^−0.3·dt / e^−0.35·dt</td><td class="desc">signal τ ≈ 3.3 s / 2.9 s</td></tr>
-          <tr><td class="m">trustValue weights</td><td class="num">0.34 / 0.40 / 0.16 / 0.10</td><td class="desc">comfort / (1−susp) / ev / (1−fitGap); ev scale 0.6</td></tr>
-          <tr><td class="m">calibrate verdict bands</td><td class="num">≥ 0.60 · ≤ 0.38</td><td class="desc">trustOk / trustLow</td></tr>
-          <tr><td class="m">mood bands</td><td class="num">susp 0.6 · comfort 0.55</td><td class="desc"><code>ambientMood()</code> idleS / idleC / idleN</td></tr>
-          <tr><td class="m">talkativeness modifiers</td><td class="num">0.55 × (0.4 + 0.3 + 0.25)</td><td class="desc">baseline 0.22 → up to 0.52 per decision</td></tr>
-          <tr><td class="m">questionnaire bands</td><td class="num">0.65 / 0.45 (grade: 0.62 / 0.45)</td><td class="desc">end-good / end-mid / end-bad</td></tr>
+          <tr><td class="m">ride_start / ride_end</td><td class="num">120 / 600 s</td><td class="desc">phase machine + <code>calibrate</code> window (<code>ride_start</code>/<code>ride_end</code> CLI)</td></tr>
+          <tr><td class="m">tick_dt (CLI default)</td><td class="num">2.0 s / step</td><td class="desc">300 steps cover the 600 s ride; tests use 1.0</td></tr>
+          <tr><td class="m">ticker interval (wall)</td><td class="num">1.2 s</td><td class="desc">real time between decision steps in server mode</td></tr>
+          <tr><td class="m">view poll interval</td><td class="num">700 ms</td><td class="desc">speed buttons remap it (1600/sp ms)</td></tr>
+          <tr><td class="m">sample cadence</td><td class="num">≥ 3 s</td><td class="desc">mood/trust samples for the summary charts</td></tr>
+          <tr><td class="m">priors file</td><td class="num">opt-in path</td><td class="desc"><code>SimEngine(priors_path=…)</code> — no file I/O in tests</td></tr>
         </tbody>
       </table>
 
-      <h3>Loop, timeline &amp; buffers</h3>
+      <h3>Reasoning (cabin_sim/reasoning.py)</h3>
       <table>
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td class="m">RIDE_START / RIDE_END</td><td class="num">120 s / 600 s</td><td class="desc">phase boundaries; 13 scripted events</td></tr>
-          <tr><td class="m">timeScale (default)</td><td class="num">×4</td><td class="desc">UI speed buttons; sim s ≈ 250 ms wall</td></tr>
-          <tr><td class="m">dt clamp</td><td class="num">4 s</td><td class="desc"><code>Math.min(4, Δwall)</code> — tab-switch protection</td></tr>
-          <tr><td class="m">sample interval</td><td class="num">3 s</td><td class="desc"><code>S.samples</code> + <code>S.trust.trail</code></td></tr>
-          <tr><td class="m">speed coasting rate</td><td class="num">0.05 /s</td><td class="desc">velocity eases toward target</td></tr>
-          <tr><td class="m">rain FX window</td><td class="num">540–570 s</td><td class="desc">beads up at 0.08/s, decays at 0.18/s</td></tr>
-          <tr><td class="m">buffers</td><td class="num">log 60 · thoughts 3 · chat 40 · samples ~160</td><td class="desc">rolling caps</td></tr>
-          <tr><td class="m">reserved (unused)</td><td class="num">assertiveness 0.6 · nextSpeak · lastThink</td><td class="desc">declared for future chatter scheduling, not read yet</td></tr>
+          <tr><td class="m">--reasoning</td><td class="num">auto · rules · llm</td><td class="desc">auto = LLM when the provider is groq/ollama; rules = deterministic (tests); llm = force</td></tr>
+          <tr><td class="m">--chat-model</td><td class="num">any Ollama/Groq model</td><td class="desc">second backend for experimenter chat only (default <code>CHAT_MODEL</code>, unset = same model as ticks)</td></tr>
+          <tr><td class="m">deliberation throttle</td><td class="num">12 s</td><td class="desc">min sim-seconds between model calls with an unchanged legal set — sized to the Groq free tier (~6K TPM), no 429 churn</td></tr>
+          <tr><td class="m">retry backoff</td><td class="num">1.5 s × 1</td><td class="desc">one retry on rate limits/errors, then rules fallback for that tick</td></tr>
+          <tr><td class="m">MAX_THOUGHT / MAX_REPLY</td><td class="num">160 / 240 chars</td><td class="desc">validated truncation of model-generated text</td></tr>
+          <tr><td class="m">default backend</td><td class="num">allam-2-7b (Groq free)</td><td class="desc"><code>LLM_PROVIDER=groq</code> — ~300&nbsp;ms per decision/chat call, 30&nbsp;req/min free, no card; on 429: one retry, else rules that tick</td></tr>
+          <tr><td class="m">offline fallback</td><td class="num">qwen3:4b (Ollama)</td><td class="desc"><code>OLLAMA_MODEL=qwen3:4b</code> — 100% local when Ollama is up; Qwen3 thinking off (<code>OLLAMA_THINK=0</code>) + output cap (<code>OLLAMA_NUM_PREDICT=160</code>); split chat onto a bigger local model via <code>CHAT_MODEL</code></td></tr>
         </tbody>
       </table>
 
-      <div class="warn"><b>Tuning intuition.</b> The three levers that most change the ride's story:
-      <b>λ</b> (how fast Phill stops caring about what happened), <b>suspicionBase / prior gain</b>
-      (the emotional set-point across rides), and the <b>settleThresh vs. fit-gap knee</b> pair
-      (0.22 / 0.30 — how wrongly the seat must sit before he both complains and distrusts).</div>
+      <div class="note"><b>Backend reality check:</b> the default brain is
+      Groq's <b>free tier</b> (<code>allam-2-7b</code>) — measured ~300&nbsp;ms per
+      call, so ticks and chat keep real-time pace at $0. The free plan allows
+      30&nbsp;req/min: a burst earns a <code>429</code>, the reasoner retries once
+      and otherwise answers that tick from rules — the ride never stalls (the log
+      shows it as <code>rules this tick</code>). Local Ollama is the offline
+      fallback: there Qwen3's <i>hidden thinking</i> is switched off
+      (<code>OLLAMA_THINK=0</code>, measured 0.75&nbsp;s vs 19&nbsp;s per call)
+      with a 160-token output cap and <code>num_ctx 1536</code>
+      (<code>OLLAMA_NUM_CTX</code>) trimming the KV cache; any failure falls back
+      to rules for that tick. <code>--provider scripted</code> restores
+      deterministic everything.</div>
+
+      <div class="warn"><b>Verification:</b> <code>python -m pytest tests -q</code> → <b>81 passed</b>
+      (36 pre-existing + 25 port tests covering rate tables, fit/comfort/trust worked examples, memory
+      decay/floor/FIFO, BDI cooldowns &amp; preconditions, event once-only firing, mood impulses,
+      chat routing, snapshot determinism per seed, priors round-trip — plus 20 reasoning tests:
+      mode selection, legal-set validation, JSON/error fallbacks, chat side effects, snapshot mode,
+      hybrid chat-provider split).
+      <code>npm run build</code> → exit 0.</div>
     </div>
   </details>
 
   <footer class="kiosk">
-    cabin-agent-sim · tutorial-cognitive.html · source of truth: src/cognitive.js ·
-    standalone document — no external assets · black/gray kiosk theme
+    cabin-agent-sim · tutorial v2 (python-authoritative port)<br>
+    mind: cabin_sim/cognition.py · reasoning: cabin_sim/reasoning.py · clock: sim.py · contract: schema.py · transport: server.py · view: src/cognitive.js (legacy: cognitive.legacy.js)<br>
+    python -m pytest tests -q · python -m cabin_sim.main --server --provider ollama (local Qwen) | --provider groq (free tier) · npm run dev · npm run build
   </footer>
 </div>
 

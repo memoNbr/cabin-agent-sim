@@ -432,6 +432,7 @@
           <option value="4">4×</option>
         </select>
         <button class="kbtn" id="simSeat" type="button" title="interior view, camera focused on the driver seat">seat</button>
+        <button class="kbtn" id="simAvatar" type="button" title="Avatar: replay the walk-in and sit-down entry sequence">avatar</button>
         <button class="kbtn on" id="seatVis" type="button" title="show / hide the adjustable seat and its sliders">seat on</button>
         <div class="seat-sys" id="seatSys" role="group" aria-label="seat adjustments">
           <label class="seat-lbl" title="seat height: 38–46 cm above the floor">h<input type="range" id="seatHgt" min="38" max="46" step="1" value="38" aria-label="seat height, 38 to 46 cm"><span class="seat-val" id="seatHgtV">38</span></label>
@@ -707,12 +708,13 @@
   <button type="button" class="sp-chip" id="spChip" aria-controls="seatPortal">seat ▸</button>
 </div>
 <!-- experimenter chat: UI + global hook. window.__EXPERIMENTER_CHAT__
-     .send(text) posts an "Experimenter:" line and schedules the stub
-     agent, which answers "Agent received: <text>" after 500 ms;
-     .onAgentReply(cb) registers callbacks fired with each agent reply
-     (cognitive.js can take over the reply side later). This classic
-     script runs during parse, before the module bundle, so the hook
-     always exists by the time the agent code boots. -->
+     .send(text) posts an "Experimenter:" line, then ASKS THE PYTHON MIND
+     (POST /api/chat) and prints Phill's real reply when it lands — async
+     on purpose: a sync call froze the tab while Groq answered.
+     .onAgentReply(cb) registers callbacks fired with each agent reply.
+     This classic script runs during parse, before the module bundle, so
+     the hook always exists by the time the agent code boots (the bundle
+     then replaces it with the full {send, history, state, clear} proxy). -->
 <script>
 (function () {
   var root = document.getElementById("xpChat");
@@ -735,19 +737,41 @@
     el.appendChild(document.createTextNode(" " + text));
     log.appendChild(el);
     log.scrollTop = log.scrollHeight;
+    return el;
+  }
+  function setMsg(el, text) {                /* swap a line's text in place */
+    while (el.childNodes.length > 1) el.removeChild(el.lastChild);
+    el.appendChild(document.createTextNode(" " + text));
+    log.scrollTop = log.scrollHeight;
+  }
+  function answer(reply, el) {
+    if (el) setMsg(el, reply); else line("Agent", reply);
+    replyCbs.forEach(function (cb) {
+      try { cb(reply); } catch (e) { console.error("[xp-chat]", e); }
+    });
   }
   function send(msg) {
     msg = String(msg === null || msg === undefined ? "" : msg).trim();
     if (!msg) return false;
     setOpen(true);
     line("Experimenter", msg);
-    setTimeout(function () {
-      var reply = "Agent received: " + msg;
-      line("Agent", reply);
-      replyCbs.forEach(function (cb) {
-        try { cb(reply); } catch (e) { console.error("[xp-chat]", e); }
+    var pend = line("Agent", "…");           /* thinking state — panel never goes silent */
+    /* async on purpose: the reply comes from Groq through the Python mind
+       and must never freeze this tab (a sync XHR did, for seconds) */
+    fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: msg }),
+      cache: "no-store"
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        answer(res && res.ok && res.reply ? String(res.reply)
+          : (res && res.error) || "(no reply — Python mind not reachable)", pend);
+      })
+      .catch(function () {
+        answer("(no reply — Python mind not reachable)", pend);
       });
-    }, 500);
     return true;
   }
   fab.addEventListener("click", function () { setOpen(!root.classList.contains("open")); });

@@ -10,6 +10,7 @@ Not running a template: this is the CLI of the sim.
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -24,6 +25,15 @@ def _parse(argv):
                         help="path to a persona JSON file")
     parser.add_argument("--provider", default=None,
                         help="groq | ollama | scripted (default: from .env)")
+    parser.add_argument("--reasoning", default="auto",
+                        choices=["auto", "rules", "llm"],
+                        help="who reasons: auto = LLM when the provider is "
+                             "groq/ollama, rules = deterministic phrase banks "
+                             "(tests), llm = force the model")
+    parser.add_argument("--chat-model", default=None,
+                        help="model used ONLY for experimenter chat replies "
+                             "(default: .env CHAT_MODEL; unset = same model as "
+                             "ticks) — hybrid: fast model ticks, big model chats")
     parser.add_argument("--steps", type=int, default=300,
                         help="decision steps: total (headless) or safety cap (server)")
     parser.add_argument("--interval", type=float, default=1.2,
@@ -34,6 +44,13 @@ def _parse(argv):
                         help="random seed for reproducible runs")
     parser.add_argument("--port", type=int, default=8000,
                         help="port for the browser view")
+    parser.add_argument("--tick-dt", type=float, default=2.0,
+                        help="sim seconds per decision step (default 2.0: "
+                             "300 steps cover the 600 s ride script)")
+    parser.add_argument("--ride-start", type=float, default=120.0,
+                        help="sim second the ride phase begins")
+    parser.add_argument("--priors", default=None,
+                        help="path to a priors JSON (persisted between rides)")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--headless", action="store_true",
                        help="run N steps and print, without a browser")
@@ -60,14 +77,36 @@ def main(argv=None):
     provider = create_provider(args.provider)
     print(f"Persona: {persona['name']}   Provider: {provider.name}", flush=True)
 
+    # hybrid: an optional second backend whose model answers ONLY experimenter
+    # chat (default .env CHAT_MODEL); ticks/deliberation keep `provider`.
+    chat_model = args.chat_model or os.environ.get("CHAT_MODEL")
+    chat_provider = None
+    if (chat_model and provider.name != "scripted"
+            and chat_model != getattr(provider, "model", None)):
+        keep_alive = (int(os.environ.get("CHAT_OLLAMA_KEEP_ALIVE", "120"))
+                      if provider.name == "ollama" else None)
+        chat_provider = create_provider(args.provider, model=chat_model,
+                                        keep_alive=keep_alive)
+
     from .session import Session
 
     session = Session(persona, provider, max_steps=args.steps,
                       step_interval=args.interval, duration=args.duration,
-                      seed=args.seed)
+                      seed=args.seed, reasoning=args.reasoning,
+                      chat_provider=chat_provider)
+    mode = session.reasoner.kind if session.reasoner else "rules"
+    if chat_provider is not None and session.reasoner is not None:
+        mode += f"   chat: {chat_model}"
+    print(f"Reasoning: {mode}", flush=True)
+
+    from .sim import SimEngine
+
+    engine = SimEngine(session, seed=args.seed, tick_dt=args.tick_dt,
+                       ride_start=args.ride_start,
+                       priors_path=args.priors)
 
     if args.headless:
-        _run_headless(session)
+        _run_headless(engine)
         return 0
 
     from .server import serve
@@ -77,24 +116,31 @@ def main(argv=None):
     print(f"Open {url} in your browser. Session: {mins:.2g} min. "
           f"(Ctrl+C to stop)", flush=True)
     try:
-        serve(session, args.port)
+        serve(engine, args.port, interval=args.interval)
     except KeyboardInterrupt:
         pass
     return 0
 
 
-def _run_headless(session):
+def _run_headless(engine):
+    session = engine.session
     session.note("session_start", persona=session.persona["name"])
-    for _ in range(session.max_steps):
-        session.step_once()
-    session.finish()
+    engine.run()
 
     for entry in session.log:
         print(json.dumps(entry, ensure_ascii=False))
 
+    snap = engine.snapshot()
     print("\n--- summary ---")
     print(f"actions succeeded: {session.agent.succeeded}   "
           f"blocked: {session.agent.blocked}")
+    print(f"phase: {snap['phase']}   t: {snap['t']}s   "
+          f"intention: {snap['agent']['intention']}")
+    print(f"reasoning: {snap['agent']['reasoning']}   "
+          f"trust live: {snap['agent']['trust']['live']}   "
+          f"mood: {json.dumps(snap['agent']['mood'])}")
+    print(f"ride: {json.dumps(snap['ride'])}   "
+          f"memory: {len(snap['agent']['memory'])} traces")
     print("final cabin:", json.dumps(session.cabin.to_dict()))
     if session.questionnaire:
         q = session.questionnaire

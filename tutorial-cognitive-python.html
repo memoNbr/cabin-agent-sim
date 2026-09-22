@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Python Mind — BDI cognitive agent (cabin_sim) — technical tutorial</title>
+<meta name="description" content="Section-by-section walkthrough of the Python-authoritative BDI mind: cabin_sim/cognition.py (Mind), data structures, step loop, memory, trust &amp; mood, ride script, schema snapshot, experimenter chat, determinism, reasoning modes, parameters.">
+<style>
+  :root{
+    --bg:#08090a; --panel:#0e0f11; --panel2:#131417; --line:#24252a; --line2:#1a1b1f;
+    --tx:#c7c9d0; --tx-dim:#8b8d96; --tx-bright:#eceef3;
+    --gold:#c9a227; --gold-soft:#e6c85a; --teal:#6bd5c0; --red:#d9756b;
+    --mono:Consolas,"SF Mono","Cascadia Mono",Menlo,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:var(--sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1060px; margin:0 auto; padding:0 18px 90px}
+
+  /* ---------- kiosk header ---------- */
+  header.kiosk{
+    background:linear-gradient(180deg,#0d0e10 0%,#08090a 100%);
+    border-bottom:1px solid var(--line);
+    padding:34px 0 22px; margin-bottom:22px;
+  }
+  header.kiosk .wrap{padding-bottom:0}
+  .kicker{
+    font-family:var(--mono); font-size:11px; letter-spacing:.28em;
+    text-transform:uppercase; color:var(--gold);
+  }
+  h1{
+    margin:8px 0 6px; font-size:30px; line-height:1.2;
+    letter-spacing:-.01em; color:var(--tx-bright); font-weight:700;
+  }
+  .sub{color:var(--tx-dim); font-size:15px; max-width:70ch}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
+  .chip{
+    font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+    border:1px solid var(--line); background:var(--panel2);
+    color:var(--tx-dim); padding:5px 10px;
+  }
+  .chip b{color:var(--gold-soft); font-weight:600}
+
+  /* ---------- toolbar + toc ---------- */
+  .bar{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    justify-content:space-between; margin:20px 0 14px;
+  }
+  .btn{
+    font-family:var(--mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+    background:var(--panel2); color:var(--tx); border:1px solid var(--line);
+    padding:12px 18px; min-height:44px; cursor:pointer;
+  }
+  .btn:hover{border-color:var(--gold); color:var(--gold-soft)}
+  .toc{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:8px; margin:0 0 26px;
+  }
+  .toc a{
+    display:block; text-decoration:none; background:var(--panel);
+    border:1px solid var(--line); border-left:3px solid var(--gold);
+    padding:11px 13px; color:var(--tx); font-size:13.5px;
+  }
+  .toc a:hover{background:var(--panel2); color:var(--gold-soft)}
+  .toc a span{
+    display:block; font-family:var(--mono); font-size:10.5px;
+    color:var(--gold); letter-spacing:.14em; margin-bottom:2px;
+  }
+
+  /* ---------- collapsible sections ---------- */
+  details.sec{
+    background:var(--panel); border:1px solid var(--line);
+    margin:0 0 14px; scroll-margin-top:14px;
+  }
+  details.sec > summary{
+    list-style:none; cursor:pointer; user-select:none;
+    padding:17px 20px; display:flex; align-items:center; gap:14px;
+    font-family:var(--mono); font-size:14px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--tx-bright);
+  }
+  details.sec > summary::-webkit-details-marker{display:none}
+  details.sec > summary:hover{background:var(--panel2)}
+  details.sec > summary .no{
+    font-size:11px; color:#08090a; background:var(--gold);
+    padding:3px 7px; font-weight:700; letter-spacing:.05em; flex:none;
+  }
+  details.sec > summary .caret{margin-left:auto; color:var(--gold); font-size:13px; flex:none}
+  details.sec[open] > summary{border-bottom:1px solid var(--line); background:#101114}
+  details.sec[open] > summary .caret::after{content:" ▾"}
+  details.sec > summary .caret::after{content:" ▸"}
+  .body{padding:22px 22px 26px}
+  .body > :first-child{margin-top:0}
+
+  h2{font-size:19px; color:var(--tx-bright); margin:26px 0 8px; letter-spacing:-.01em}
+  h3{
+    font-family:var(--mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--gold-soft); margin:26px 0 8px; font-weight:600;
+  }
+  p{margin:10px 0; max-width:78ch}
+  ul,ol{margin:10px 0; padding-left:22px; max-width:78ch}
+  li{margin:5px 0}
+  a{color:var(--teal)}
+
+  /* ---------- code ---------- */
+  code{
+    font-family:var(--mono); font-size:.875em;
+    background:#17181b; color:#e3cf92; padding:1.5px 5px; border:1px solid #212226;
+  }
+  pre{
+    position:relative; margin:14px 0; background:#050506;
+    border:1px solid var(--line); border-left:3px solid var(--gold);
+    padding:15px 16px; overflow-x:auto;
+  }
+  pre code{
+    background:none; border:none; padding:0; color:#d8d5c9;
+    font-size:13px; line-height:1.62; display:block; white-space:pre;
+  }
+  pre .cm{color:#6e7076}
+  pre .kw{color:#c9a227}
+  pre .st{color:#8fc7a8}
+  pre .nu{color:#c99a6b}
+  .copy{
+    position:absolute; top:7px; right:7px; font-family:var(--mono);
+    font-size:10px; letter-spacing:.1em; background:#111214; color:var(--tx-dim);
+    border:1px solid var(--line); padding:5px 9px; cursor:pointer;
+  }
+  .copy:hover{color:var(--gold-soft); border-color:var(--gold)}
+
+  /* ---------- tables ---------- */
+  table{width:100%; border-collapse:collapse; margin:14px 0; font-size:13.5px}
+  th{
+    text-align:left; background:#16171a; color:var(--gold-soft);
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    padding:9px 10px; border:1px solid var(--line);
+  }
+  td{padding:8px 10px; border:1px solid var(--line2); vertical-align:top}
+  tbody tr:nth-child(even) td{background:#0b0c0e}
+  td.m,th.m{font-family:var(--mono); font-size:12.5px}
+  td.num{text-align:right; font-family:var(--mono); font-size:12.5px; color:var(--gold-soft)}
+  .desc{color:var(--tx-dim)}
+
+  /* ---------- formulas & notes ---------- */
+  .fx{
+    font-family:var(--mono); font-size:13px; line-height:1.75;
+    background:#0a0b0d; border:1px solid var(--line); border-left:3px solid var(--teal);
+    padding:13px 16px; margin:12px 0; overflow-x:auto; color:#d5d7dd; white-space:pre;
+  }
+  .fx b{color:var(--gold-soft); font-weight:600}
+  .note{
+    border-left:3px solid var(--teal); background:rgba(107,213,192,.05);
+    padding:11px 15px; margin:14px 0; font-size:14.5px; color:#c2cbc9;
+  }
+  .warn{
+    border-left:3px solid var(--gold); background:rgba(201,162,39,.06);
+    padding:11px 15px; margin:14px 0; font-size:14.5px;
+  }
+  .note b,.warn b{color:var(--gold-soft)}
+
+  /* ---------- flow diagram ---------- */
+  .flow{
+    font-family:var(--mono); font-size:12.5px; line-height:1.5;
+    background:#050506; border:1px solid var(--line); padding:16px;
+    overflow-x:auto; color:#b9bcc4; margin:16px 0; white-space:pre;
+  }
+  .flow .g{color:var(--gold-soft)}
+  .flow .t{color:var(--teal)}
+  .flow .d{color:#6e7076}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media (max-width:760px){ .grid2{grid-template-columns:1fr} h1{font-size:24px} }
+
+  /* ---------- timeline ---------- */
+  .tl{position:relative; height:74px; margin:22px 0 8px;
+      background:#0a0b0d; border:1px solid var(--line)}
+  .tl .axis{position:absolute; left:0; right:0; top:36px; height:2px; background:#2b2c31}
+  .tl .seg{position:absolute; top:34px; height:6px; background:rgba(201,162,39,.55)}
+  .tl .ev{position:absolute; top:22px; width:2px; height:30px; background:var(--teal)}
+  .tl .ev.j{background:var(--red)}
+  .tl .ev b{
+    position:absolute; top:-17px; left:-13px; font-family:var(--mono);
+    font-size:9.5px; color:var(--tx-dim); font-weight:400;
+  }
+  .tl .tick{position:absolute; top:52px; font-family:var(--mono); font-size:10px; color:#6e7076; transform:translateX(-50%)}
+  .tl .lbl{position:absolute; top:4px; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; color:var(--gold)}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-family:var(--mono); font-size:11px; color:var(--tx-dim); margin-bottom:8px}
+  .dot{display:inline-block; width:9px; height:9px; margin-right:5px; vertical-align:-1px}
+
+  footer.kiosk{
+    border-top:1px solid var(--line); margin-top:34px; padding-top:18px;
+    font-family:var(--mono); font-size:11.5px; color:#6e7076; letter-spacing:.06em;
+  }
+</style>
+</head>
+<body>
+
+<header class="kiosk">
+  <div class="wrap">
+    <div class="kicker">cabin-agent-sim · technical documentation · the python mind</div>
+    <h1>The Python Mind</h1>
+    <div class="sub">The authoritative BDI passenger agent of <code>cabin_sim/</code> — a section-by-section
+      walkthrough of <code>cognition.py</code> (<code>Mind</code>): core data structures, the
+      perceive → desire → intention → act loop, associative memory, trust &amp; mood dynamics, the
+      120–600&nbsp;s ride script, the <code>schema.py</code> snapshot contract, the experimenter chat,
+      deterministic seeding, LLM reasoning modes, and every tunable parameter. Companion to the
+      <a href="tutorial-cognitive.html">architecture &amp; view walkthrough</a> — that one shows the
+      layers; this one opens the mind.</div>
+    <div class="chips">
+      <span class="chip">mind <b>cabin_sim/cognition.py</b></span>
+      <span class="chip">persona <b>Phill · personas/phill.json</b></span>
+      <span class="chip">memory λ <b>0.004 /s</b></span>
+      <span class="chip">ride <b>120s → 600s</b></span>
+      <span class="chip">snapshot <b>cabin-agent.v1</b></span>
+      <span class="chip">loop <b>step(dt) · engine tick · poll 700ms</b></span>
+      <span class="chip">chat <b>chat_send → POST /api/chat</b></span>
+      <span class="chip">reasoning <b>rules | llm</b></span>
+      <span class="chip">tests <b>81 pytest · 0 fail</b></span>
+      <span class="chip">companion <b><a href="tutorial-cognitive.html">tutorial-cognitive.html</a></b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="bar">
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:#6e7076">
+      11 SECTIONS · COLLAPSIBLE
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="btnExpand">Expand all</button>
+      <button class="btn" id="btnCollapse">Collapse all</button>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <a href="#s1"><span>01</span>Architecture Overview</a>
+    <a href="#s2"><span>02</span>Core Data Structures</a>
+    <a href="#s3"><span>03</span>Main Loop</a>
+    <a href="#s4"><span>04</span>Memory System</a>
+    <a href="#s5"><span>05</span>Trust &amp; Mood Dynamics</a>
+    <a href="#s6"><span>06</span>Event Timeline</a>
+    <a href="#s7"><span>07</span>Schema &amp; Snapshot</a>
+    <a href="#s8"><span>08</span>Experimenter Chat</a>
+    <a href="#s9"><span>09</span>Determinism</a>
+    <a href="#s10"><span>10</span>Reasoning Modes</a>
+    <a href="#s11"><span>11</span>Key Parameters</a>
+  </nav>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s1" open>
+    <summary><span class="no">01</span>Architecture Overview<span class="caret"></span></summary>
+    <div class="body">
+      <p><code>cabin_sim/cognition.py</code> is the <b>Python authoritative mind</b>: BDI deliberation,
+      associative memory, mood &amp; trust dynamics, the ride script and the experimenter chat all live
+      in the <code>Mind</code> class — on the server. The three.js/canvas page is a <b>passive
+      renderer</b>: it polls a versioned snapshot and draws exactly what it is told; it decides
+      nothing. The module states the contract in its own docstring:</p>
+
+      <pre><code>world/cabin  --&gt;  Mind.step(dt)  --&gt;  schema snapshot  --&gt;  view (JS)
+
+The three.js/canvas page is a *view* - it polls the snapshot produced by
+cabin_sim.schema and draws what it is told, it no longer reasons.</code></pre>
+
+      <div class="flow"><span class="d">                    ┌──────────────────────────────────────────────┐</span>
+                      │  <span class="g">VIEW</span>  src/cognitive.js  (passive adapter)     │
+                      │  polls GET /api/snapshot every 700 ms · draws V  │
+      <span class="d">                └───────▲───────────────────────┬──────────────────┘</span>
+                              │ <span class="t">GET /api/snapshot</span>     │ <span class="t">POST /api/seat · /api/chat · /api/control</span>
+                      <span class="d">┌───────┴───────────────────────▼──────────────────┐</span>
+                            │  <span class="g">TRANSPORT</span>  cabin_sim/server.py (stdlib HTTP)   │
+                            │  ticker thread → engine.tick(1) every interval    │
+                      <span class="d">└───────▲───────────────────────────────────────────┘</span>
+                              │ build_snapshot(engine)
+                      <span class="d">┌───────┴───────────────────────────────────────────┐</span>
+                            │  <span class="g">CLOCK + CONTRACT</span>  sim.py · schema.py          │
+                            │  engine.t · phase machine · seeded rng · priors   │
+                      <span class="d">└───────▲───────────────────────────────────────────┘</span>
+                              │ session.step_once() → mind.step(dt)
+      <span class="d">┌─────────────────────┴───────────────────────────────────────────────┐</span>
+      │  <span class="g">CORE (authoritative)</span>                                              │
+      │  cognition.Mind  ← world.Seat · actions gate · agent · provider     │
+      │  perceive → desire → intention → act, once per decision step        │
+      <span class="d">└──────────────────────────────────────────────────────────────────────┘</span></div>
+
+      <h2>Who owns what</h2>
+      <table>
+        <thead><tr><th>Layer</th><th>Owns</th><th class="m">Files</th></tr></thead>
+        <tbody>
+          <tr><td><b>Core</b> (authoritative)</td><td class="desc">world state, action gate, persona, MDMT questionnaire, <b>BDI / mood / memory / trust / ride / chat</b></td><td class="m">world.py · actions.py · agent.py · provider.py · session.py · questionnaire.py · cognition.py</td></tr>
+          <tr><td><b>Clock + contract</b></td><td class="desc">sim time <code>t</code>, phase machine, seeded rng, canonical snapshot, priors file</td><td class="m">sim.py · schema.py</td></tr>
+          <tr><td><b>Transport</b></td><td class="desc">stdlib HTTP: <code>/</code> · <code>/api/state</code> · <code>/api/snapshot</code> · <code>/api/chat</code> · <code>/api/seat</code> · <code>/api/control</code> + ticker thread</td><td class="m">server.py</td></tr>
+          <tr><td><b>View</b></td><td class="desc">rendering/interpolation only — draws the snapshot, POSTs input, runs no reasoning</td><td class="m">src/cognitive.js (adapter) · cabin.js · avatar.js · ui.js · main.js · index.html</td></tr>
+        </tbody>
+      </table>
+
+      <h2>The boundary rules</h2>
+      <ul>
+        <li><b>Only <code>SimEngine</code> advances the clock.</b> The server's ticker thread calls
+            <code>engine.tick(1)</code> every <code>interval</code> wall-seconds; the browser never
+            simulates time. <code>engine.t</code> and <code>mind.t</code> advance together by
+            <code>tick_dt</code> each decision step.</li>
+        <li><b>Only <code>schema.build_snapshot</code> produces state.</b> Everything the view knows
+            arrives in one JSON document; it never reads <code>world</code>/<code>agent</code>/<code>session</code>
+            internals (§07).</li>
+        <li><b>The view never decides.</b> It may compute <em>display-only</em> figures, but nothing
+            feeds back: seat input travels <code>POST /api/seat</code> → clamped by
+            <code>world.Seat</code> → <code>mind.note_user_input()</code> (sets
+            <code>belief.user_hands</code> for 3&nbsp;s).</li>
+        <li><b>Determinism is guaranteed for <code>--provider scripted</code> only</b> — all randomness
+            is seeded and snapshot building consumes none (§09).</li>
+      </ul>
+
+      <h2>One decision step, end to end</h2>
+      <div class="flow"><span class="g">server side</span>   ticker thread every <span class="t">interval</span> wall-s (1.2)
+     └─&gt; engine.tick(1)
+            └─&gt; session.step_once()
+                   ├─ agent.decide()        <span class="d">provider: scripted | ollama | groq</span>
+                   ├─ actions.apply(...)    <span class="d">whitelist + Seat clamps</span>
+                   ├─ agent.observe(...)    <span class="d">drink/adjust impulses → shared mood dict</span>
+                   └─ <span class="g">mind.step(tick_dt)</span>  <span class="d">perceive → desire → intention → act (§03)</span>
+                   engine.t += tick_dt      <span class="d">(the two clocks advance together)</span>
+
+<span class="g">browser</span> (passive)   GET /api/snapshot every <span class="t">pollMs</span> (700 ms)
+     └─&gt; applySnapshot(s) → V → renderAll()      <span class="d">rAF draws V; no reasoning here</span></div>
+
+      <div class="note"><b>The mood is shared, not copied:</b> <code>CognitiveAgent.mood</code> and
+      <code>Mind.mood</code> are the <em>same dict</em> — the mind relaxes it once per tick; the
+      provider (scripted or LLM) only adds action impulses through <code>observe()</code>. There is one
+      relaxation model, in Python. The pre-port mind is archived unchanged at
+      <code>src/cognitive.legacy.js</code>.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s2">
+    <summary><span class="no">02</span>Core Data Structures<span class="caret"></span></summary>
+    <div class="body">
+
+      <h3>Mind — the state object</h3>
+      <pre><code>class Mind:
+    """BDI agent state: perceive -&gt; desire -&gt; intention -&gt; act, per tick."""
+
+    def __init__(self, persona, cabin, seed=1, reasoner=None):
+        self.persona, self.cabin = persona, cabin   # world.Cabin = pure state
+        self.reasoner      = reasoner               # None = rules · LLMReasoner
+        # persona preferences (canonical mm/deg; formulas want cm)
+        self.target_rot     = 0.0                   # persona.seat.rotation_deg
+        self.target_hgt_cm  = 44.0                  # persona.seat.height_mm / 10
+        self.tol_rot, self.tol_hgt_cm = 20.0, 2.0   # persona.tolerance
+        self.talkativeness  = 0.55                  # persona.talkativeness
+        self.suspicion_base = 0.5                   # persona.mood.suspicion
+        self.energy_drain   = 0.00018
+        # tunables from persona["cognition"] (JS defaults as fallback)
+        self.memory_lambda, self.memory_cap   = 0.004, 8
+        self.forget_floor, self.rehearsal_boost = 0.09, 0.22
+        self.settle_thresh  = 0.22
+        self.settle_step_mm, self.settle_step_deg = 10, 10
+        self.ride_start, self.ride_end = 120.0, 600.0
+        self.rng    = random.Random(seed)           # ALL randomness lives here
+        self.memory = Memory(lam=0.004, cap=8, floor=0.09, rehearsal=0.22)
+        self.t, self.finished = 0.0, False
+        self.mood   = {"comfort": 0.4, "energy": 0.6, "suspicion": 0.5}
+        self.ride   = {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0}
+        self.belief = {"fit_gap": 0.0, "fit_rot": 0.0, "fit_hgt": 0.0,
+                       "user_hands": False}
+        self.bdi    = {"intention": None, "since": 0.0, "last": {}}
+        self.thoughts, self.speech, self.module = [], "", ""
+        self.log, self.chat = [], []               # caps 60 (newest) / 40 (oldest)
+        self.samples, self.trail = [], []          # charts, sampled every ≥3 s
+        self._fired, self._pending_thought = set(), None</code></pre>
+
+      <table>
+        <thead><tr><th class="m">Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">t</td><td class="desc">sim seconds; advances with the engine clock each decision step</td></tr>
+          <tr><td class="m">mood</td><td class="desc">comfort / energy / suspicion, each 0…1 (§05)</td></tr>
+          <tr><td class="m">ride</td><td class="desc">speed / g / jolt / rain — the live script state (§06)</td></tr>
+          <tr><td class="m">belief</td><td class="desc">seat-fit errors + <code>user_hands</code>, re-perceived every tick</td></tr>
+          <tr><td class="m">bdi</td><td class="desc">current intention, when it was chosen, per-goal last-fired times (cooldowns)</td></tr>
+          <tr><td class="m">thoughts · speech · module</td><td class="desc">inner-monologue ring (3, newest first) · last spoken line · HUD label <code>perceive|memorize|think|speak|forget|intend</code></td></tr>
+          <tr><td class="m">log · chat · samples · trail</td><td class="desc">event log (60) · experimenter chat (40, oldest first) · mood/trust chart points + live-trust trail</td></tr>
+          <tr><td class="m">priors</td><td class="desc">previous-ride aggregates applied at boot (<code>apply_priors</code>) and written at finish (<code>make_priors</code>)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Persona — Phill</h3>
+      <p>Everything persona-specific lives in <code>personas/phill.json</code> — swap the file to swap
+      the passenger (code defaults keep older personas working):</p>
+      <pre><code>{
+  "name": "Phill",
+  "blurb": "33-year-old entry-level officer from Aachen, married, no kids. …",
+  "traits": ["introvert", "suspicious", "confident", "uninterested in cars"],
+  "talkativeness": 0.55,   "verbosity": "low",
+  "seat":      { "slider_mm": 330, "height_mm": 440, "recline_deg": 95, "rotation_deg": 0 },
+  "tolerance": { "slider_mm": 90,  "height_mm": 20,  "recline_deg": 12, "rotation_deg": 20 },
+  "mood":      { "energy": 0.6, "suspicion": 0.5 },
+  "cognition": { "memory_lambda": 0.004, "memory_cap": 8, "forget_floor": 0.09,
+                 "rehearsal_boost": 0.22, "settle_thresh": 0.22,
+                 "settle_step_mm": 10, "settle_step_deg": 10,
+                 "ride_start": 120, "ride_end": 600 },
+  "vending_interest": "low", "curiosity": 0.1
+}</code></pre>
+      <ul>
+        <li><b>seat / tolerance</b> → the BDI's targets and gates: forward (0°), 44&nbsp;cm cushion,
+            ±20° / ±2&nbsp;cm comfort zone (§05).</li>
+        <li><b>mood</b> → the suspicion/energy set-points the dynamics relax back to.</li>
+        <li><b>cognition</b> → every tunable the mind reads (full table in §11).</li>
+        <li><b>blurb / talkativeness</b> → voice: the LLM system prompt quotes the blurb verbatim;
+            <code>talkativeness</code> scales the chance any line is <em>spoken</em> aloud.</li>
+        <li><b>vending_interest / curiosity</b> → read by <code>CognitiveAgent</code> (the scripted
+            provider's side behaviour), not by the BDI loop.</li>
+      </ul>
+
+      <h3>ROT / HGT — reference curves (thesis data)</h3>
+      <p>Two piecewise-linear tables score "how good is this seat pose", looked up by
+      <code>rate()</code> — the same clamped interpolation the JS original had:</p>
+      <pre><code>ROT = [(0, 1.0), (30, 0.5), (60, 0.1429), (90, 0.4286), (120, 0.2143),
+       (150, 0.4286), (180, 0.6071), (210, 0.4286), (240, 0.5333),
+       (270, 0.6), (300, 0.2857), (330, 0.8462), (360, 1.0)]
+HGT = [(38, 0.4545), (40, 0.2955), (42, 0.1818), (44, 0.04545), (46, 0.02273)]
+
+def rate(tbl, x):          # clamped piecewise-linear lookup (the JS rate())
+    if x &lt;= tbl[0][0]:  return tbl[0][1]     # below range → first value
+    if x &gt;= tbl[-1][0]: return tbl[-1][1]    # above range → last value
+    ...                                   # lerp between the bracketing pair</code></pre>
+      <ul>
+        <li><b><code>ROT</code></b> — comfort per swivel heading in degrees: facing the road
+            (0°/360°) scores 1.0, the pokey angles (60°/120°) score lowest; mid-weights at 180°
+            (turned to the cabin) and 330°.</li>
+        <li><b><code>HGT</code></b> — comfort per cushion height in cm across the 38–46&nbsp;cm travel
+            (44&nbsp;cm — Phill's target — sits at 0.0455 on this curve).</li>
+        <li>Both are consumed only by <code>comfort_target()</code> (§05):
+            <code>0.35·rate(ROT, rot) + 0.35·rate(HGT, hgt) + 0.30·fit</code>.</li>
+      </ul>
+
+      <h3>EVENTS — the ride script</h3>
+      <pre><code>RIDE_START, RIDE_END = 120.0, 600.0        # persona "cognition" may override
+
+EVENTS = [
+    {"t": 121, "kind": "depart", "g": 0.15, "jolt": 0.00, "spd": 60,
+     "label": "Departing — auto-pilot engaged"},
+    ...  # 13 entries, t = 121 … 590 — the full table is in §06
+    {"t": 590, "kind": "arrive", "g": 0.05, "jolt": 0.00, "spd": 0,
+     "label": "Arrived — parked"},
+]
+IMPORTANT_KINDS = {"bump", "arrive", "workzone"}   # +0.1 encoding bonus</code></pre>
+      <table>
+        <thead><tr><th class="m">Key</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">t</td><td class="desc">sim second the event fires (once — guarded by a fired-set)</td></tr>
+          <tr><td class="m">kind</td><td class="desc">event id; also the memory-trace id and the <code>THOUGHTS</code> phrase-bank key</td></tr>
+          <tr><td class="m">g</td><td class="desc">sustained load 0…1 — curves, overtakes, braking</td></tr>
+          <tr><td class="m">jolt</td><td class="m desc">sharp impulse 0…1 — bumps, rumble strips (drives mood hits)</td></tr>
+          <tr><td class="m">spd</td><td class="desc">target km/h the speed coasts toward</td></tr>
+          <tr><td class="m">label</td><td class="desc">HUD banner + log text + the memory trace's label</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Language &amp; deliberation constants</h3>
+      <pre><code>GOAL_CD = {"settle": 9.0, "attend": 3.2, "calibrate": 10.0}   # BDI cooldowns (§03)
+
+CHAT_SEAT      = re.compile(r"(seat|height|tall|lower|raise|rotate|rotation|adjust|settle)")
+CHAT_TRUST     = re.compile(r"(trust|safe|confidence|rely|sure)")
+CHAT_WELLBEING = re.compile(r"(feel|how|you|ok|okay|alright|comfort|fine|doing)")</code></pre>
+      <p><code>THOUGHTS</code> is the phrase-bank dict keyed by trace id — ride events
+      (<code>bump · curve · overtake · brake · smooth · workzone · rain · arrive · depart · merge</code>),
+      seat feedback (<code>seatLow · seatGood · rotFwd · rotSide · rotCabin · rotOther</code>), idles
+      (<code>idleC · idleS · idleN</code>), the settle lines (<code>settle · settleLow · request</code>),
+      trust bands (<code>trustOk · trustMid · trustLow</code>), <code>chat</code> and the endings
+      (<code>endGood · endMid · endBad</code>). <code>pick_line()</code> draws one uniformly via
+      <code>mind.rng</code>, excluding the previously used line. The chat regexes route experimenter
+      questions in §08; <code>GOAL_CD</code> gates the BDI in §03.</p>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s3">
+    <summary><span class="no">03</span>Main Loop<span class="caret"></span></summary>
+    <div class="body">
+
+      <p>There is exactly one loop that matters, and it runs <b>server-side</b>, once per decision
+      step: <code>session.step_once()</code> → <code>Mind.step(tick_dt)</code>. The whole cognitive
+      tick is this method:</p>
+
+      <pre><code>def step(self, dt):
+    """Advance the mind by dt sim-seconds. Called once per decision step."""
+    if dt &lt;= 0:
+        return
+    self.t += dt
+    self._fire_events()                              # ride script, each event once
+
+    # speed coasts toward the event's target          (k = dt·0.05)
+    k = min(1.0, dt * 0.05)
+    self.ride["speed"] += (self.target_speed - self.ride["speed"]) * k
+
+    # mood relaxation
+    ct = self.comfort_target()
+    self.mood["comfort"] += (ct - self.mood["comfort"]) * min(1.0, dt * 0.06)
+    self.ride["g"] *= math.exp(-dt * 0.3)
+    self.ride["jolt"] *= math.exp(-dt * 0.35)
+    if 540 &lt; self.t &lt; 570:
+        self.ride["rain"] = min(1.0, self.ride["rain"] + dt * 0.08)   # rain window
+    else:
+        self.ride["rain"] *= math.exp(-dt * 0.18)
+    self.mood["energy"] = max(0.05, self.mood["energy"] - dt * self.energy_drain)
+
+    bs = self.suspicion_base                         # set-point, not a ratchet
+    if self.mood["suspicion"] &gt; bs:
+        self.mood["suspicion"] = max(bs, self.mood["suspicion"] - dt * 0.004)
+    else:
+        self.mood["suspicion"] = min(bs, self.mood["suspicion"] + dt * 0.003)
+
+    # cognition
+    self.decay_memory(dt)                            # traces below 0.09 forgotten
+    self.bdi_reason(dt)                              # perceive → desires → argmax → act
+    self.sample()                                    # every ≥3 s: mood + trust charts</code></pre>
+
+      <h3>Beliefs — re-perceived every tick</h3>
+      <pre><code>def perceive_fit(self):
+    f = self.seat_fit()
+    self.belief["fit_rot"] = 1 - f["rot"]            # how wrong the swivel is
+    self.belief["fit_hgt"] = 1 - f["hgt"]            # how wrong the height is
+    self.belief["fit_gap"] = 1 - f["overall"]        # combined gap (dr+dh)/2
+    self.belief["user_hands"] = (self.t - self._last_user_input) &lt; 3   # 3 s window</code></pre>
+
+      <h3>The deliberation step</h3>
+      <pre><code>def bdi_reason(self, dt):
+    self.perceive_fit()                              # beliefs from the real seat
+
+    # a persistent fit gap erodes trust: the cabin ignores his body
+    gap = self.belief["fit_gap"]
+    gb = (gap - 0.3) * 2.4 if gap &gt; 0.3 else 0.0
+    if gb &gt; 0:
+        hands = 1.6 if self.belief["user_hands"] else 1.0
+        self.mood["suspicion"] = min(1.0, self.mood["suspicion"] + dt * 0.006 * gb * hands)
+
+    best, best_v = None, 0.0
+    offered = []                                     # (goal, desire), legal only
+    for goal in GOAL_CD:                             # settle · attend · calibrate
+        if self.t - self.bdi["last"].get(goal, -99.0) &lt; GOAL_CD[goal]:
+            continue                                 # cooldown
+        if not self._pre(goal):
+            continue                                 # precondition
+        v = self._desire(goal)
+        if v &gt; 0:
+            offered.append((goal, v))
+            if v &gt; best_v:
+                best, best_v = goal, v                # argmax = rule pick
+
+    # LLM deliberation: choose among `offered` ONLY (§10) — legality (cooldowns,
+    # preconditions) was decided above in Python; a bad answer keeps the argmax.
+    self._pending_thought = None
+    if self.reasoner and offered:
+        choice, thought = self.reasoner.deliberate(
+            self, [g for g, _ in offered], best)
+        if choice in {g for g, _ in offered}:
+            best = choice
+        self._pending_thought = thought
+
+    if best:
+        self.bdi["intention"] = best
+        self.bdi["since"] = self.t
+        self.bdi["last"][best] = self.t
+    else:
+        self.bdi["intention"] = None
+
+    if best == "settle":
+        if self.self_adjust():                       # whitelisted seat actions
+            ... alternating speak/think of THOUGHTS["settle"]
+        else:
+            self.think(self.pick_line(THOUGHTS["settleLow"]))   # couldn't move
+    elif best == "attend":
+        self.maybe_speak(self.think())               # recall a trace, maybe say it
+    elif best == "calibrate":
+        tw = self.trust_value()
+        ... # ≥0.6 trustOk think · ≤0.38 trustLow think+maybe_speak · else intend</code></pre>
+
+      <h3>Three goals</h3>
+      <table>
+        <thead><tr><th class="m">Goal</th><th class="m">Precondition</th><th class="m">Desire</th><th class="num">cd</th></tr></thead>
+        <tbody>
+          <tr><td class="m">settle</td><td class="m">fit_gap ≥ 0.22 and not user_hands</td>
+              <td class="m">min(2, ph·gap·(0.15 if hands else 1)), 0 below gap 0.18 — ph 1.3 setup / 0.9 ride</td><td class="num">9 s</td></tr>
+          <tr><td class="m">attend</td><td class="m">always</td>
+              <td class="m">0.3 + 0.7·act (0.15 if memory empty) + 0.4 if suspicion &gt; 0.6</td><td class="num">3.2 s</td></tr>
+          <tr><td class="m">calibrate</td><td class="m">phase == "ride"</td>
+              <td class="m">0.35 + min(0.6, (t−120)/480)·k, k ∈ {0.85, 0.5}</td><td class="num">10 s</td></tr>
+        </tbody>
+      </table>
+
+      <ul>
+        <li><b>settle</b> actuates through the same whitelist a human input uses
+            (<code>actions.apply(cabin, "seat_up" / "seat_down" / "rotate_cw" / "rotate_ccw")</code> —
+            fixed ±10&nbsp;mm / ±10° steps, clamped by <code>Seat</code>; the mind gets no privileged
+            path). It only moves when the perceived fit error exceeds 0.22 and — for rotation — the
+            angular distance is beyond <code>tol + 2°</code>. Every successful move counts; even
+            counts <em>speak</em> "…", odd counts <em>think</em> "…". When it cannot move (bounds,
+            hands on the controls) it thinks <code>settleLow</code> instead.</li>
+        <li><b>attend</b> retrieves the strongest memory trace, rehearses it (+0.22) and speaks the
+            line with probability <code>maybe_speak()</code>.</li>
+        <li><b>calibrate</b> reviews trust only during the ride: ≥0.6 → <code>trustOk</code> thought;
+            ≤0.38 → <code>trustLow</code> thought <em>and</em> possible speech; between the bands it
+            just lights the <code>intend</code> module.</li>
+      </ul>
+
+      <div class="warn"><b>Why <code>intention</code> is sometimes <code>null</code>:</b> that is
+      faithful behaviour, not a bug — if every goal is inside its cooldown or fails its precondition
+      for this tick, the agent idles with <code>intention = null</code>. With <code>tick_dt = 2</code>
+      you see it clearly: <code>attend</code> (cd 3.2&nbsp;s) fires every other step.</div>
+
+      <div class="note"><b>Human override:</b> any <code>POST /api/seat</code> stamps
+      <code>mind._last_user_input = mind.t</code>; for the next 3 seconds
+      <code>belief.user_hands</code> suppresses <code>settle</code>'s precondition and multiplies its
+      desire by 0.15 (and ×1.6 on the erosion term) — the machine waits while you drag the dial.
+      <b>Speech is probabilistic:</b> <code>freq = talkativeness · (0.4 + 0.3 if susp &gt; 0.62 +
+      0.25 if comfort &lt; 0.35)</code> — a wary, uncomfortable Phill talks more.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s4">
+    <summary><span class="no">04</span>Memory System<span class="caret"></span></summary>
+    <div class="body">
+
+      <p>Associative traces with exponential decay (ACT*-flavoured, exactly as the JS had it). Ride
+      events, seat adjustments and the experimenter's questions all enter through the same door:</p>
+      <pre><code>class Memory:
+    """Associative traces with exponential decay (ACT*-flavoured, as in JS)."""
+
+    def remember(self, trace_id, label, salience, important, t):
+        act = min(1.0, salience + (0.1 if important else 0.0))
+        self.traces.append({"id": trace_id, "label": label, "salience": salience,
+                            "act": act, "born": t, "rehearsed": 0})
+        if len(self.traces) &gt; self.cap:            # cap 8 — FIFO evict
+            del self.traces[: len(self.traces) - self.cap]
+
+    def decay(self, dt, t):                        # called once per tick
+        dead = []
+        for tr in self.traces:
+            tr["act"] *= math.exp(-self.lam * dt)  # λ = 0.004 /s
+            if tr["act"] &lt; self.floor:             # floor 0.09
+                dead.append(tr)
+        for tr in dead:                            # → forgot ring (6) + count
+            self.traces.remove(tr)
+            self.forgot.append({"label": tr["label"], "age": ...})
+            self.forgot_count += 1
+
+    def pick(self):                                # retrieval = highest activation
+        return max(self.traces, key=lambda tr: tr["act"])
+
+    def rehearse(self, tr):                        # recalling strengthens
+        tr["rehearsed"] += 1
+        tr["act"] = min(1.0, tr["act"] + self.rehearsal)   # +0.22, cap 1.0</code></pre>
+
+      <h3>Worked example</h3>
+      <div class="fx">remember("bump", salience 0.795)  →  act = 0.795
+after 480 s:  act = 0.795 · e^(−0.004·480) = <b>0.1166</b>   still remembered (&gt; 0.09)
+after 960 s:  act = 0.1166 · e^(−1.92)     = <b>0.0171</b>   &lt; 0.09 → <b>forgotten</b>
+                                                          forgot ring: [{label, age}], count++</div>
+
+      <ul>
+        <li><b>Encoding:</b> <code>salience = max(0.35, 0.42 + impact·0.5)</code> where
+            <code>impact = max(g, jolt)</code>; important kinds (<code>bump · arrive · workzone</code>)
+            get +0.1; chat lines enter as <code>remember("chat", "Experimenter: …", 0.5, important=True)</code>
+            (§08).</li>
+        <li><b>Retrieval:</b> <code>pick()</code> returns the strongest trace; <code>think()</code>
+            then quotes <code>THOUGHTS[trace.id]</code> and rehearses it (+0.22) — recall feeds
+            itself.</li>
+        <li><b>Capacity:</b> 8 traces, oldest evicted silently (FIFO); traces that decay past the
+            floor are remembered <em>as forgotten</em> in a ring of 6 plus a counter — the HUD shows
+            both.</li>
+        <li><b>Publishing:</b> <code>memory.view(t)</code> → snapshot
+            <code>agent.memory: [{id, label, act, age, rehearsed}]</code>;
+            <code>forgot_view()</code> / <code>forgot_count</code> → <code>agent.forgot</code> /
+            <code>agent.forgotCount</code> (§07).</li>
+      </ul>
+
+      <h3>think() — retrieval into language</h3>
+      <pre><code>def think(self, in_phrase=None):
+    phrase = in_phrase
+    top = self.memory.pick()
+    if not phrase:
+        if self._rot_changed:                       # seat turned → sector line
+            sector = view_sector(self.cabin.seat.rotation_deg)
+            phrase = self.pick_line(THOUGHTS[key])  # rotFwd / rotCabin / rotSide
+            self._rot_changed = False
+        elif top:
+            phrase = self.pick_line(THOUGHTS.get(top["id"], THOUGHTS["idleN"]))
+            self.memory.rehearse(top)               # +0.22 activation
+    if not phrase:
+        phrase = self.pick_line(THOUGHTS[self.ambient_mood()])   # idleC / idleS / idleN
+    if self.reasoner and self._pending_thought:
+        phrase = self._pending_thought              # LLM wording wins (§10)
+    self.thoughts.insert(0, {"time": fmt_time(self.t), "text": phrase})
+    del self.thoughts[3:]                           # ring of 3, newest first</code></pre>
+
+      <div class="note">At λ = 0.004/s a trace's activation <b>halves every ~173 s</b>
+      (ln2/λ) — a mid-salience event stays quotable for roughly 6–10 minutes of ride: long enough
+      that <code>attend</code> keeps re-reading the pothole at 258&nbsp;s while still motorway-bound,
+      short enough that the summary screen shows real forgetting by 600&nbsp;s.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s5">
+    <summary><span class="no">05</span>Trust &amp; Mood Dynamics<span class="caret"></span></summary>
+    <div class="body">
+
+      <h3>Seat fit (canonical units)</h3>
+      <div class="fx">rot = seat.rotation_deg mod 360     hgt = seat.height_mm / 10     <span class="d">(mm → cm)</span>
+dr  = min(1, |rot − target_rot| / <b>180</b>)          dh = min(1, |hgt − target_hgt| / <b>8</b>)
+fit = { rot: 1−dr, hgt: 1−dh, overall: 1 − (dr+dh)/2 }
+fitGap = 1 − overall       <span class="d">Phill starts as-found (90° / 38 cm) → gap 0.625</span></div>
+
+      <h3>Comfort — attractor blend</h3>
+      <div class="fx">comfortTarget = clamp01( <b>0.35</b>·rate(ROT, rot) + <b>0.35</b>·rate(HGT, hgt) + <b>0.30</b>·fit.overall )
+comfort += (comfortTarget − comfort) · min(1, dt·<b>0.06</b>)</div>
+      <p>With the seat settled forward at 44&nbsp;cm: <code>0.35·1.0 + 0.35·0.0455 + 0.30·1.0 =
+      0.6659</code> — the live snapshot converges to exactly that. The rate tables
+      (<code>ROT</code>, <code>HGT</code>) are the thesis reference data, unchanged (§02).</p>
+
+      <h3>Live trust</h3>
+      <div class="fx">trust.live = clamp01( <b>0.34</b>·comfort + <b>0.40</b>·(1 − suspicion) + <b>0.16</b>·ev + <b>0.10</b>·(1 − fitGap) )
+                 where ev = clamp01(1 − jolt / <b>0.6</b>)
+
+worked example:  comfort 0.5, susp 0.3, jolt 0.3, fitGap 0.2
+  = 0.34·0.5 + 0.40·0.7 + 0.16·0.5 + 0.10·0.8 = <b>0.61</b></div>
+
+      <h3>Mood impulses — what hits suspicion &amp; comfort</h3>
+      <table>
+        <thead><tr><th>Source</th><th class="m">Effect</th></tr></thead>
+        <tbody>
+          <tr><td class="desc">any event with jolt &gt; 0.3 (bump, workzone)</td><td class="m">suspicion +0.20 · comfort −jolt·0.12</td></tr>
+          <tr><td class="desc">brake event</td><td class="m">suspicion +0.07</td></tr>
+          <tr><td class="desc">overtake event</td><td class="m">suspicion +0.05</td></tr>
+          <tr><td class="desc">rain event</td><td class="m">suspicion +0.04</td></tr>
+          <tr><td class="desc">persistent fit gap (in <code>bdi_reason</code>)</td><td class="m">+dt·0.006·(gap−0.3)·2.4 above gap 0.30, ×1.6 with user_hands</td></tr>
+          <tr><td class="desc">energy</td><td class="m">−0.00018 /s all ride, floor 0.05</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Suspicion — set-point, not a ratchet</h3>
+      <ul>
+        <li>Base set-point <code>0.5</code> (persona <code>mood.suspicion</code>); drifts back at
+            <b>−0.004/s</b> above it, <b>+0.003/s</b> below (every tick, in <code>step</code>).</li>
+        <li><b>Priors re-baseline it for the next ride:</b>
+            <code>base = clamp01(0.5 + (0.5 − prior_trust)·0.35)</code> — a wary last ride starts
+            this one slightly more suspicious (persisted as aggregate JSON, no personal data).</li>
+        <li>The cabin ignoring his body is <em>itself</em> suspicious: the fit-gap erosion term in
+            §03 pushes <code>+dt·0.006·gb</code> every tick the seat stays wrong, ×1.6 while the
+            human is dragging.</li>
+      </ul>
+
+      <h3>Two instruments, one frame</h3>
+      <table>
+        <thead><tr><th>Quantity</th><th class="m">Source</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td>Live trust</td><td class="m">agent.trust.live = Mind.trust_value()</td><td class="desc">every tick — drives chat answers, <code>calibrate</code>, the view</td></tr>
+          <tr><td>Canonical trust score</td><td class="m">agent.trust.score = MDMT mean / 7</td><td class="desc">end-of-session questionnaire only (before that: <code>null</code>)</td></tr>
+          <tr><td>Energy</td><td class="m">−0.00018 /s, floor 0.05</td><td class="desc">slow fatigue; drinks/adjustments push it up via <code>observe()</code></td></tr>
+        </tbody>
+      </table>
+
+      <ul>
+        <li><b>Sampling:</b> <code>sample()</code> appends <code>{t, c, s, e, trust}</code> to
+            <code>samples</code> and <code>{t, v}</code> to the live-trust <code>trail</code> every
+            ≥3&nbsp;s — both published for the summary charts.</li>
+        <li><b>Priors out:</b> <code>summarize()</code> averages comfort/suspicion over the samples;
+            <code>make_priors(prev, trust)</code> writes <code>{rides, trust, comfort, suspicion}</code>
+            to the priors file at session end.</li>
+      </ul>
+
+      <div class="warn"><b>Mood ownership:</b> <code>CognitiveAgent.mood</code> and
+      <code>Mind.mood</code> are <b>the same dict</b> — the mind updates it once per tick, the
+      provider (scripted/LLM) only adds action impulses through <code>observe()</code>. There is no
+      second relaxation model anymore.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s6">
+    <summary><span class="no">06</span>Event Timeline<span class="caret"></span></summary>
+    <div class="body">
+
+      <p>The ride is scripted in sim-seconds: <code>setup</code> runs 0–120&nbsp;s, the
+      <code>ride</code> phase 120–600&nbsp;s, and <code>cognition.EVENTS</code> fires 13 impressions
+      between t&nbsp;=&nbsp;121 and t&nbsp;=&nbsp;590. Phases come from the mind
+      (<code>ride_start</code> / <code>ride_end</code>, persona-overridable) with the engine mirroring
+      its own from <code>--ride-start</code>:</p>
+
+      <pre><code>@property
+def phase(self) -&gt; str:                # cabin_sim/cognition.py
+    if self.finished:
+        return "done"
+    if self.t &gt;= self.ride_end:
+        return "done"
+    return "ride" if self.t &gt;= self.ride_start else "setup"</code></pre>
+
+      <p>Firing is <b>advance-safe</b>: even one huge tick across the whole ride fires each event
+      exactly once (guarded by a fired-set keyed on <code>t</code>, and by
+      <code>tests/test_cognition.py</code>):</p>
+      <pre><code>def _fire_events(self):
+    for ev in EVENTS:
+        key = ev["t"]
+        if key not in self._fired and self.t &gt;= ev["t"]:
+            self._fired.add(key)
+            self.perceive_event(ev)</code></pre>
+
+      <div class="legend">
+        <span><i class="dot" style="background:rgba(201,162,39,.7)"></i>ride phase 120–600 s</span>
+        <span><i class="dot" style="background:var(--teal)"></i>event</span>
+        <span><i class="dot" style="background:var(--red)"></i>jolt &gt; 0.2 (shake + speak)</span>
+      </div>
+      <div class="tl">
+        <div class="axis"></div>
+        <div class="seg" style="left:20%; right:0"></div>
+        <span class="lbl" style="left:2%">SETUP</span>
+        <span class="lbl" style="left:21%">RIDE</span>
+        <div class="ev" style="left:20.17%"><b>121 depart</b></div>
+        <div class="ev" style="left:26.33%"><b>158 merge</b></div>
+        <div class="ev" style="left:33.33%"><b>200 curve</b></div>
+        <div class="ev j" style="left:43%"><b>258 bump</b></div>
+        <div class="ev j" style="left:48.67%"><b>292 overtake</b></div>
+        <div class="ev" style="left:56.67%"><b>340</b></div>
+        <div class="ev" style="left:64.33%"><b>386</b></div>
+        <div class="ev" style="left:70.83%"><b>425</b></div>
+        <div class="ev j" style="left:78.33%"><b>470 workzone</b></div>
+        <div class="ev" style="left:86.67%"><b>520</b></div>
+        <div class="ev" style="left:91.67%"><b>550 rain</b></div>
+        <div class="ev" style="left:95.83%"><b>575</b></div>
+        <div class="ev" style="left:98.33%"><b>590 arrive</b></div>
+        <span class="tick" style="left:0%">0</span>
+        <span class="tick" style="left:20%">120</span>
+        <span class="tick" style="left:40%">240</span>
+        <span class="tick" style="left:60%">360</span>
+        <span class="tick" style="left:80%">480</span>
+        <span class="tick" style="left:99%">600 s</span>
+      </div>
+
+      <h3>What one event does — <code>Mind.perceive_event(ev)</code></h3>
+      <pre><code>def perceive_event(self, ev):
+    impact = max(ev["g"], ev["jolt"])
+    salience = max(0.35, 0.42 + impact * 0.5)         # encoding strength (§04)
+    important = ev["kind"] in IMPORTANT_KINDS
+    self.remember(ev["kind"], ev["label"], salience, important)
+
+    self.target_speed = float(ev["spd"])              # speed coasts toward it
+    self.ride["g"] = ev["g"]
+    self.ride["jolt"] = ev["jolt"]                    # decays on later ticks
+
+    if ev["jolt"] &gt; 0.3:
+        self.mood["suspicion"] = min(1.0, self.mood["suspicion"] + 0.20)
+        self.mood["comfort"] = max(0.0, self.mood["comfort"] - ev["jolt"] * 0.12)
+    if ev["kind"] == "brake":                         # +0.07 susp
+        self.mood["suspicion"] = min(1.0, self.mood["suspicion"] + 0.07)
+    if ev["kind"] == "overtake":                      # +0.05 susp
+        self.mood["suspicion"] = min(1.0, self.mood["suspicion"] + 0.05)
+    if ev["kind"] == "rain":                          # +0.04 susp
+        self.mood["suspicion"] = min(1.0, self.mood["suspicion"] + 0.04)
+
+    self.log_line("evt", f"{ev['label']}  ({ev['spd']} km/h)")   # HUD banner + log
+    self.set_module("perceive")
+
+    if ev["jolt"] &gt; 0.2 or (ev["g"] &gt; 0.25 and self.rng.random() &lt; 0.5):
+        self.maybe_speak(self.pick_line(THOUGHTS.get(ev["kind"], THOUGHTS["idleN"])))
+    return ev</code></pre>
+
+      <h3>The script</h3>
+      <table>
+        <thead><tr><th class="num">t</th><th class="m">kind</th><th class="num">g</th><th class="num">jolt</th><th class="num">km/h</th><th>label</th></tr></thead>
+        <tbody>
+          <tr><td class="num">121</td><td class="m">depart</td><td class="num">0.15</td><td class="num">0.00</td><td class="num">60</td><td class="desc">Departing — auto-pilot engaged</td></tr>
+          <tr><td class="num">158</td><td class="m">merge</td><td class="num">0.20</td><td class="num">0.00</td><td class="num">105</td><td class="desc">Merging onto the motorway</td></tr>
+          <tr><td class="num">200</td><td class="m">curve</td><td class="num">0.38</td><td class="num">0.00</td><td class="num">115</td><td class="desc">Long left-hand curve</td></tr>
+          <tr><td class="num">258</td><td class="m">bump ⚡</td><td class="num">0.10</td><td class="num">0.55</td><td class="num">92</td><td class="desc">Pothole · thump! (+0.20 susp, comfort −0.066)</td></tr>
+          <tr><td class="num">292</td><td class="m">overtake ⚡</td><td class="num">0.45</td><td class="num">0.25</td><td class="num">135</td><td class="desc">Overtaking a truck (+0.05 susp)</td></tr>
+          <tr><td class="num">340</td><td class="m">smooth</td><td class="num">0.08</td><td class="num">0.00</td><td class="num">120</td><td class="desc">Cruising steadily</td></tr>
+          <tr><td class="num">386</td><td class="m">curve</td><td class="num">0.32</td><td class="num">0.00</td><td class="num">112</td><td class="desc">Right-hand curve</td></tr>
+          <tr><td class="num">425</td><td class="m">brake</td><td class="num">0.25</td><td class="num">0.18</td><td class="num">40</td><td class="desc">Traffic ahead — slowing (+0.07 susp)</td></tr>
+          <tr><td class="num">470</td><td class="m">workzone ⚡</td><td class="num">0.12</td><td class="num">0.22</td><td class="num">70</td><td class="desc">Roadworks · rumble strip</td></tr>
+          <tr><td class="num">520</td><td class="m">smooth</td><td class="num">0.06</td><td class="num">0.00</td><td class="num">128</td><td class="desc">Clear road again</td></tr>
+          <tr><td class="num">550</td><td class="m">rain</td><td class="num">0.14</td><td class="num">0.10</td><td class="num">105</td><td class="desc">Light rain (+0.04 susp; rain beads 540–570 s)</td></tr>
+          <tr><td class="num">575</td><td class="m">brake</td><td class="num">0.20</td><td class="num">0.10</td><td class="num">30</td><td class="desc">Slowing for the destination</td></tr>
+          <tr><td class="num">590</td><td class="m">arrive</td><td class="num">0.05</td><td class="num">0.00</td><td class="num">0</td><td class="desc">Arrived — parked (important trace)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note"><b>Rain, twice:</b> the rain event (+0.04 susp) lands at 550&nbsp;s, inside the
+      hard-coded fill window <code>540 &lt; t &lt; 570</code> where <code>ride.rain</code> grows
+      +0.08/s — so beads visibly gather on the glass — then decays exponentially
+      (<code>e^(−0.18·dt)</code>) after the window closes. Speed never jumps: it coasts at
+      <code>k = 0.05·dt</code> toward each event's <code>spd</code>. On the wire the events reach the
+      view inside the snapshot: the adapter watches <code>agent.log</code> for new
+      <code>kind == "evt"</code> lines, pops the banner and shakes on jolts — it holds no copy of the
+      script beyond decorative timeline dots.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s7">
+    <summary><span class="no">07</span>Schema &amp; Snapshot<span class="caret"></span></summary>
+    <div class="body">
+
+      <p><code>cabin_sim/schema.py</code> is the <b>single contract</b> for everything the simulation
+      publishes — the future transport (WebSocket) and the three.js view consume <em>exactly this
+      shape and nothing else</em>. The shape is versioned so the contract can never drift silently
+      across the boundary. Units are canonical: <b>millimetres</b> for slide/height, <b>degrees</b> for
+      recline/rotation — the view converts for display only.</p>
+
+      <pre><code>SCHEMA_VERSION = 1
+SCHEMA_NAME    = "cabin-agent.v1"
+SEAT_AXES   = ("slider_mm", "height_mm", "recline_deg", "rotation_deg")
+SEAT_LIMITS = {"slider_mm": (260, 460), "height_mm": (380, 460),
+               "recline_deg": (80, 110), "rotation_deg": (0, 359)}   # = world.Seat
+
+def empty_snapshot() -&gt; dict:      # neutral template before any producer runs
+    ...  # "version", "t": 0.0, "phase": "setup", "step", "running", "done",
+         # "world": seat/vending/table all None, "ride": zeros,
+         # "agent": mood/trust/intention/memory/... all None or empty,
+         # "priors": {"rides": 0, "trust": None}
+
+def build_snapshot(engine) -&gt; dict:
+    """Build the canonical state snapshot from a SimEngine (cabin_sim.sim).
+
+    Pure: reads engine/session only, consumes no randomness, does not mutate.
+    Two calls with the same engine state return identical dicts.
+    """
+    snapshot = empty_snapshot()
+    st = engine.session.state()
+    snapshot["t"] = engine.t
+    snapshot["phase"] = engine.phase
+    ...                                        # world + step/done/running
+    mind = getattr(engine, "mind", None)
+    if mind is not None:
+        snap_agent["mood"]  = {k: round(float(v), 4) for k, v in mind.mood.items()}
+        snap_agent["trust"]["live"] = round(mind.trust_value(), 4)
+        snap_agent["intention"]     = mind.bdi["intention"]
+        snap_agent["intentionSince"] = mind.bdi["since"]
+        snap_agent["thoughts"] = list(mind.thoughts)
+        snap_agent["memory"]   = mind.memory.view(mind.t)
+        snap_agent["forgot"]   = mind.memory.forgot_view()
+        snap_agent["module"]   = mind.module
+        snap_agent["chat"]     = list(mind.chat)
+        snap_agent["log"]      = list(mind.log)
+        snap_agent["reasoning"] = (mind.reasoner.kind if mind.reasoner else "rules")
+        snap_agent["samples"]  = ...   snap_agent["trail"] = ...
+        snap_agent["prefs"]    = {"rot": mind.target_rot, "hgt": mind.target_hgt_cm,
+                                  "tolRot": mind.tol_rot, "tolHgt": mind.tol_hgt_cm}
+        snapshot["ride"].update({... round(v, 4) for v in mind.ride ...})
+        snapshot["priors"] = mind.priors or {"rides": 0, "trust": None}</code></pre>
+
+      <h3>Where every PORT slot comes from</h3>
+      <table>
+        <thead><tr><th class="m">Snapshot field</th><th class="m">Source</th></tr></thead>
+        <tbody>
+          <tr><td class="m">t · phase · step · running · done</td><td class="m">SimEngine (clock, phase machine, session)</td></tr>
+          <tr><td class="m">world.seat / vending / table</td><td class="m">session.state()["cabin"] — the world layer, canonical units</td></tr>
+          <tr><td class="m">agent.mood</td><td class="m">mind.mood, rounded to 4 dp</td></tr>
+          <tr><td class="m">agent.trust.live</td><td class="m">round(mind.trust_value(), 4) — the computed latent (§05)</td></tr>
+          <tr><td class="m">agent.trust.score</td><td class="m">_mdmt_score(questionnaire) — mean MDMT factors / 7, only after finish</td></tr>
+          <tr><td class="m">agent.intention · intentionSince</td><td class="m">mind.bdi["intention"] · mind.bdi["since"]</td></tr>
+          <tr><td class="m">agent.speech · thoughts</td><td class="m">mind.speech (fallback session say) · mind.thoughts (cap 3)</td></tr>
+          <tr><td class="m">agent.memory · forgot · forgotCount</td><td class="m">Memory.view(t) · forgot_view() · forgot_count</td></tr>
+          <tr><td class="m">agent.module · chat · log</td><td class="m">mind.module · mind.chat (cap 40) · mind.log (cap 60)</td></tr>
+          <tr><td class="m">agent.reasoning</td><td class="m">mind.reasoner.kind ("llm:groq") or "rules" (§10)</td></tr>
+          <tr><td class="m">agent.samples · trail · prefs</td><td class="m">mind.samples · mind.trail · target/tolerance pair</td></tr>
+          <tr><td class="m">ride</td><td class="m">mind.ride — the same dict the engine exposes</td></tr>
+          <tr><td class="m">priors</td><td class="m">mind.priors or {"rides": 0, "trust": None}</td></tr>
+        </tbody>
+      </table>
+
+      <h3>The view consumes exactly this shape</h3>
+      <pre><code>{
+  "version": 1, "schema": "cabin-agent.v1",
+  "t": 160.0, "phase": "ride", "step": 80, "running": true, "done": false,
+  "world": { "seat": { "slider_mm": 350, "height_mm": 440,
+                       "recline_deg": 97, "rotation_deg": 0 }, ... },
+  "ride":  { "speed": 61.2554, "g": 0.0602, "jolt": 0.0, "rain": 0.0 },
+  "agent": {
+    "mood": { "comfort": 0.6658, "energy": 0.5712, "suspicion": 0.5 },
+    "trust": { "score": null, "live": 0.6864 },
+    "intention": "attend", "intentionSince": 158.0,
+    "speech": "It reads the road and I read it back. Alright.",
+    "thoughts": [ { "time": "02:40", "text": "…" }, ... ],   // cap 3
+    "memory":  [ { "id": "depart", "act": 0.992, "age": 39, "rehearsed": 1 } ],
+    "forgot":  [ { "label": "…", "age": 512 } ], "forgotCount": 3,
+    "module": "think", "chat": [], "log": [ ... ],
+    "reasoning": "rules",
+    "samples": [ { "t": 0, "c": .4, "s": .5, "e": .6, "trust": .5 }, ... ],
+    "trail":   [ { "t": 0, "v": 0.50 }, ... ],
+    "prefs":   { "rot": 0, "hgt": 44, "tolRot": 20, "tolHgt": 2 }
+  },
+  "priors": { "rides": 1, "trust": 0.62, "comfort": 0.61, "suspicion": 0.49 },
+  "log": [ ... ]                       // session activity (provider decisions)
+}</code></pre>
+
+      <h3>check() — the contract validator</h3>
+      <ul>
+        <li><code>version</code> must equal 1, <code>schema</code> "cabin-agent.v1",
+            <code>phase</code> ∈ setup/ride/done.</li>
+        <li>Every provided seat axis inside <code>SEAT_LIMITS</code>; mood, trust (both instruments)
+            and every <code>memory[].act</code> inside [0, 1].</li>
+        <li><code>intention</code> — when set — must be exactly
+            <code>settle | attend | calibrate</code>; <code>ride.*</code> non-negative;
+            <code>t</code> numeric.</li>
+        <li>Used by <code>tests/test_schema.py</code> now, and available to the transport later as a
+            last line of defence.</li>
+      </ul>
+
+      <div class="note"><b><code>None</code> means "not yet":</b> <code>empty_snapshot()</code> keeps
+      the PORT slots neutral — trust before the questionnaire, memory before the first step — so a
+      template produced with no engine is still conformant JSON. <code>build_snapshot</code> fills
+      them; it never invents side structure (it starts from the template).</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s8">
+    <summary><span class="no">08</span>Experimenter Chat<span class="caret"></span></summary>
+    <div class="body">
+
+      <p>The experimenter's chat line goes from the browser to the mind in one hop — the reply is
+      chosen server-side, from live state:</p>
+
+      <pre><code>def chat_send(self, raw):
+    text = str(raw or "").strip()
+    if not text:
+        return {"ok": False, "error": "empty message"}
+    self.chat.append({"who": "experimenter", "t": self.t, "text": text})
+    self.log_line("chat", f"experimenter · {text}")
+    self.remember("chat", f"Experimenter: {text}", 0.5, True)   # encoded into memory (§04)
+    reply = self._chat_reply(text)
+    self.chat.append({"who": "phill", "t": self.t, "text": reply})
+    del self.chat[: max(0, len(self.chat) - 40)]                # history capped at 40
+    self.speak(reply)                                           # → speech in next snapshot
+    return {"ok": True, "reply": reply, "state": self.chat_state()}</code></pre>
+
+      <h3>Routing — <code>_chat_reply()</code>, never a fixed script</h3>
+      <p>It first calls <code>perceive_fit()</code> — answers come from the <em>current</em> seat,
+      even between ticks — then routes by regex:</p>
+      <table>
+        <thead><tr><th class="m">Route</th><th class="m">Pattern</th><th>Reply comes from</th><th>Side effect</th></tr></thead>
+        <tbody>
+          <tr><td class="m">seat words</td><td class="m">seat|height|tall|lower|raise|rotate|rotation|adjust|settle</td>
+              <td class="desc">his body's current fit: fit gap ≥ 0.22 → a <code>request</code> line ("I'd sit a touch taller…"), otherwise <code>seatGood</code></td>
+              <td class="desc"><b>clears the settle cooldown</b> (<code>bdi.last["settle"] = −99.0</code>) so the BDI acts on your request immediately</td></tr>
+          <tr><td class="m">trust words</td><td class="m">trust|safe|confidence|rely|sure</td>
+              <td class="desc"><code>trust_value()</code> bands: ≥ 0.6 → <code>trustOk</code> · ≤ 0.38 → <code>trustLow</code> · else <code>trustMid</code></td><td class="desc">—</td></tr>
+          <tr><td class="m">wellbeing words</td><td class="m">feel|how|you|ok|okay|alright|comfort|fine|doing</td>
+              <td class="desc">ambient mood: <code>idleS</code> (susp &gt; 0.6) · <code>idleC</code> (comfort &gt; 0.55) · <code>idleN</code></td><td class="desc">—</td></tr>
+          <tr><td class="m">anything else</td><td class="m">—</td><td class="desc">a dry <code>idleN</code> line</td><td class="desc">—</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note"><b>The rule path always runs first — its side effects are authoritative in
+      every mode:</b> the settle-cooldown clear and the <code>rng</code> draws happen in Python; only
+      then may <code>reasoner.chat(self, text, rule)</code> <em>reword</em> the answer (§10),
+      <code>None</code> meaning "keep the rule reply".</div>
+
+      <p>The reply payload also carries a state digest for the caller:</p>
+      <pre><code>chat_state() → { t, phase, done, mood, trust, belief,
+                 intention, since,
+                 seat: {rot, hgt, sl},
+                 memory: {count, top, forgot},
+                 ride: {speed, g, jolt, rain} }</code></pre>
+
+      <h3>Transport — <code>POST /api/chat</code></h3>
+      <pre><code>if path == "/api/chat":
+    if data.get("clear"):
+        engine.session.mind.chat.clear()          # {"clear": true} wipes history
+        self._json({"ok": True, "history": []})
+        return
+    session = self.engine.session
+    with session._lock:                           # the ticker may be deliberating
+        result = session.mind.chat_send(data.get("text", ""))
+    if result.get("ok") and isinstance(result.get("state"), dict):
+        # legacy hook shape: state.trustScore was the questionnaire score
+        result["state"]["trustScore"] = (score if score is not None
+                                         else round(result["state"]["trust"], 4))
+    self._json(result, 200 if result.get("ok") else 400)</code></pre>
+
+      <h3>The JS bridge — <code>window.__EXPERIMENTER_CHAT__</code>, two stages</h3>
+      <ol>
+        <li><b><code>index.html</code>, classic script at parse time</b> (before the module bundle):
+            builds the 💬 panel (fab, message log, input form), defines
+            <code>window.__EXPERIMENTER_CHAT__ = { send, onAgentReply }</code> and wires the
+            form's <code>send()</code> to <b>the Python mind</b>: an <em>async</em>
+            <code>fetch("/api/chat")</code> that prints Phill's real reply the moment it
+            lands — <em>async on purpose</em>: the original sync path froze the tab for
+            seconds while Groq answered — then fires the registered
+            <code>onAgentReply</code> callbacks; if the mind is unreachable the panel says
+            so instead of echoing. As the comment says: <em>"This classic script runs
+            during parse, before the module bundle, so the hook always exists by the time
+            the agent code boots."</em></li>
+        <li><b><code>src/cognitive.js</code> (the view adapter) replaces the hook object</b> with the
+            Python proxy — same legacy synchronous shape, new destination:</li>
+      </ol>
+      <pre><code>// cognitive.js — "the reply itself is chosen by mind.chat_send() on the server,
+// never in this file"
+window.__EXPERIMENTER_CHAT__ = {
+  send: function (raw) {
+    var res = xhrJSON("/api/chat", { text: String(raw == null ? "" : raw) });  // sync XHR
+    if (!res) return { ok: false, error: "offline — Python mind not reachable" };
+    if (res.ok) poll();                                    // refresh the snapshot
+    return res;                                            // { ok, reply, state }
+  },
+  history: function () { return V.chat.slice(0); },        // oldest first, from mind
+  state:   function () { ... },                            // live digest, no I/O
+  clear:   function () { ... }                             // POST /api/chat {"clear":true}
+};</code></pre>
+
+      <p>Use it from the console mid-ride — the reply is computed from <b>live</b> state:</p>
+      <pre><code>&gt; window.__EXPERIMENTER_CHAT__.send("Do you trust this car?")
+{ ok: true,
+  reply: "It reads the road and I read it back. Alright.",
+  state: { t: 160, phase: "ride", mood: {...}, trust: 0.6189,
+           trustScore: null,          // MDMT score appears after the ride
+           intention: "attend", seat: { rot: 0, hgt: 44, sl: -1 },
+           memory: { count: 3, top: "Merging onto the motorway", forgot: 0 },
+           ride: { speed: 61.2, g: 0.06, jolt: 0 } } }
+
+&gt; window.__EXPERIMENTER_CHAT__.history()      // [{who, t, text}] oldest first
+&gt; await fetch("/api/chat", { method: "POST",
+    body: JSON.stringify({ text: "How do you feel?" }) })   // async alternative</code></pre>
+
+      <div class="warn"><b>Which chat UI talks to Python?</b> All three paths — the 💬 panel's
+      form (async <code>fetch</code>), the console hook, and any direct
+      <code>POST /api/chat</code> — reach the mind, so every reply is computed from live
+      state (Groq via the reasoner, rules when rate-limited); if the server is down the
+      panel shows <code>(no reply — Python mind not reachable)</code> rather than a fake
+      echo, and <code>history()</code> always shows what the mind actually recorded. Every
+      message that reaches the mind is also encoded into memory (salience 0.5, important),
+      so a later <code>attend</code> can resurface what you asked.</div>
+
+      <div class="note"><b>Dev wiring:</b> <code>npm run dev</code> serves the view on
+      <code>:5173</code> and proxies <code>/api</code> to the Python mind on <code>:8000</code>
+      (<code>vite.config.js → server.proxy</code>). Run the mind with
+      <code>python -m cabin_sim.main --server --provider scripted</code>.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s9">
+    <summary><span class="no">09</span>Determinism<span class="caret"></span></summary>
+    <div class="body">
+
+      <p>The port's hard guarantee: <b>two engines built with the same seed produce byte-identical
+      snapshots</b> — for the scripted provider. Everything rests on two facts:</p>
+
+      <pre><code># cabin_sim/cognition.py — Mind.__init__
+self.rng = random.Random(seed)     # the ONLY randomness the mind ever draws
+
+# cabin_sim/sim.py — SimEngine.__init__
+self.rng = random.Random(seed)     # the engine's own seeded rng
+self.t   = 0.0                     # sim clock: tick counts, never wall time</code></pre>
+
+      <ul>
+        <li><b>Every draw goes through <code>mind.rng</code>:</b> phrase choice
+            (<code>pick_line</code> → <code>int(rng.random()·n) % n</code>), the speech chance in
+            <code>maybe_speak()</code>, the event speech flip <code>rng &lt; 0.5</code>. Nothing
+            else is stochastic — mood relax, memory decay, cooldowns and clamps are pure arithmetic.</li>
+        <li><b>Snapshot building consumes no randomness:</b> <code>build_snapshot</code> is documented
+            <em>pure — reads engine/session only, does not mutate; two calls with the same engine
+            state return identical dicts</em>.</li>
+        <li><b>The clock is tick-driven:</b> the ticker's wall-clock sleeps only <em>pace</em>
+            steps; <code>engine.t</code> advances by <code>tick_dt</code> per step, so timing never
+            leaks in from the host machine.</li>
+        <li><b>Seeds flow from one flag:</b> <code>--seed</code> (default 1) →
+            <code>Session(seed=…)</code> → <code>Mind.rng</code>, and
+            <code>SimEngine(seed=…)</code> → its rng. <code>POST /api/control {"reset": true}</code>
+            rebuilds session + engine from the <em>same</em> persona/provider/seed — the restarted
+            run replays identically.</li>
+      </ul>
+
+      <h3>Where the guarantee stops</h3>
+      <ul>
+        <li><b><code>--provider scripted</code> only.</b> All randomness is seeded and snapshot
+            building consumes none; <b>LLM providers are not deterministic</b> — that is the trade of
+            §10, contained by validation and rule-fallbacks (the ride itself still follows the same
+            script, mood and cooldowns).</li>
+        <li>Pytest forces rules mode (scripted provider → <code>create_reasoner</code> returns
+            <code>None</code>), so the suite is deterministic by construction.</li>
+      </ul>
+
+      <h3>The guards</h3>
+      <table>
+        <thead><tr><th class="m">Test</th><th>Proves</th></tr></thead>
+        <tbody>
+          <tr><td class="m">test_determinism.py</td><td class="desc">same seed → identical session log; different seed → different trajectory; engine run → reproducible snapshot sequence; snapshot is pure and repeatable</td></tr>
+          <tr><td class="m">test_cognition.py</td><td class="desc">same seed → same mind, different seed → differs; events fire once even with big ticks; worked fit/comfort/trust examples; decay/FIFO/cooldown semantics</td></tr>
+          <tr><td class="m">test_schema.py</td><td class="desc">snapshot conforms after a full run (bounds, mood, trust landing); template stays neutral; <code>check()</code> reports violations</td></tr>
+          <tr><td class="m">test_reasoning.py</td><td class="desc">rules mode leaves the mind untouched; illegal/garbled/failed LLM answers fall back to the rule answer for that tick</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note"><b>Reproduce a run:</b>
+      <code>python -m cabin_sim.main --headless --steps 40 --seed 1</code> prints the same JSON log
+      lines and the same summary on every machine; the browser path replays the same snapshots
+      through <code>/api/snapshot</code>. <code>python -m pytest tests -q</code> → <b>81 passed</b>.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s10">
+    <summary><span class="no">10</span>Reasoning Modes<span class="caret"></span></summary>
+    <div class="body">
+
+      <p><code>cabin_sim/reasoning.py</code> plugs an LLM into the mind without ever letting it own
+      the state. The separation is stated in its docstring — <b>who decides vs. what is decided</b>:</p>
+
+      <pre><code>cabin_sim.cognition      owns state, dynamics and legality
+                         (cooldowns, preconditions, clamps, memory decay,
+                          mood relax — Python)
+cabin_sim.reasoning.py   owns WORDING and CHOICE among legal options
+                         (an LLM behind provider.complete(), or rules/None)</code></pre>
+
+      <table>
+        <thead><tr><th class="m">Mode</th><th>Behaviour</th></tr></thead>
+        <tbody>
+          <tr><td class="m">rules (default)</td><td class="desc"><code>create_reasoner()</code> returns <code>None</code>: the mind keeps its deterministic desire-argmax and phrase banks — byte-identical to the pre-LLM port, which is what pytest exercises.</td></tr>
+          <tr><td class="m">llm</td><td class="desc">Each decision step the model is handed <b>only the legal goals</b> (cooldowns/preconditions already applied in Python) and picks one plus a one-line thought; chat replies are written from the live state. Anything it returns is validated — an illegal intention, bad JSON, an empty line or a network error silently falls back to the rule answer <em>for that tick</em>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Mode selection</h3>
+      <pre><code>def create_reasoner(provider, mode="auto", persona=None):
+    """Never raises: an unusable 'llm' request degrades to rules with a warning,
+    so a missing key or stopped Ollama can never take the ride down."""
+    mode = (mode or "auto").lower()
+    backend = getattr(provider, "name", "scripted")
+    if mode == "auto":
+        mode = "llm" if backend != "scripted" else "rules"
+    if mode == "llm":
+        if backend == "scripted":
+            print("reasoning: 'llm' needs a real provider (groq/ollama) — "
+                  "using rule-based reasoning.", file=sys.stderr)
+        else:
+            return LLMReasoner(provider, persona)
+    return None</code></pre>
+      <ul>
+        <li><b>CLI:</b> <code>--reasoning auto|rules|llm</code> (env <code>REASONING</code>);
+            <code>main.py</code> prints <code>Reasoning: rules</code> /
+            <code>Reasoning: llm:groq</code>, and the snapshot publishes the same string in
+            <code>agent.reasoning</code>.</li>
+        <li><b>Providers:</b> <code>scripted</code> (deterministic stand-in, no key),
+            <code>ollama</code> (fully local via <code>OLLAMA_BASE_URL</code>, default model
+            <code>llama3.2</code> — any model via <code>OLLAMA_MODEL</code>), <code>groq</code> (free
+            cloud tier, default <code>allam-2-7b</code> via <code>GROQ_MODEL</code>, temperature 0.7,
+            max 240 tokens). <code>create_provider()</code> honours <code>--provider</code> then
+            <code>.env</code>, and unknown config falls back to scripted with a warning.</li>
+      </ul>
+
+      <h3>The one allowed call per step</h3>
+      <p>Legality is decided in Python (§03); the model sees the legal set with its desire scores
+      and answers in JSON:</p>
+      <pre><code>msg = (
+    f"STATE: {state_block(mind)}\n"
+    f"LEGAL GOALS — you may pick exactly ONE: {legal}\n"
+    "Choose the goal worth pursuing right now, given your body, mood "
+    "and memories. Respond with JSON:\n"
+    '{"intention": "&lt;one legal goal&gt;", '
+    '"thought": "&lt;your inner monologue line, max 14 words&gt;"}'
+)</code></pre>
+      <ul>
+        <li><b><code>state_block()</code></b> is one compact STATE line built from the authoritative
+            mind only — <em>the same facts the snapshot publishes, so the model can never contradict
+            observable state</em> (seat, prefs, fit gap, user hands, mood, live trust, ride, top-3
+            memories with activations, last said).</li>
+        <li><b>The system prompt</b> anchors the persona: Phill's blurb verbatim, "dry, practical,
+            British understatement; short first-person lines", <em>never invent numbers</em>, never
+            break character, answer with the requested JSON only.</li>
+        <li><b>Validation &amp; containment:</b> the caller re-checks
+            <code>choice ∈ offered</code> (else the rule argmax stands); <code>extract_json</code>
+            tolerates fences/prose; <code>clean_line</code> strips and truncates to
+            <code>MAX_THOUGHT = 160</code> / <code>MAX_REPLY = 240</code> chars; deliberation is
+            throttled — an unchanged legal set within <code>THROTTLE_S = 12.0</code> sim-seconds is
+            covered by rules; one retry after <code>RETRY_BACKOFF = 1.5</code> wall-seconds; any
+            exception → stderr note + rules for that tick. <b>≤1 model call per decision step</b>
+            (intention and thought come back together); the chat call happens only when the
+            experimenter actually sends a line.</li>
+        <li><b>What the model never touches:</b> cooldowns, preconditions, clamps, memory decay,
+            rehearsal, mood relaxation, salience, the ride script, and — in chat — the rule path's
+            side effects (the settle-cooldown clear runs <em>before</em> the model is asked,
+            §08).</li>
+      </ul>
+
+      <div class="note"><b>Inner monologue:</b> the returned thought lands in
+      <code>mind._pending_thought</code> and <code>think()</code> lets it override this tick's
+      phrase-bank line — while the memory side effects of <code>think()</code> (rehearse,
+      rotation-flush) have already happened Python-side and stay authoritative.</div>
+
+      <div class="warn"><b>Ride never breaks:</b> missing key, stopped Ollama, rate limit, garbled
+      JSON — every failure mode degrades to the deterministic rule answer for that tick and logs a
+      one-line warning. The mode is observable at any time via
+      <code>snapshot.agent.reasoning</code>.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s11">
+    <summary><span class="no">11</span>Key Parameters<span class="caret"></span></summary>
+    <div class="body">
+
+      <h3>Persona (personas/phill.json)</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">seat target (rot / hgt)</td><td class="num">0° / 440 mm (44 cm)</td><td class="desc">where <code>seat_fit()</code> measures from — Phill wants to face forward, 44 cm cushion</td></tr>
+          <tr><td class="m">seat as-found pose</td><td class="num">90° · 380 mm · 390 mm · 103°</td><td class="desc"><code>world.Seat</code> defaults (rot·height·slider·recline) — turned to the door, bottom of travel → immediate settle job</td></tr>
+          <tr><td class="m">tolerances (rot / hgt / sl / rec)</td><td class="num">20° / 20 mm / 90 mm / 12°</td><td class="desc">comfort zone; rotation gate uses <code>tol + 2 = 22°</code></td></tr>
+          <tr><td class="m">mood (energy / suspicion)</td><td class="num">0.6 / 0.5</td><td class="desc">initial values and the suspicion set-point the dynamics relax to</td></tr>
+          <tr><td class="m">talkativeness</td><td class="num">0.55</td><td class="desc">base scale of the <code>maybe_speak()</code> probability</td></tr>
+          <tr><td class="m">blurb / traits / verbosity</td><td class="num">33 · Aachen · introvert…</td><td class="desc">persona story: quoted in the LLM system prompt (blurb), persona metadata (traits, verbosity)</td></tr>
+          <tr><td class="m">vending_interest / curiosity</td><td class="num">low / 0.1</td><td class="desc">read by <code>CognitiveAgent</code> (scripted side behaviour)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Cognition block — persona-tunable (code defaults identical)</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">memory_lambda</td><td class="num">0.004 /s</td><td class="desc">exponential decay of trace activation (half-life ≈ 173 s)</td></tr>
+          <tr><td class="m">memory_cap / forget_floor</td><td class="num">8 / 0.09</td><td class="desc">FIFO capacity; activation below which a trace is forgotten (into the ring of 6)</td></tr>
+          <tr><td class="m">rehearsal_boost</td><td class="num">+0.22</td><td class="desc">activation gained per recall (cap 1.0)</td></tr>
+          <tr><td class="m">settle_thresh</td><td class="num">0.22</td><td class="desc">fit gap required before <code>settle</code> is even legal</td></tr>
+          <tr><td class="m">settle_step_mm / settle_step_deg</td><td class="num">10 / 10</td><td class="desc">stored on <code>Mind</code>; the whitelisted actions apply the same fixed ±10 mm / ±10° steps</td></tr>
+          <tr><td class="m">ride_start / ride_end</td><td class="num">120 / 600 s</td><td class="desc">phase machine + the <code>calibrate</code> window (CLI overrides the engine side)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Seat &amp; fit</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">seat ranges (schema SEAT_LIMITS)</td><td class="num">rot 0–359 · hgt 380–460 mm · sl 260–460 · rec 80–110</td><td class="desc">hard clamps — mirrored from <code>world.Seat</code>, drift-tested by <code>test_world.py</code></td></tr>
+          <tr><td class="m">fit normalisers (dr, dh)</td><td class="num">180° / 8 cm</td><td class="desc">denominators in <code>seat_fit()</code> — how far is "totally wrong"</td></tr>
+          <tr><td class="m">actuation gates (fit_hgt / fit_rot)</td><td class="num">&gt; 0.22</td><td class="desc"><code>self_adjust()</code> only moves when the perceived error is large</td></tr>
+          <tr><td class="m">rotation gate / steps</td><td class="num">beyond tol+2 · ±10°</td><td class="desc">angular distance check, then whitelisted <code>rotate_cw/ccw</code></td></tr>
+          <tr><td class="m">user_hands window</td><td class="num">3 s</td><td class="desc"><code>mind.t − last_user_input &lt; 3</code> → suppresses settle, ×0.15 desire, ×1.6 erosion</td></tr>
+        </tbody>
+      </table>
+
+      <h3>BDI deliberation</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">cooldowns settle / attend / calibrate</td><td class="num">9 / 3.2 / 10 s</td><td class="desc"><code>GOAL_CD</code> — minimum gap between firings</td></tr>
+          <tr><td class="m">settle: desire floor / cap</td><td class="num">0.18 / 2.0</td><td class="desc">below the floor desire = 0 (the agent rests at ~0.17 gap)</td></tr>
+          <tr><td class="m">settle: phase gain ph</td><td class="num">1.3 setup / 0.9 ride</td><td class="desc">keener before departure</td></tr>
+          <tr><td class="m">settle: userHands factor</td><td class="num">0.15</td><td class="desc">desire nearly suppressed while the human drags</td></tr>
+          <tr><td class="m">attend: base / gain / empty / susp bonus</td><td class="num">0.3 + 0.7·act · 0.15 · +0.4</td><td class="desc">memory activation drives attentiveness; +0.4 when suspicion &gt; 0.6</td></tr>
+          <tr><td class="m">calibrate: base / ramp cap / k</td><td class="num">0.35 / 0.6 / 0.85 · 0.5</td><td class="desc"><code>0.35 + min(0.6, (t−120)/480)·k</code>; k = 0.85 if suspicion &gt; 0.62 or gap &gt; 0.35</td></tr>
+          <tr><td class="m">fit-gap erosion knee / gain / rate / hands</td><td class="num">0.30 · ×2.4 · 0.006/s · ×1.6</td><td class="desc">suspicion pressure while the seat ignores his body</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Memory &amp; language</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">event salience</td><td class="num">max(0.35, 0.42 + impact·0.5), +0.1 important</td><td class="desc">encoding strength; important = bump · arrive · workzone</td></tr>
+          <tr><td class="m">chat trace salience</td><td class="num">0.5 (+0.1 important)</td><td class="desc">every experimenter line is encoded (§08)</td></tr>
+          <tr><td class="m">rings: thoughts / log / chat / forgot</td><td class="num">3 / 60 / 40 / 6</td><td class="desc">published sizes in the snapshot</td></tr>
+          <tr><td class="m">speak frequency</td><td class="num">talk·(0.4 + 0.3 susp&gt;0.62 + 0.25 comf&lt;0.35)</td><td class="desc">with <code>talkativeness 0.55</code></td></tr>
+          <tr><td class="m">event speak chance</td><td class="num">jolt &gt; 0.2 or (g &gt; 0.25 and rng &lt; 0.5)</td><td class="desc">then <code>maybe_speak(THOUGHTS[kind])</code></td></tr>
+          <tr><td class="m">sample cadence</td><td class="num">≥ 3 s</td><td class="desc">mood/trust samples + live-trust trail for the charts</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Mood, trust &amp; ride physics</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">comfort relax rate</td><td class="num">0.06 /s</td><td class="desc"><code>comfort += (target−comfort)·min(1, dt·0.06)</code></td></tr>
+          <tr><td class="m">comfort weights</td><td class="num">0.35 · 0.35 · 0.30</td><td class="desc">rate(ROT) · rate(HGT) · fit.overall</td></tr>
+          <tr><td class="m">trust weights</td><td class="num">0.34 · 0.40 · 0.16 · 0.10</td><td class="desc">comfort · (1−susp) · eventful (ev = 1−jolt/0.6) · (1−fitGap)</td></tr>
+          <tr><td class="m">trust bands (chat + calibrate)</td><td class="num">≥ 0.6 / ≤ 0.38</td><td class="desc">trustOk vs trustLow, between them trustMid</td></tr>
+          <tr><td class="m">suspicion relax / priors base</td><td class="num">−0.004 · +0.003 /s · 0.5+(0.5−trust)·0.35</td><td class="desc">set-point recovery; prior ride re-baselines it</td></tr>
+          <tr><td class="m">energy drain / floor</td><td class="num">0.00018 /s / 0.05</td><td class="desc">slow fatigue over the ride</td></tr>
+          <tr><td class="m">event impulses</td><td class="num">jolt&gt;0.3 +0.20 &amp; −jolt·0.12 · brake +0.07 · overtake +0.05 · rain +0.04</td><td class="desc">suspicion (and comfort) shocks (§06)</td></tr>
+          <tr><td class="m">speed coast / g decay / jolt decay</td><td class="num">0.05 / e^(−0.3·dt) / e^(−0.35·dt)</td><td class="desc">how fast state chases the event</td></tr>
+          <tr><td class="m">rain fill / window / decay</td><td class="num">0.08/s · 540–570 s · e^(−0.18·dt)</td><td class="desc">beads on the glass during the squall</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Reasoning (cabin_sim/reasoning.py)</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">--reasoning</td><td class="num">auto · rules · llm</td><td class="desc">auto = LLM when the provider is groq/ollama; rules = deterministic (tests); llm = force</td></tr>
+          <tr><td class="m">deliberation throttle</td><td class="num">12 s</td><td class="desc">min sim-seconds between model calls with an unchanged legal set — sized to the Groq free tier (~6K TPM), no 429 churn</td></tr>
+          <tr><td class="m">retry backoff</td><td class="num">1.5 s × 1</td><td class="desc">one retry on rate limits/errors, then rules fallback for that tick</td></tr>
+          <tr><td class="m">MAX_THOUGHT / MAX_REPLY</td><td class="num">160 / 240 chars</td><td class="desc">validated truncation of model-generated text</td></tr>
+          <tr><td class="m">backends</td><td class="num">scripted · ollama (llama3.2) · groq (allam-2-7b)</td><td class="desc"><code>create_provider()</code>: --provider → .env → scripted fallback; groq at temperature 0.7, max 240 tokens</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Clock, transport &amp; CLI (cabin_sim/main.py)</h3>
+      <table>
+        <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="m">--seed</td><td class="num">1</td><td class="desc">flows into <code>Session(seed=)</code> → <code>Mind.rng</code> and <code>SimEngine(seed=)</code> (§09)</td></tr>
+          <tr><td class="m">--tick-dt</td><td class="num">2.0 s / step</td><td class="desc">sim seconds per decision step — 300 steps cover the 600 s ride script</td></tr>
+          <tr><td class="m">--steps / --interval / --duration</td><td class="num">300 · 1.2 s · 300 s</td><td class="desc">decision cap · wall-seconds between steps (ticker) · browser session length</td></tr>
+          <tr><td class="m">--ride-start / --port / --priors</td><td class="num">120 · 8000 · opt-in</td><td class="desc">engine phase threshold · HTTP port · priors JSON path (no file I/O without it)</td></tr>
+          <tr><td class="m">view poll interval</td><td class="num">700 ms</td><td class="desc"><code>cognitive.js</code> <code>pollMs</code> (speed buttons remap it: 1600/sp ms)</td></tr>
+          <tr><td class="m">schema version</td><td class="num">1 · cabin-agent.v1</td><td class="desc">the snapshot contract (<code>check()</code>-validated)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warn"><b>Verification:</b> <code>python -m pytest tests -q</code> → <b>78
+      passed</b> (rate tables, fit/comfort/trust worked examples, memory decay/floor/FIFO, BDI
+      cooldowns &amp; preconditions, event once-only firing, mood impulses, chat routing, snapshot
+      determinism per seed, schema conformance, priors round-trip — plus 20 reasoning tests: mode
+      selection, legal-set validation, JSON/error fallbacks, chat side effects, snapshot mode).
+      <code>npm run build</code> → exit 0 (this tutorial is a standalone file at the project root —
+      opened directly in a browser, not part of the Vite bundle).</div>
+    </div>
+  </details>
+
+  <footer class="kiosk">
+    cabin-agent-sim · the python mind · companion to <a href="tutorial-cognitive.html">tutorial-cognitive.html</a><br>
+    mind: cabin_sim/cognition.py · reasoning: cabin_sim/reasoning.py · clock: sim.py · contract: schema.py · transport: server.py · persona: personas/phill.json · legacy view mind: src/cognitive.legacy.js<br>
+    python -m pytest tests -q · python -m cabin_sim.main --server --provider scripted | ollama | groq · python -m cabin_sim.main --headless --steps 40 --seed 1 · npm run dev · npm run build
+  </footer>
+</div>
+
+<script>
+(function () {
+  var secs = Array.prototype.slice.call(document.querySelectorAll("details.sec"));
+  var ex = document.getElementById("btnExpand");
+  var co = document.getElementById("btnCollapse");
+  if (ex) ex.addEventListener("click", function () { secs.forEach(function (s) { s.open = true; }); });
+  if (co) co.addEventListener("click", function () { secs.forEach(function (s) { s.open = false; }); });
+
+  // TOC: open the target section before scrolling
+  document.querySelectorAll(".toc a").forEach(function (a) {
+    a.addEventListener("click", function () {
+      var id = a.getAttribute("href").slice(1);
+      var el = document.getElementById(id);
+      if (el) el.open = true;
+    });
+  });
+
+  // copy buttons on every code block
+  document.querySelectorAll("pre").forEach(function (pre) {
+    var b = document.createElement("button");
+    b.className = "copy"; b.type = "button"; b.textContent = "COPY";
+    b.addEventListener("click", function () {
+      var code = pre.querySelector("code");
+      var txt = code ? code.innerText : pre.innerText;
+      var done = function () { b.textContent = "COPIED ✓"; setTimeout(function () { b.textContent = "COPY"; }, 1400); };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(done, function () { b.textContent = "CTRL+C"; });
+        } else { done(); }
+      } catch (e) { b.textContent = "CTRL+C"; }
+    });
+    pre.appendChild(b);
+  });
+})();
+</script>
+</body>
+</html>

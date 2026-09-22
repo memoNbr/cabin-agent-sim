@@ -1,29 +1,49 @@
-"""A tiny stdlib HTTP server: the browser page + the live state feed.
+"""A tiny stdlib HTTP server: the browser pages + the live state feed.
 
-It deliberately uses only the standard library so there is no web
-framework to learn. Two endpoints:
+It deliberately uses only the standard library so there is no web framework
+to learn. The engine (not a session thread) drives the simulation: a ticker
+thread calls engine.tick(1) every ``interval`` wall seconds.
 
-  /            the SVG visual (web/index.html)
-  /api/state   JSON snapshot of the running session (polled each second)
+Endpoints:
+
+  GET  /               the SVG visual (web/index.html)
+  GET  /api/state      session feed (existing shape, polled by web/index.html)
+  GET  /api/snapshot   canonical schema snapshot (the view adapter polls this)
+  POST /api/chat       experimenter chat      {"text": "..."}
+  POST /api/seat       set a seat axis        {"axis": "rot|hgt|sl", "value": n}
+  POST /api/control    play/pause             {"running": true|false}
 """
 
 import json
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from .schema import build_snapshot
+
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+# view axis key -> canonical seat attribute (mm/deg) and conversion
+SEAT_AXES = {"slider_mm": "slider_mm", "height_mm": "height_mm",
+             "recline_deg": "recline_deg", "rotation_deg": "rotation_deg"}
 
 
 class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        path = self.path.split("?", 1)[0]
-        if path in ("/", "/index.html"):
-            self._send(WEB_DIR / "index.html", "text/html; charset=utf-8")
-        elif path == "/api/state":
-            body = json.dumps(self.server.session.state()).encode("utf-8")
-            self._send_bytes(body, "application/json; charset=utf-8")
-        else:
-            self.send_error(404)
+    # ---- helpers ---------------------------------------------------------
+
+    @property
+    def engine(self):
+        return self.server.engine
+
+    def _json(self, payload, status=200):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _send(self, path, content_type):
         try:
@@ -31,9 +51,6 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:
             self.send_error(404)
             return
-        self._send_bytes(body, content_type)
-
-    def _send_bytes(self, body, content_type):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -41,12 +58,136 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _read_json(self):
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) if length else b"{}"
+            data = json.loads(raw.decode("utf-8") or "{}")
+            return data if isinstance(data, dict) else {}
+        except (ValueError, UnicodeDecodeError):
+            return {}
+
     def log_message(self, *args):  # keep the console clean
         pass
 
+    # ---- GET --------------------------------------------------------------
 
-def serve(session, port=8000):
+    def do_GET(self):
+        path = self.path.split("?", 1)[0]
+        if path in ("/", "/index.html"):
+            self._send(WEB_DIR / "index.html", "text/html; charset=utf-8")
+        elif path == "/api/state":
+            self._json(self.engine.session.state())
+        elif path == "/api/snapshot":
+            self._json(build_snapshot(self.engine))
+        else:
+            self.send_error(404)
+
+    # ---- POST -------------------------------------------------------------
+
+    def do_POST(self):
+        path = self.path.split("?", 1)[0]
+        data = self._read_json()
+
+        if path == "/api/chat":
+            if data.get("clear"):
+                engine = self.engine
+                engine.session.mind.chat.clear()
+                self._json({"ok": True, "history": []})
+                return
+            session = self.engine.session
+            # lock: the ticker may be deliberating (LLM call) on the same mind
+            with session._lock:
+                result = session.mind.chat_send(data.get("text", ""))
+            if result.get("ok") and isinstance(result.get("state"), dict):
+                # legacy hook shape: state.trustScore was the questionnaire score
+                from .schema import _mdmt_score
+                score = _mdmt_score(session.questionnaire)
+                result["state"]["trustScore"] = (score if score is not None
+                                                 else round(result["state"]["trust"], 4))
+            self._json(result, 200 if result.get("ok") else 400)
+
+        elif path == "/api/seat":
+            self._set_seat(data)
+
+        elif path == "/api/control":
+            self._control(data)
+
+        else:
+            self.send_error(404)
+
+    def _control(self, data):
+        engine = self.engine
+        if data.get("reset"):
+            # rebuild session + engine from the same persona/provider/seed
+            from .session import Session
+            from .sim import SimEngine
+            old = engine.session
+            fresh = Session(old.persona, old.agent.provider,
+                            max_steps=old.max_steps,
+                            step_interval=old.step_interval,
+                            duration=old.duration, seed=engine.seed,
+                            reasoning=getattr(old, "reasoning", "auto"))
+            self.server.engine = SimEngine(
+                fresh, seed=engine.seed, tick_dt=engine.tick_dt,
+                ride_start=engine.ride_start, priors_path=engine.priors_path)
+            self._json({"ok": True, "reset": True})
+            return
+        if data.get("advance") == "ride":
+            # fast-forward through the setup phase (the old "skip" button)
+            limit = 0
+            while (not engine.done and engine.t < engine.mind.ride_start
+                   and limit < 400):
+                engine.tick(1)
+                limit += 1
+            self._json({"ok": True, "t": engine.t})
+            return
+        running = bool(data.get("running", engine.running))
+        engine.running = running
+        self._json({"ok": True, "running": running})
+
+    def _set_seat(self, data):
+        """Set one seat axis in canonical units and mark 'human hands'."""
+        alias = {"rot": "rotation_deg", "hgt": "height_mm",
+                 "sl": "slider_mm", "rec": "recline_deg"}
+        axis = str(data.get("axis", ""))
+        attr = SEAT_AXES.get(axis) or SEAT_AXES.get(alias.get(axis, ""))
+        value = data.get("value")
+        if attr is None or not isinstance(value, (int, float)):
+            self._json({"ok": False, "error": "unknown axis"}, 400)
+            return
+        engine = self.engine
+        session = engine.session
+        view_axis = {"rotation_deg": "rot", "height_mm": "hgt",
+                     "slider_mm": "sl", "recline_deg": "rec"}[attr]
+        with session._lock:
+            seat = session.cabin.seat
+            delta = int(round(value)) - getattr(seat, attr)
+            seat.move(attr, delta)          # clamps through Seat's own bounds
+            session.note_user_input(view_axis)
+            session.mind.log_line("adj", f"{attr} → {getattr(seat, attr)}")
+        self._json({"ok": True, "seat": session.cabin.to_dict()["seat"]})
+
+
+def serve(engine, port=8000, interval=1.2):
+    """Serve the pages and step the engine every ``interval`` wall seconds."""
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    httpd.session = session
-    session.start()
-    httpd.serve_forever()
+    httpd.engine = engine
+    stop = threading.Event()
+
+    def ticker():
+        # reads httpd.engine every pass so POST /api/control {"reset": true}
+        # can swap in a fresh engine while the ticker keeps running
+        while not stop.is_set():
+            eng = httpd.engine
+            if eng.running and not eng.done:
+                eng.tick(1)
+            time.sleep(interval)
+
+    thread = threading.Thread(target=ticker, daemon=True)
+    thread.start()
+    try:
+        httpd.serve_forever()
+    finally:
+        stop.set()
+        thread.join(timeout=2)

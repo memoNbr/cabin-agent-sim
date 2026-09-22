@@ -104,7 +104,7 @@ class AgentDecision:
 
 
 class CognitiveAgent:
-    def __init__(self, persona, provider, cabin, seed=1):
+    def __init__(self, persona, provider, cabin, seed=1, mood=None):
         self.persona = persona
         self.provider = provider
         self.cabin = cabin
@@ -114,37 +114,25 @@ class CognitiveAgent:
         self.succeeded = 0
         self.blocked = 0
 
-        base_mood = persona.get("mood", {})
-        self.mood = {
-            "energy": float(base_mood.get("energy", 0.6)),
-            "suspicion": float(base_mood.get("suspicion", 0.3)),
-            "comfort": 0.0,
-        }
+        if mood is not None:
+            # shared with cabin_sim.cognition.Mind - the mind owns the mood
+            # dynamics (comfort/energy/suspicion relax & impulses), this object
+            # only reads them and adds action impulses via observe().
+            self.mood = mood
+        else:
+            base_mood = persona.get("mood", {})
+            self.mood = {
+                "energy": float(base_mood.get("energy", 0.6)),
+                "suspicion": float(base_mood.get("suspicion", 0.3)),
+                "comfort": 0.0,
+            }
         if provider.name == "scripted":
             provider.attach(self)
 
     # ---- beliefs ----------------------------------------------------------
-
-    def _comfort(self):
-        s = self.cabin.seat
-        pref, tol = self.persona["seat"], self.persona["tolerance"]
-        scores = []
-        for attr in ("slider_mm", "height_mm", "recline_deg", "rotation_deg"):
-            gap = abs(getattr(s, attr) - pref[attr])
-            scores.append(max(0.0, 1.0 - gap / max(1, tol[attr])))
-        return sum(scores) / len(scores)
-
-    def update_mood(self):
-        self.mood["comfort"] = self._comfort()
-        self.mood["energy"] = max(0.0, min(1.0, self.mood["energy"] - 0.004))
-        baseline = float(self.persona.get("mood", {}).get("suspicion", 0.3))
-        # slow drift back toward the persona's baseline suspicion
-        if self.mood["suspicion"] > baseline:
-            self.mood["suspicion"] = max(baseline,
-                                         self.mood["suspicion"] - 0.005)
-        elif self.mood["suspicion"] < baseline:
-            self.mood["suspicion"] = min(baseline,
-                                         self.mood["suspicion"] + 0.005)
+    # The comfort/relax dynamics live in cognition.Mind (the ported cognitive
+    # core): comfort_target(), trust_value() and the suspicion set-point are
+    # evaluated there once per tick. The agent only reacts to what it did.
 
     def observe(self, action, ok):
         if ok:

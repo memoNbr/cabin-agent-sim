@@ -10,19 +10,32 @@ import time
 
 from . import actions
 from .agent import CognitiveAgent
+from .cognition import Mind
 from .questionnaire import run_questionnaire
+from .reasoning import create_reasoner
 from .world import Cabin
 
 
 class Session:
     def __init__(self, persona, provider, max_steps=300, step_interval=1.2,
-                 duration=0.0, seed=1):
+                 duration=0.0, seed=1, reasoning="auto", chat_provider=None):
         self.persona = persona
+        self.reasoning = reasoning       # requested mode (auto|rules|llm)
         self.cabin = Cabin()
-        self.agent = CognitiveAgent(persona, provider, self.cabin, seed=seed)
+        # the reasoner decides WHO words/chooses: None = deterministic rules,
+        # LLMReasoner = provider-backed reasoning (see cabin_sim/reasoning.py).
+        # chat_provider = optional second backend for experimenter replies only
+        # (hybrid: small/fast model ticks, bigger model chats).
+        self.reasoner = create_reasoner(provider, reasoning, persona,
+                                        chat_provider=chat_provider)
+        self.mind = Mind(persona, self.cabin, seed=seed,
+                         reasoner=self.reasoner)
+        self.agent = CognitiveAgent(persona, provider, self.cabin, seed=seed,
+                                    mood=self.mind.mood)
         self.max_steps = max_steps
         self.step_interval = step_interval
         self.duration = duration
+        self.tick_dt = 1.0          # sim seconds per decision step (set by engine)
         self.step = 0
         self.done = False
         self.questionnaire = None
@@ -60,7 +73,14 @@ class Session:
                 self.agent.observe(decision.action, ok)
             else:
                 self.note("talk", action=None)
-            self.agent.update_mood()
+            # the cognitive core: ride events, mood relaxation, memory decay and
+            # the BDI loop (perceive -> desire -> intention -> act)
+            self.mind.step(self.tick_dt)
+
+    def note_user_input(self, axis=None):
+        """The human grabbed a control: sets belief.user_hands in the mind."""
+        with self._lock:
+            self.mind.note_user_input(axis)
 
     def finish(self):
         with self._lock:
@@ -68,22 +88,33 @@ class Session:
                 return
             self.questionnaire = run_questionnaire(self.agent, self.persona)
             self.done = True
+            self.mind.finished = True
             self.note("session_end",
                       questionnaire=self.questionnaire["factors"])
 
     def state(self):
-        with self._lock:
-            return {
-                "persona": self.persona.get("name", "?"),
-                "blurb": self.persona.get("blurb", ""),
-                "step": self.step,
-                "max_steps": self.max_steps,
-                "done": self.done,
-                "cabin": self.cabin.to_dict(),
-                "mood": dict(self.agent.mood),
-                "say": self.agent.last_say,
-                "succeeded": self.agent.succeeded,
-                "blocked": self.agent.blocked,
-                "activity": list(self.log[-8:]),
-                "questionnaire": self.questionnaire,
-            }
+        # Deliberately lock-free: the view polls this every 700 ms while
+        # writers (step_once, chat, seat) hold _lock — often for seconds at a
+        # time while a provider inference is in flight. The GIL keeps each
+        # field read consistent (a mixed frame is harmless for display);
+        # taking the lock here would freeze the view behind every model call
+        # (and, with impatient pollers, storm the log with WinError 10053s).
+        mind = self.mind
+        return {
+            "persona": self.persona.get("name", "?"),
+            "blurb": self.persona.get("blurb", ""),
+            "step": self.step,
+            "max_steps": self.max_steps,
+            "done": self.done,
+            "t": mind.t,
+            "cabin": self.cabin.to_dict(),
+            "mood": dict(self.agent.mood),
+            "say": self.agent.last_say or mind.speech,
+            "speech": mind.speech,
+            "intention": mind.bdi["intention"],
+            "thoughts": list(mind.thoughts),
+            "succeeded": self.agent.succeeded,
+            "blocked": self.agent.blocked,
+            "activity": list(self.log[-8:]),
+            "questionnaire": self.questionnaire,
+        }

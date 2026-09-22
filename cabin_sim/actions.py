@@ -14,8 +14,10 @@ DEFAULT_STEP = {
     "seat_down": ("height_mm", -10),
     "recline_more": ("recline_deg", 3),
     "recline_less": ("recline_deg", -3),
-    "rotate_cw": ("rotation_deg", 2),
-    "rotate_ccw": ("rotation_deg", -2),
+    # the swivel now spans 0..359 deg, so it moves in 10 deg steps - the same
+    # human-sized step cognitive.js used for its self-settle actuation.
+    "rotate_cw": ("rotation_deg", 10),
+    "rotate_ccw": ("rotation_deg", -10),
 }
 
 VENDING_ACTIONS = ("get_snack", "get_water", "get_coffee")

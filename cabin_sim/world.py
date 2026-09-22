@@ -14,16 +14,17 @@ def _clamp(value, lo, hi):
 
 @dataclass
 class Seat:
-    # "as found" position - the previous driver left it like this.
+    # "as found" position - the previous driver left it turned toward the door
+    # and at the bottom of its travel, so the persona has a real settling job.
     slider_mm: int = 390        # forward/back position (mm from rearmost)
-    height_mm: int = 305        # seat cushion height above the floor
+    height_mm: int = 380        # cushion height: 38 cm = bottom of 38..46 cm
     recline_deg: int = 103      # backrest angle from the seat pan
-    rotation_deg: int = -5      # seat facing rotation, negative = toward the door
+    rotation_deg: int = 90      # full swivel heading, 0 = facing forward/road
 
     SLIDER_MIN, SLIDER_MAX = 260, 460
-    HEIGHT_MIN, HEIGHT_MAX = 240, 330
+    HEIGHT_MIN, HEIGHT_MAX = 380, 460        # mm  (38..46 cm, as in cognitive.js)
     RECLINE_MIN, RECLINE_MAX = 80, 110
-    ROT_MIN, ROT_MAX = -8, 8
+    ROT_MIN, ROT_MAX = 0, 359                # deg, absolute swivel (clamped, no wrap)
 
     def move(self, attr, delta):
         limits = {

@@ -12,6 +12,8 @@
      shell fade, so the move never clips or blocks on geometry
    adjustable seat on the avatar's mount point: height / rotation /
      lateral / longitudinal sliders in the sim bar
+   simple avatar entry: dark-grey primitive figure walks to the driver
+     door and sits into the seat mount (sim-bar "avatar" replays it)
 
    No rounded boxes, no seat rig, no portal UI, no cognitive hooks.
    ============================================================ */
@@ -36,6 +38,7 @@ var simJumpEl = document.getElementById("simJump");
 var simGoEl = document.getElementById("simGo");
 var simSpeedEl = document.getElementById("simSpeed");
 var simSeatEl = document.getElementById("simSeat");
+var avatarBtn = document.getElementById("simAvatar");
 
 /* ---- adjustable seat controls (on/off toggle + 4 sliders, sim bar) ----- */
 var seatVisEl = document.getElementById("seatVis");
@@ -63,7 +66,8 @@ var state = (window.__CABIN3D__ = {
   simSpeed: 1,
   simTime: 0,
   camPos: null,
-  target: null
+  target: null,
+  avatar: "out"
 });
 
 /* Red full-screen failure surface: missing canvas, missing WebGL, or any
@@ -240,6 +244,149 @@ function boot() {
     seatBox("seatBack", 0.46, 0.52, 0.12, 0x6a6a72, 0, 0.65, -0.31, -0.14);
     seatBox("seatHead", 0.24, 0.14, 0.09, 0x7a7a82, 0, 0.96, -0.34, -0.14);
     pedestal.scale.y = 0.24;   /* 0.12..0.36 on the floor at the default */
+
+    /* -- avatar: simple figure + entry sequence ----------------------------
+       Purely visual — Phill (cognitive.js) stays the mind (avatar.js's
+       init() early-returns on the pre-seeded cabinApi.__avatar stub, so
+       this figure is the only body). Basic primitives in one dark-grey
+       material: box torso, sphere head, cylinder thighs/shins, box feet —
+       1.66 m standing, which puts the seated head at 1.26 m (1.34 m at the
+       46 cm seat max), always under the 1.34 m roofline. No rig: each leg
+       has one hip and one knee pivot purely so the sit pose (hips at
+       cushion height, knees bent) can be lerped. Phases: out at the driver
+       door -> walk (2 s, linear) -> sit (0.9 s: the drop + fold eases
+       ahead of the slide-in, so the head is already under the roof before
+       the body crosses the shell) -> parented to seatMount at local
+       (0, -0.50, -0.24), so every seat slider and the swivel carry it.
+       Plays once on load; the sim-bar "avatar" button replays it. -------- */
+    var avDoor = { x: -1.2, y: 0, z: -0.15 };   /* start: outside the driver
+       door — the seat rides at x -0.42, so its door is the -x side */
+    var avSeat = new THREE.Vector3(0, -0.5, -0.24);   /* seated pose, mount-local */
+    var WALK_MS = 2000, SIT_MS = 900;
+    var SEATED_THIGH = -1.78, SEATED_SHIN = 1.78;   /* ~102 deg at hip + knee */
+    var avPhase = "out", avT0 = 0;
+    var avA = new THREE.Vector3(avDoor.x, avDoor.y, avDoor.z);   /* walk start */
+    var avB = new THREE.Vector3();   /* walk end: outside the driver door */
+    var avC = new THREE.Vector3();   /* sit end: world pose on the seat */
+    var avYaw0 = 0, avYaw1 = 0;
+    var _avV = new THREE.Vector3();
+    function avSmooth(t) {
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      return t * t * (3 - 2 * t);
+    }
+    function avPlan() {
+      /* the walk stops just OUTSIDE the body skin (x <= -1.1) at the seat's
+         own height of the side window — an upright 1.66 m figure can never
+         stand up inside the 1.34 m cabin, so it only enters once folded */
+      var s = seatMount.getWorldPosition(_avV);
+      avB.set(
+        Math.min(s.x - 0.73, -1.1),
+        0,
+        Math.max(-0.35, Math.min(0.3, s.z - 0.25))
+      );
+      avYaw0 = Math.atan2(avB.x - avA.x, avB.z - avA.z);
+    }
+    function avPlanSeat() {
+      seatMount.updateWorldMatrix(true, false);
+      avC.copy(avSeat).applyMatrix4(seatMount.matrixWorld);
+      avYaw1 = seatMount.rotation.y;
+    }
+
+    var avMat = mat(0x3c3c42, 0.9);
+    var avRoot = new THREE.Group();
+    avRoot.name = "avatar";
+    function avPart(geo, x, y, z, parent) {
+      var m = new THREE.Mesh(geo, avMat);
+      m.position.set(x, y, z);
+      (parent || avRoot).add(m);
+      return m;
+    }
+    avPart(new THREE.BoxGeometry(0.42, 0.5, 0.24), 0, 1.15, 0);   /* torso 0.90..1.40 */
+    avPart(new THREE.SphereGeometry(0.13, 16, 12), 0, 1.53, 0);    /* head, top 1.66 */
+    var avThighGeo = new THREE.CylinderGeometry(0.09, 0.078, 0.42, 12);
+    var avShinGeo = new THREE.CylinderGeometry(0.075, 0.062, 0.42, 12);
+    var avFootGeo = new THREE.BoxGeometry(0.14, 0.06, 0.2);
+    function avLeg(side) {
+      var hip = new THREE.Group();
+      hip.position.set(side * 0.11, 0.9, 0);       /* hip pivot: 0.90 up */
+      avRoot.add(hip);
+      avPart(avThighGeo, 0, -0.21, 0, hip);
+      var knee = new THREE.Group();
+      knee.position.set(0, -0.42, 0);              /* knee pivot */
+      hip.add(knee);
+      avPart(avShinGeo, 0, -0.21, 0, knee);
+      avPart(avFootGeo, 0, -0.44, 0.04, knee);     /* toes point +z (forward) */
+      return { hip: hip, knee: knee };
+    }
+    var avLegL = avLeg(-1), avLegR = avLeg(1);
+    function setLegFold(k) {
+      var th = SEATED_THIGH * k, sh = SEATED_SHIN * k;
+      avLegL.hip.rotation.x = th; avLegR.hip.rotation.x = th;
+      avLegL.knee.rotation.x = sh; avLegR.knee.rotation.x = sh;
+    }
+    function avatarEnter() {
+      avPlan();
+      avPlanSeat();
+      scene.add(avRoot);              /* pulls it back out of seatMount */
+      avRoot.position.copy(avA);
+      avRoot.rotation.set(0, avYaw0, 0);
+      setLegFold(0);
+      avPhase = "walk";
+      avT0 = performance.now();
+      state.avatar = "walk";
+    }
+    function stepAvatar(now) {
+      if (avPhase === "walk") {
+        var p = Math.min(1, (now - avT0) / WALK_MS);
+        avRoot.position.lerpVectors(avA, avB, p);   /* linear, per spec */
+        if (p >= 1) {
+          avPlanSeat();        /* land on wherever the seat is now */
+          avPhase = "sit";
+          avT0 = now;
+          state.avatar = "sit";
+        }
+      } else if (avPhase === "sit") {
+        var q = Math.min(1, (now - avT0) / SIT_MS);
+        var eD = avSmooth(q / 0.55);   /* drop + fold first */
+        var eM = avSmooth((q - 0.4) / 0.6);   /* then slide aboard */
+        avRoot.position.set(
+          avB.x + (avC.x - avB.x) * eM,
+          avB.y + (avC.y - avB.y) * eD,
+          avB.z + (avC.z - avB.z) * eM
+        );
+        avRoot.rotation.y = avYaw0 + (avYaw1 - avYaw0) * eM;
+        setLegFold(eD);
+        if (q >= 1) {
+          seatMount.add(avRoot);        /* parent: rides the seat sliders */
+          avRoot.position.copy(avSeat);
+          avRoot.rotation.set(0, 0, 0);
+          setLegFold(1);
+          avPhase = "seated";
+          state.avatar = "seated";
+        }
+      }
+    }
+    /* a seat click may now land on the figure sitting on the seat — walking
+       the parent chain keeps click-to-focus working through it */
+    function inAvatar(o) {
+      while (o) { if (o === avRoot) return true; o = o.parent; }
+      return false;
+    }
+    avPlan();
+    avRoot.position.copy(avA);
+    avRoot.rotation.y = avYaw0;
+    scene.add(avRoot);
+    /* feed ui.js's per-frame mirror (README: __CABIN3D__.avatarPose) */
+    cabinApi.__avatar.getAvatarPose = function () {
+      avRoot.updateWorldMatrix(true, false);
+      var w = avRoot.getWorldPosition(_avV);
+      return {
+        state: avPhase,
+        world: { x: w.x, y: w.y, z: w.z },
+        seated: avPhase === "seated"
+      };
+    };
+    if (avatarBtn) avatarBtn.addEventListener("click", avatarEnter);
 
     /* -- simple SUV: full-height body + exterior-only roof cap + 4 wheels -----
            The body runs all the way to 1.34 (top); the roof is a thin cap
@@ -670,7 +817,8 @@ function boot() {
         camera
       );
       var hits = ray.intersectObjects(scene.children, true);
-      if (hits.length && seatSysOn && seatParts.indexOf(hits[0].object) !== -1) focusSeat();
+      if (hits.length && seatSysOn &&
+        (seatParts.indexOf(hits[0].object) !== -1 || inAvatar(hits[0].object))) focusSeat();
     });
 
     /* ---- zoom walk-out / walk-in: pulling the wheel past a threshold flies
@@ -750,6 +898,9 @@ function boot() {
     /* ---- ready ----------------------------------------------------------- */
     setRoof(true);
     state.ready = true;
+    /* the entry sequence plays once on load; the sim-bar button replays it
+       from the driver door at any time (the guard keeps it to one auto-run) */
+    setTimeout(function () { if (avPhase === "out") avatarEnter(); }, 700);
     if (statusEl) {
       statusEl.textContent = "cabin ready · drag to orbit · [C] walk outside · W/S/Q/E travel";
       setTimeout(function () { statusEl.className = "viewer-status gone"; }, 1600);
@@ -773,6 +924,7 @@ function boot() {
         c.position.x = -34 + mod68(c.userData.x0 + state.simTime * c.userData.s);
       }
       paintClock();
+      stepAvatar(now);
       controls.update();
       if (camAnim) {
         /* flight owns the camera; controls.update() above keeps damping
