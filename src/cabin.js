@@ -1,10 +1,13 @@
 /* ============================================================
    cabin-agent-sim — minimal cabin scene (clean rewrite)
 
-   cubic interior (floor, windowed walls — frames + tinted glass so the
-     cabin is visible from outside when the roof is off — dashboard cube;
-     NO ceiling panel: the roof cap is exterior-only, open to the sky)
-   simple SUV shell (full-height lower body + exterior-only roof cap + 4 wheels)
+   cubic interior (floor, windowed walls — A/B/C frames + tinted glass so
+     the cabin is visible from outside when the roof is off — dashboard
+     cube; NO ceiling panel: the roof cap is exterior-only, open to the
+     sky; car-like roofline at 1.42: tapered cap + raked windscreen
+     (Cayenne-like), not a bus box)
+   simple SUV shell (yellow skirt + hood/deck + open glasshouse +
+     exterior-only roof cap + 4 wheels)
    gradient sky dome + drifting cloud parallax
    road plane with animated dashed centre line
    OrbitControls, [C] interior/exterior toggle
@@ -131,15 +134,15 @@ function boot() {
     var camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.05, 400);
     var HOME = {
       interior: {
-        pos: new THREE.Vector3(0, 0.75, -0.95),
-        target: new THREE.Vector3(0, 0.5, 1.0)
+        pos: new THREE.Vector3(0, 0.80, -0.95),
+        target: new THREE.Vector3(0, 0.52, 1.0)
       },
       exterior: {
         /* three-quarter REAR view, pulled back so the whole vehicle, the road
            beneath it and the road running to the horizon all fit in frame
            (hood faces +z, so the tailgate is the -z end) */
         pos: new THREE.Vector3(-6.8, 3.0, -8.6),
-        target: new THREE.Vector3(0, 0.7, 0)
+        target: new THREE.Vector3(0, 0.72, 0)
       }
     };
     camera.position.copy(HOME.interior.pos);
@@ -147,12 +150,14 @@ function boot() {
     /* Seat mount point for the avatar — a bare Object3D, no rig; it also
        carries the adjustable seat meshes (see below), so slider changes land
        directly on cabinApi.seatMount position/rotation. It doubles as
-       avatar.js's seatRig/agentMount guard fields (same node); x/z rest at
-       avatar.js's driver waypoint, y follows the height slider (updateSeat,
-       default hgt 38 cm → y = 0.10). */
+       avatar.js's seatRig/agentMount guard fields (same node); rest pose is
+       the driver seat (x -0.42, z 0.38 — set back so the avatar's knees
+       clear the dash), y follows the height slider (updateSeat, default
+       hgt 38 cm → y = 0.10). updateSeat() hard-clamps every slider so the
+       seat can never leave the cabin. */
     var seatMount = new THREE.Object3D();
     seatMount.name = "seatMount";
-    seatMount.position.set(-0.42, 0.1, 0.55);
+    seatMount.position.set(-0.42, 0.1, 0.38);
 
     cabinApi.scene = scene;
     cabinApi.camera = camera;
@@ -176,17 +181,23 @@ function boot() {
       return m;
     }
 
-    /* -- cubic interior: floor 0.12, walls up to the roof line (tops 1.35;
-           the body top stops 1 cm lower at 1.34 so the wall tops never
-           z-fight it when the cap is off). Each wall is built as a WINDOW
-           FRAME (body colour 0x55555d) plus tinted glass (0x88aacc @ 0.3):
-           side windows 0.8 x 0.5 centred at y 0.8, windscreen / rear
-           window full width x 0.5 across the top — so with the roof off
-           the exterior still reads as a vehicle AND you can see straight
-           into the cabin from outside. The frame pieces are solid meshes,
-           so they stay solid from in here; there is NO ceiling panel of
-           any kind (the roof cap only draws for an eye outside the shell —
-           see insideShell), the cabin is open floor-to-roof to the sky. */
+    /* -- cubic interior: floor 0.12, walls up to the car-like roof line
+           (tops 1.42; the body top stops 1 cm lower at 1.41 so the wall
+           tops never z-fight it when the cap is off). Each wall is built
+           as a WINDOW FRAME (body colour 0x55555d) plus tinted glass
+           (0x88aacc @ 0.3): side windows split by a B-pillar into front
+           (z 0.05..0.40) and rear (z -0.40..-0.05) panes, y 0.55..1.12 —
+           A-pillar at the windscreen end, B-pillar amidships, C-pillar at
+           the rear end, so the greenhouse reads as a framed automobile;
+           the windscreen rakes back ~28° Cayenne-like from the cowl top to
+           tuck under the roof front edge (sloped A-posts rake with it),
+           rear window full width x 0.52 across the top — so
+           with the roof off the exterior still reads as a vehicle AND you
+           can see straight into the cabin from outside. The frame pieces
+           are solid meshes, so they stay solid from in here; there is NO
+           ceiling panel of any kind (the roof cap only draws for an eye
+           outside the shell — see insideShell), the cabin is open
+           floor-to-roof to the sky. */
     var interior = new THREE.Group();
     interior.name = "interior";
     scene.add(interior);
@@ -206,23 +217,41 @@ function boot() {
       wallParts.push(m);
       return m;
     }
-    /* side walls: sill + header + fore/aft pillars around the opening
-       z -0.40..0.40 (0.8 long), y 0.55..1.05 (0.5 tall, centre y 0.80) */
+    /* side walls: sill + header + A/B/C pillars around the openings
+       z -0.40..0.40 (front pane 0.05..0.40, rear pane -0.40..-0.05),
+       y 0.55..1.12 (0.57 tall, centre y 0.835); headers run z -1.30..1.05,
+       ending where the raked windscreen begins */
     wPart("wallLsill", 0.06, 0.43, 2.6, -0.93, 0.335, 0);
-    wPart("wallLhead", 0.06, 0.30, 2.6, -0.93, 1.2, 0);
-    wPart("wallLpilF", 0.06, 0.5, 0.9, -0.93, 0.8, 0.85);
-    wPart("wallLpilR", 0.06, 0.5, 0.9, -0.93, 0.8, -0.85);
-    wGlass("wallLglass", 0.02, 0.5, 0.8, -0.93, 0.8, 0);
+    wPart("wallLhead", 0.06, 0.15, 2.35, -0.93, 1.345, -0.125);
+    wPart("wallLpilA", 0.06, 0.57, 0.9, -0.93, 0.835, 0.85);
+    wPart("wallLpilB", 0.06, 0.57, 0.10, -0.93, 0.835, 0);
+    wPart("wallLpilC", 0.06, 0.57, 0.9, -0.93, 0.835, -0.85);
+    wGlass("wallLglassF", 0.02, 0.57, 0.35, -0.93, 0.835, 0.225);
+    wGlass("wallLglassR", 0.02, 0.57, 0.35, -0.93, 0.835, -0.225);
     wPart("wallRsill", 0.06, 0.43, 2.6, 0.93, 0.335, 0);
-    wPart("wallRhead", 0.06, 0.30, 2.6, 0.93, 1.2, 0);
-    wPart("wallRpilF", 0.06, 0.5, 0.9, 0.93, 0.8, 0.85);
-    wPart("wallRpilR", 0.06, 0.5, 0.9, 0.93, 0.8, -0.85);
-    wGlass("wallRglass", 0.02, 0.5, 0.8, 0.93, 0.8, 0);
-    /* windscreen / rear window: full width, y 0.85..1.35 (top 0.5) */
-    wPart("wallFcowl", 1.92, 0.73, 0.06, 0, 0.485, 1.33);
-    wGlass("wallFglass", 1.92, 0.5, 0.02, 0, 1.1, 1.33);
-    wPart("wallBcowl", 1.92, 0.73, 0.06, 0, 0.485, -1.33);
-    wGlass("wallBglass", 1.92, 0.5, 0.02, 0, 1.1, -1.33);
+    wPart("wallRhead", 0.06, 0.15, 2.35, 0.93, 1.345, -0.125);
+    wPart("wallRpilA", 0.06, 0.57, 0.9, 0.93, 0.835, 0.85);
+    wPart("wallRpilB", 0.06, 0.57, 0.10, 0.93, 0.835, 0);
+    wPart("wallRpilC", 0.06, 0.57, 0.9, 0.93, 0.835, -0.85);
+    wGlass("wallRglassF", 0.02, 0.57, 0.35, 0.93, 0.835, 0.225);
+    wGlass("wallRglassR", 0.02, 0.57, 0.35, 0.93, 0.835, -0.225);
+    /* windscreen: raked ~28° (rotation.x -0.494) from the cowl top
+       (y 0.90, z 1.33) to tuck under the roof front edge (y 1.42, z 1.05);
+       narrowed to ±0.95 so the raked edges bury inside the side pillars
+       instead of sitting coplanar on them. Rear window stays vertical. */
+    var fg = wGlass("wallFglass", 1.90, 0.62, 0.02, 0, 1.16, 1.19);
+    fg.rotation.x = -0.494;
+    function wPost(name, x) {
+      var m = box(interior, name, 0.08, 0.66, 0.08, FRAME, x, 1.16, 1.19);
+      m.rotation.x = -0.494;   /* same rake: base buried in the cowl, top in the cap */
+      wallParts.push(m);
+      return m;
+    }
+    wPost("wallLpostA", -0.93);
+    wPost("wallRpostA", 0.93);
+    /* rear window: full width, y 0.90..1.42 (top 0.52) */
+    wPart("wallBcowl", 1.92, 0.78, 0.06, 0, 0.51, -1.33);
+    wGlass("wallBglass", 1.90, 0.52, 0.02, 0, 1.16, -1.33);
     box(interior, "dash", 1.7, 0.4, 0.45, 0x26262c, 0, 0.32, 1.0, 0.8);
     interior.add(seatMount);
 
@@ -248,10 +277,10 @@ function boot() {
     /* -- avatar: simple figure + entry sequence ----------------------------
        Purely visual — Phill (cognitive.js) stays the mind (avatar.js's
        init() early-returns on the pre-seeded cabinApi.__avatar stub, so
-       this figure is the only body). Basic primitives in one dark-grey
+       this figure is the only body). Basic primitives in one turquoise
        material: box torso, sphere head, cylinder thighs/shins, box feet —
        1.66 m standing, which puts the seated head at 1.26 m (1.34 m at the
-       46 cm seat max), always under the 1.34 m roofline. No rig: each leg
+       46 cm seat max), always under the 1.41 m roofline. No rig: each leg
        has one hip and one knee pivot purely so the sit pose (hips at
        cushion height, knees bent) can be lerped. Phases: out at the driver
        door -> walk (2 s, linear) -> sit (0.9 s: the drop + fold eases
@@ -277,7 +306,7 @@ function boot() {
     function avPlan() {
       /* the walk stops just OUTSIDE the body skin (x <= -1.1) at the seat's
          own height of the side window — an upright 1.66 m figure can never
-         stand up inside the 1.34 m cabin, so it only enters once folded */
+         stand up inside the 1.41 m cabin, so it only enters once folded */
       var s = seatMount.getWorldPosition(_avV);
       avB.set(
         Math.min(s.x - 0.73, -1.1),
@@ -292,7 +321,7 @@ function boot() {
       avYaw1 = seatMount.rotation.y;
     }
 
-    var avMat = mat(0x3c3c42, 0.9);
+    var avMat = mat(0x40c8c0, 0.9);   /* turquoise figure */
     var avRoot = new THREE.Group();
     avRoot.name = "avatar";
     function avPart(geo, x, y, z, parent) {
@@ -388,21 +417,44 @@ function boot() {
     };
     if (avatarBtn) avatarBtn.addEventListener("click", avatarEnter);
 
-    /* -- simple SUV: full-height body + exterior-only roof cap + 4 wheels -----
-           The body runs all the way to 1.34 (top); the roof is a thin cap
-           seated on the wall tops (1.35..1.40). The cap is an EXTERIOR
+    /* -- simple SUV: yellow skirt + hood/deck + open glasshouse +
+           exterior-only roof cap + 4 wheels. The solid bodywork stops at
+           the beltline (0.88): yellow skirt full-length below, grey hood
+           (front, z 1.30..2.15) and deck (rear, z -2.15..-1.30) above it —
+           so the greenhouse (frames + raked windscreen + glass) stands open
+           to the air and the windshield is never blocked by a solid block.
+           The roof is a thin tapered cap seated on the wall tops
+           (1.42..1.47), narrowed and shortened versus the body so the
+           greenhouse reads automobile, not bus. The cap is an EXTERIOR
            part only: the render loop hides it while the eye is inside the
            shell (insideShell), so it never draws as a grey ceiling panel
            in there — the interior sees sky, the exterior sees a solid
-           roof (roof off = cap hidden in both views). ------------------- */
+           roof (roof off = cap hidden in both views). ------------------ */
     var suv = new THREE.Group();
     suv.name = "suv";
     scene.add(suv);
-    var bodyLower = box(suv, "bodyLower", 1.96, 1.28, 4.3, 0x4a4a52, 0, 0.70, 0, 0.75);
-    /* cap (±0.96) seats exactly on the wall tops at y 1.35, inset 2 cm
-       from the body sides (±0.98); the body stopping at 1.34 keeps every
-       horizontal plane distinct (no z-fighting when the cap is hidden) */
-    var roofMesh = box(suv, "bodyRoof", 1.92, 0.05, 3.4, 0x55555d, 0, 1.375, -0.15, 0.75);
+    /* yellow lower skirt (0.06..0.61) full length + grey hood/deck
+       (0.61..0.88, inset 3 cm per side): stepped nose/tail, glasshouse
+       open above the beltline. The skirt is 4 perimeter strips, not one
+       solid box, so no yellow top face ever spans the cabin and cuts the
+       interior view — the exterior sides read exactly the same. */
+    var bodySkirtParts = [];
+    function skirtPart(name, w, d, x, z) {
+      var m = box(suv, name, w, 0.55, d, 0xe9a90b, x, 0.335, z, 0.75);
+      bodySkirtParts.push(m);
+      return m;
+    }
+    skirtPart("bodySkirtL", 0.10, 4.30, -0.93, 0);
+    skirtPart("bodySkirtR", 0.10, 4.30, 0.93, 0);
+    skirtPart("bodySkirtF", 1.76, 0.10, 0, 2.10);
+    skirtPart("bodySkirtB", 1.76, 0.10, 0, -2.10);
+    var hood = box(suv, "hood", 1.90, 0.27, 0.85, 0x4a4a52, 0, 0.745, 1.725, 0.75);
+    var deck = box(suv, "deck", 1.90, 0.27, 0.85, 0x4a4a52, 0, 0.745, -1.725, 0.75);
+    var bodyShell = bodySkirtParts.concat([hood, deck]);
+    /* tapered cap (±0.90, z -1.65..1.35) seats exactly on the wall tops
+       at y 1.42; hood/deck stop at 0.88, so every horizontal plane stays
+       distinct (no z-fighting when the cap is hidden) */
+    var roofMesh = box(suv, "bodyRoof", 1.80, 0.05, 3.0, 0x55555d, 0, 1.445, -0.15, 0.75);
     var wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.24, 18);
     var wheelMat = mat(0x17171a, 0.95);
     /* wheels sit 8 cm proud of the body side so all four still read from a
@@ -580,7 +632,7 @@ function boot() {
     var BOUND = {
       x: 0.8,
       yLo: 0.2,
-      yHi: 1.2,
+      yHi: 1.28,
       zLo: -1.2,
       zHi: 1.15
     };
@@ -610,21 +662,24 @@ function boot() {
       state.roof = !!on;
       roofMesh.visible = state.roof;
       var b = state.roof ? 1 : 0.12;
-      bodyLower.userData.baseOpacity = b;
-      var bm = bodyLower.material;
-      if (bm.opacity !== b) bm.opacity = b;
-      var bt = b < 0.999;
-      if (bm.transparent !== bt) { bm.transparent = bt; bm.needsUpdate = true; }
+      for (var bi = 0; bi < bodyShell.length; bi++) {
+        var bp = bodyShell[bi];
+        bp.userData.baseOpacity = b;
+        var bm = bp.material;
+        if (bm.opacity !== b) bm.opacity = b;
+        var bt = b < 0.999;
+        if (bm.transparent !== bt) { bm.transparent = bt; bm.needsUpdate = true; }
+      }
       if (roofBtn) roofBtn.className = "btn" + (state.roof ? " on" : "");
     }
     /* the roof cap is exterior-only: hide it whenever the eye is inside
-       the body shell (x ±0.98, y 0.06..1.34, z ±2.15 — the exact volume
+       the body shell (x ±0.98, y 0.06..1.41, z ±2.15 — the exact volume
        whose own faces are backface-culled), so in there nothing ever
        draws overhead and the sky dome shows through the open roof line.
        From outside the cap renders as the full solid exterior roof. */
     function insideShell(p) {
       return p.x > -0.98 && p.x < 0.98 &&
-             p.y > 0.06 && p.y < 1.34 &&
+             p.y > 0.06 && p.y < 1.41 &&
              p.z > -2.15 && p.z < 2.15;
     }
     function resetView() {
@@ -748,10 +803,18 @@ function boot() {
     var seatSysOn = true;
     state.seat = seatCtl;
     function updateSeat() {
+      /* hard clamps: the sliders can never push the seat out of the cabin
+         (inner walls x ±0.90, front/rear walls z ±1.30) and the rest pose
+         sits back (z 0.38) so the seated avatar's knees clear the dash
+         face (z 0.775) at every slider extreme */
+      var sx = -0.42 + seatCtl.lat / 100;
+      var sz = 0.38 + seatCtl.lng / 100;
+      sx = Math.min(0.67, Math.max(-0.67, sx));
+      sz = Math.min(0.75, Math.max(-0.50, sz));
       seatMount.position.set(
-        -0.42 + seatCtl.lat / 100,
+        sx,
         seatCtl.hgt / 100 - 0.28,   /* cushion top = floor(0.12) + hgt cm */
-        0.55 + seatCtl.lng / 100
+        sz
       );
       seatMount.rotation.y = THREE.MathUtils.degToRad(seatCtl.rot);
       pedestal.scale.y = 0.14 + seatMount.position.y;
@@ -831,7 +894,7 @@ function boot() {
     var EXIT_DIST = 2.0;    /* interior zoom-out: past the interior bounds */
     var ENTER_DIST = 3.0;   /* exterior zoom-in: outside the shell (max ~2.5) */
     var FADE_MS = 500;
-    var SHELL = wallParts.concat([roofMesh, bodyLower]);
+    var SHELL = wallParts.concat([roofMesh].concat(bodyShell));
     var camAnim = null;
     var lastDist = camera.position.distanceTo(controls.target);
     function shellFade(k) {

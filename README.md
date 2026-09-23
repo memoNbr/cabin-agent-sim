@@ -16,6 +16,16 @@ forward input back. A real LLM (Groq free tier by default) words the
 thoughts, picks among *legal* goals and answers the chat — anything it
 can't do falls back to deterministic rules, so a run never breaks.
 
+## Preview
+
+![Cabin simulation — SUV exterior and interior](docs/preview.png)
+
+Current 3D scene (`src/cabin.js`): framed SUV greenhouse with A/B/C
+pillars, raked windscreen, yellow skirt with grey hood/deck, turquoise
+avatar that walks in and sits, and a seat clamped inside the cabin with
+its knees clear of the dash. Drag to orbit, `[C]` to walk outside,
+`W/S/Q/E` to travel.
+
 ## Web app (Vite + three.js)
 
 The interactive cabin runs as a **Vite web app at the repo root**
