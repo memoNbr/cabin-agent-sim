@@ -112,8 +112,11 @@ def main(argv=None):
     from .server import serve
 
     url = f"http://127.0.0.1:{args.port}"
-    mins = args.duration / 60
-    print(f"Open {url} in your browser. Session: {mins:.2g} min. "
+    if args.duration > 0:
+        session_txt = f"Session: {args.duration / 60:.2g} min."
+    else:
+        session_txt = "Session: unlimited."   # --duration 0 runs until Ctrl+C
+    print(f"Open {url} in your browser. {session_txt} "
           f"(Ctrl+C to stop)", flush=True)
     try:
         serve(engine, args.port, interval=args.interval)

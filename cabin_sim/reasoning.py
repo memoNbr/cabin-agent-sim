@@ -38,7 +38,17 @@ THROTTLE_S = 12.0       # min sim-seconds between deliberation calls; sized
                         # to the Groq free tier (~6K TPM at tick-dt 2.0 →
                         # ≈8 calls/min ≈ 4K TPM, zero 429s — at 8.0 we still
                         # saw ~4 429/min, each stalling the session lock)
-RETRY_BACKOFF = 1.5     # wall-seconds before the single retry
+RETRY_BACKOFF = 4.0     # wall-seconds before the single retry — measured:
+                        # 1.5s always lands inside the same 429 window, 4s
+                        # crosses the edge (entry greet went bank -> LLM)
+SPEAK_GAP_S = 30.0      # min wall-seconds between ANY non-priority model
+                        # call — deliberate() and speak_line() check it,
+                        # chat() only stamps it. Measured on gpt-oss-120b:
+                        # at 7.5, 14 and even 20 the rolling TPM window kept
+                        # rejecting deliberate; 30s ≈ 2 calls/min fits under
+                        # it, and speech never stalls (skip -> bank line)
+SPEAK_FORCE_S = 10.0    # floor between FORCED lines: the entry greeting skips
+                        # the gap, but never faster than this
 
 
 def create_reasoner(provider, mode="auto", persona=None, chat_provider=None):
@@ -95,9 +105,9 @@ def state_block(mind):
     memories = "; ".join(f"{tr['label']} ({tr['act']:.2f})" for tr in top) or "none"
     return (
         f"t={mind.t:.0f}s phase={mind.phase} | "
-        f"seat {seat.rotation_deg % 360:.0f}° / {seat.height_mm / 10:.0f}cm "
-        f"(pref {mind.target_rot:.0f}°±{mind.tol_rot:.0f} / "
-        f"{mind.target_hgt_cm:.0f}±{mind.tol_hgt_cm:.1f}cm) | "
+        f"seat {seat.rotation_deg % 360:.0f}° / {seat.height_mm / 10:.0f}cm / "
+        f"slide {seat.slider_mm:.0f}mm (pref {mind.target_rot:.0f}°/"
+        f"{mind.target_hgt_cm:.0f}cm/{mind.target_slider_mm:.0f}mm) | "
         f"fit_gap={mind.belief['fit_gap']:.2f} "
         f"user_hands={'yes' if mind.belief['user_hands'] else 'no'} | "
         f"mood comfort {mind.mood['comfort']:.2f} "
@@ -165,6 +175,8 @@ class LLMReasoner:
         self.calls = 0                      # observability (tests, HUD)
         self._last_offered = None           # deliberation throttle
         self._last_deliberate_t = -1e9
+        self._last_wall = 0.0               # shared rate-gap stamp (all lanes)
+        self._last_forced = -1e9            # forced-line floor (entry greet)
 
     # ---- transport --------------------------------------------------------
 
@@ -176,6 +188,7 @@ class LLMReasoner:
             {"role": "user", "content": user_msg},
         ]
         self.calls += 1
+        self._last_wall = time.monotonic()   # every attempt shares the budget
         try:
             return provider.complete(messages)
         except Exception:                    # noqa: BLE001 - one backoff retry
@@ -201,6 +214,9 @@ class LLMReasoner:
         if (key == self._last_offered
                 and now - self._last_deliberate_t < THROTTLE_S):
             return None, None                # too soon: rules cover this tick
+        if time.monotonic() - self._last_wall < SPEAK_GAP_S:
+            return None, None     # a speak/chat just spent the rate budget;
+                                  # deliberately NOT stamped — next tick retries
         self._last_offered, self._last_deliberate_t = key, now
         legal = " | ".join(f"{g} (desire {v:.2f})" for g, v in
                            ((g, mind._desire(g)) for g in offered))
@@ -219,11 +235,55 @@ class LLMReasoner:
                   file=sys.stderr)
             return None, None
         if not data:
+            print("reasoning: deliberate: empty answer — rules this tick.",
+                  file=sys.stderr)
             return None, None
         intention = data.get("intention")
         intention = intention.strip() if isinstance(intention, str) else None
         thought = clean_line(data.get("thought"), MAX_THOUGHT)
         return intention, thought
+
+    # ---- spoken lines (LLM first, phrase bank as fallback) ----------------
+
+    def speak_line(self, mind, situation, force=False):
+        """One short in-character line to say out loud (None = use the bank).
+
+        Shares the wall-clock rate gap with deliberate()/chat(): when the gap
+        or the provider says no, the caller falls back to its phrase bank, so
+        a run can never stall or break on this call. force=True lets a rare,
+        user-visible moment (the entry greeting) skip the gap — still floored
+        by SPEAK_FORCE_S so replays cannot hammer the provider.
+        """
+        now = time.monotonic()
+        if force:
+            if now - self._last_forced < SPEAK_FORCE_S:
+                return None
+            self._last_forced = now
+        elif now - self._last_wall < SPEAK_GAP_S:
+            return None                     # budget spent — bank answers this one
+        msg = (
+            f"STATE: {state_block(mind)}\n"
+            f"SITUATION: {situation}\n"
+            "Say ONE line Phill would say out loud right now (max 14 words, "
+            'first person, in character). Respond with JSON:\n'
+            '{"line": "<the line>"}'
+        )
+        data = None
+        try:
+            data = extract_json(self._complete(msg))
+        except Exception as exc:            # noqa: BLE001 - degrade, never crash
+            if not force:
+                print(f"reasoning: speak_line failed ({exc}) — bank used.",
+                      file=sys.stderr)
+                return None
+            time.sleep(RETRY_BACKOFF)   # a visible moment earns the shared
+            try:                        # retry;4s crosses the429 window edge
+                data = extract_json(self._complete(msg))
+            except Exception as exc2:
+                print(f"reasoning: speak_line failed ({exc2}) — bank used.",
+                      file=sys.stderr)
+                return None
+        return clean_line((data or {}).get("line"), MAX_THOUGHT) or None
 
     # ---- experimenter chat -------------------------------------------------
 

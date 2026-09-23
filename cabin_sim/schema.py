@@ -28,7 +28,7 @@ SCHEMA_NAME = "cabin-agent.v1"
 # cabin_sim.world.Seat; tests/test_world.py guards against drift.
 SEAT_AXES = ("slider_mm", "height_mm", "recline_deg", "rotation_deg")
 SEAT_LIMITS = {
-    "slider_mm": (260, 460),
+    "slider_mm": (260, 440),
     "height_mm": (380, 460),
     "recline_deg": (80, 110),
     "rotation_deg": (0, 359),
@@ -56,7 +56,8 @@ def empty_snapshot() -> dict:
             "vending": {"snack": None, "water": None, "coffee": None},
             "table": {"folded": None},
         },
-        "ride": {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0},  # filled by mind
+        "ride": {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0,
+                 "kind": ""},  # filled by mind
         "agent": {
             "mood": {"comfort": None, "energy": None, "suspicion": None},
             "trust": {"score": None, "live": None},  # live: filled by mind
@@ -74,6 +75,7 @@ def empty_snapshot() -> dict:
             "samples": [],   # mood/trust samples every ~3 s (summary charts)
             "trail": [],     # live-trust trail [{t, v}]
             "prefs": {"rot": None, "hgt": None, "tolRot": None, "tolHgt": None},
+            "traits": [],  # persona trait strings, e.g. ["introvert", "suspicious"]
         },
         "priors": {"rides": 0, "trust": None},  # filled by engine priors JSON
         "log": [],
@@ -145,7 +147,10 @@ def build_snapshot(engine) -> dict:
         snap_agent["prefs"] = {"rot": mind.target_rot, "hgt": mind.target_hgt_cm,
                                "tolRot": mind.tol_rot, "tolHgt": mind.tol_hgt_cm}
         snapshot["ride"].update({k: round(float(v), 4)
-                                 for k, v in mind.ride.items()})
+                                 for k, v in mind.ride.items() if k != "kind"})
+        snapshot["ride"]["kind"] = str(mind.ride.get("kind", "") or "")
+        snap_agent["traits"] = list(
+            getattr(getattr(engine, "mind", None), "persona", {}).get("traits", []))
         snapshot["priors"] = mind.priors or {"rides": 0, "trust": None}
     else:
         snapshot["agent"]["speech"] = st.get("say") or ""
@@ -200,6 +205,10 @@ def check(snapshot) -> list[str]:
             issues.append(f"memory trace act={act!r} outside [0, 1]")
 
     for axis, v in (snapshot.get("ride") or {}).items():
+        if axis == "kind":
+            if not isinstance(v, str):
+                issues.append(f"ride.kind={v!r} must be an event-kind string")
+            continue
         if not isinstance(v, (int, float)) or v < 0:
             issues.append(f"ride.{axis}={v!r} must be a non-negative number")
 

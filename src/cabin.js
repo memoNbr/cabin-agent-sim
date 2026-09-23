@@ -85,6 +85,7 @@ function fatal(msg) {
     el.setAttribute("role", "alert");
     el.style.cssText =
       "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;" +
+      "pointer-events:none;" +   /* never swallow clicks — chat/music/HUD keep working */
       "justify-content:center;padding:28px;background:#1a0000;color:#ff6b6b;" +
       "border:2px solid #ff3b30;font:13px/1.65 ui-monospace,Consolas,monospace;" +
       "white-space:pre-wrap;text-align:left;box-sizing:border-box;";
@@ -272,6 +273,18 @@ function boot() {
     seatBox("seatCushion", 0.46, 0.14, 0.4, 0x7a7a82, 0, 0.33, -0.05);
     seatBox("seatBack", 0.46, 0.52, 0.12, 0x6a6a72, 0, 0.65, -0.31, -0.14);
     seatBox("seatHead", 0.24, 0.14, 0.09, 0x7a7a82, 0, 0.96, -0.34, -0.14);
+    /* seat control cluster on the right bolster (real seat-side furniture
+       the avatar's hand can actually touch): height lever (front), swivel
+       dial/knob (middle), slide paddle (rear). Grab points below are the
+       mount-local spots the hand aims at (see CTLS). */
+    seatBox("seatCtlH", 0.05, 0.12, 0.07, 0x232328, 0.26, 0.35, 0.02);
+    seatBox("seatCtlR", 0.06, 0.05, 0.06, 0x232328, 0.26, 0.375, -0.10);
+    seatBox("seatCtlS", 0.05, 0.08, 0.10, 0x232328, 0.26, 0.34, -0.20);
+    var CTLS = {
+      height: { grab: [0.26, 0.41, 0.02] },
+      dial: { grab: [0.29, 0.375, -0.10] },
+      slide: { grab: [0.29, 0.34, -0.20] }
+    };
     pedestal.scale.y = 0.24;   /* 0.12..0.36 on the floor at the default */
 
     /* -- avatar: simple figure + entry sequence ----------------------------
@@ -330,8 +343,282 @@ function boot() {
       (parent || avRoot).add(m);
       return m;
     }
-    avPart(new THREE.BoxGeometry(0.42, 0.5, 0.24), 0, 1.15, 0);   /* torso 0.90..1.40 */
-    avPart(new THREE.SphereGeometry(0.13, 16, 12), 0, 1.53, 0);    /* head, top 1.66 */
+    var avTorso = avPart(new THREE.BoxGeometry(0.42, 0.5, 0.24), 0, 1.15, 0);   /* torso 0.90..1.40 */
+    /* head group (pivot at the neck) + eyes + arms: the cognitive face.
+       NOTE: avatar.js is dead code — its init() early-returns on the stub,
+       so the expression rig lives HERE on the live figure. Every channel
+       below reads window.__COG_LIVE__ (cognitive.js bridge) with numeric
+       guards; backend down = calm baseline, never hardcoded moods. */
+    var avHeadG = new THREE.Group();
+    avHeadG.name = "avatarHead";
+    avHeadG.position.set(0, 1.42, 0);
+    avRoot.add(avHeadG);
+    function avHeadPart(geo, x, y, z, material) {
+      var m = new THREE.Mesh(geo, material || avMat);
+      m.position.set(x, y, z);
+      avHeadG.add(m);
+      return m;
+    }
+    avHeadPart(new THREE.SphereGeometry(0.13, 16, 12), 0, 0.11, 0);   /* head, top 1.66 */
+    var avEyeMat = mat(0x141416, 0.9);
+    function avEye(x) {
+      var m = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), avEyeMat);
+      m.position.set(x, 0.13, 0.115);
+      avHeadG.add(m);
+      return m;
+    }
+    var avEyeL = avEye(-0.05), avEyeR = avEye(0.05);
+    function avArm(side) {
+      var sh = new THREE.Group();
+      sh.position.set(side * 0.26, 1.32, 0);
+      avRoot.add(sh);
+      var a = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.42, 0.09), avMat);
+      a.position.set(0, -0.21, 0);
+      sh.add(a);
+      var h = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), avMat);
+      h.position.set(0, -0.44, 0);
+      sh.add(h);
+      return sh;
+    }
+    var avArmL = avArm(-1), avArmR = avArm(1);
+    /* expression state: damped toward cognitive targets every frame */
+    var _ex = { yaw: 0, pitch: 0, lean: 0, armL: 0, aim: 0,
+      ctl: null, ctlT: -1e9, nodT: -1e9, lastSpeech: "",
+      sacT: 2, sacHold: 0, sacYaw: 0, sacPitch: 0,
+      lastIntent: null, intentT: -1e9 };
+    var _exT = -1;
+    var _exInit = false;
+    var _lastMP = new THREE.Vector3();
+    var _lastMY = 0;
+    var _e1 = new THREE.Euler();
+    var _e2 = new THREE.Euler();
+    var _q1 = new THREE.Quaternion();
+    var _qG = new THREE.Quaternion();
+    var _qAim = new THREE.Quaternion();
+    var _v1 = new THREE.Vector3();
+    var _v2 = new THREE.Vector3();
+    var _down = new THREE.Vector3(0, -1, 0);
+    function exNum(v, d) { return (typeof v === "number" && isFinite(v)) ? v : d; }
+    function exClamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+    function exClamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+    /* Phill's documented defaults (personas/phill.json traits) — used only
+       until the live persona channel publishes; live traits always win.
+       Weights below are calibration constants; every BEHAVIOR they scale is
+       selected by live trait + mood + ride state, never hardcoded. */
+    var PHILL_TRAITS = ["introvert", "suspicious", "confident", "uninterested in cars"];
+    function traitGains(raw) {
+      var list = (raw instanceof Array && raw.length) ? raw : PHILL_TRAITS;
+      var has = function (n) { return list.indexOf(n) >= 0; };
+      return {
+        introvert: has("introvert") ? 0.8 : 0.2,
+        suspicious: has("suspicious") ? 0.75 : 0.25,
+        confident: has("confident") ? 0.7 : 0.3,
+        cars: has("uninterested in cars") ? 0.15 : 0.5
+      };
+    }
+    function stepExpression(nowMs) {
+      var now = nowMs / 1000;
+      var dt = _exT < 0 ? 0.016 : Math.min(Math.max(now - _exT, 0), 0.1) || 0.016;
+      _exT = now;
+      var C = (typeof window !== "undefined" ? window.__COG_LIVE__ : null) || null;
+      var mood = (C && C.mood) || {};
+      var ride = (C && C.ride) || {};
+      var comfort = exNum(mood.comfort, 0.5);
+      var energy = exNum(mood.energy, 0.6);
+      var suspicion = exNum(mood.suspicion, 0.5);
+      var trust = exNum(C && C.trust, 0.5);
+      var jolt = Math.max(0, exNum(ride.jolt, 0));
+      var g = Math.max(0, exNum(ride.g, 0));
+      var speed = Math.max(0, exNum(ride.speed, 0));
+      var intent = (C && C.intention) || null;
+      var speech = (C && typeof C.speech === "string") ? C.speech : "";
+      var cogModule = (C && typeof C.module === "string") ? C.module : null;
+      var rideKind = (C && C.ride && typeof C.ride.kind === "string") ? C.ride.kind : "";
+      var P = traitGains(C && C.persona && C.persona.traits);
+      if (intent !== _ex.lastIntent) { _ex.lastIntent = intent; _ex.intentT = now; }
+      var seated = avPhase === "seated";
+      /* 1) facial expression from mood: suspicion widens the eyes, trust relaxes the lids */
+      /* personality-modulated vigilance: suspicion blended with the
+         suspicious trait, decaying as trust is earned (slow trust = more
+         vigilant glancing) */
+      var vigilance = exClamp01((suspicion * 0.55 + P.suspicious * 0.45) * (1 - 0.4 * trust));
+      var alertK = vigilance > 0.5 ? exClamp01((vigilance - 0.5) / 0.5) : 0;
+      var tension = exClamp01(suspicion * (0.4 + 0.6 * P.suspicious));
+      var slumpK = energy < 0.4 ? exClamp01((0.4 - energy) / 0.4) : 0;
+      var braceK, curveK;
+      if (rideKind) {
+        braceK = rideKind === "brake" ? 1 : 0;
+        curveK = rideKind === "curve" ? 1 : 0;
+      } else {
+        braceK = exClamp01(Math.max(0, (g - 0.35) / 0.3));
+        curveK = 0;
+      }
+      var joltK = exClamp01(Math.max(0, (jolt - 0.22) / 0.35));
+      /* introvert gain: minimizes unnecessary motion, not threat scanning */
+      var moveGain = (1 - 0.45 * P.introvert) * (1 - 0.4 * tension);
+      var lidK = trust > 0.6 ? exClamp01((trust - 0.6) / 0.4) : 0;
+      var eyeS = 1 + 0.65 * alertK;
+      avEyeL.scale.set(eyeS, eyeS * (1 - 0.35 * lidK), 1);
+      avEyeR.scale.set(eyeS, eyeS * (1 - 0.35 * lidK), 1);
+      /* 2) head tracking toward ride events: scan on jolt, pitch down on braking g, far gaze at speed */
+      var yawT = (Math.sin(now * 0.9) * 0.05
+        + Math.sin(now * 3.1) * 0.5 * alertK
+        + Math.sin(now * 9.0) * 0.25 * joltK) * moveGain;
+      yawT *= (1 - 0.8 * braceK);   /* brace is steady, never curious */
+      var pitchT = 0.06 * alertK * (1 - braceK) + 0.10 * braceK
+        - 0.04 * exClamp01(speed / 30);
+      /* relaxed lean-back when comfortable and trusted (seated only) */
+      var calmK = (comfort > 0.7 && trust > 0.55) ? exClamp01((comfort - 0.7) / 0.3) : 0;
+      var leanT = seated ? -0.05 * calmK : 0;
+      if (slumpK > 0 && seated) {
+        /* low energy slumps forward, winning over the relaxed lean-back */
+        leanT += 0.10 * slumpK;
+        pitchT += 0.08 * slumpK;
+      }
+      if (curveK > 0 && seated) {
+        /* planted into the seat through the curve: ride publishes no
+           lateral channel, so this is a centered plant, never a faked
+           directional lean */
+        leanT += 0.04 * curveK;
+        yawT *= (1 - 0.5 * curveK);
+      }
+      /* 3) seat-control tracking: which rail moved this frame? height (y),
+            swivel dial (yaw, wrap-safe) or slide track (x/z). Head + right
+            hand go to the moving control; settle with no motion defaults to
+            the dial. Grab points are seatMount-local (see CTLS); avatar
+            space = mount space + (0, +0.5, +0.24), the fixed seated offset. */
+      var mp = seatMount.position, my = seatMount.rotation.y;
+      var ctl = null;
+      if (_exInit) {
+        var ady = Math.abs(mp.y - _lastMP.y);
+        var dyaw = Math.abs(my - _lastMY);
+        dyaw = Math.min(dyaw, Math.PI * 2 - dyaw);
+        var adxz = Math.abs(mp.x - _lastMP.x) + Math.abs(mp.z - _lastMP.z);
+        if (ady > 0.002) ctl = "height";
+        else if (dyaw > 0.005) ctl = "dial";
+        else if (adxz > 0.003) ctl = "slide";
+      }
+      _lastMP.copy(mp); _lastMY = my; _exInit = true;
+      if (!seated) { _ex.ctl = null; }
+      else if (ctl) { _ex.ctl = ctl; _ex.ctlT = now; }
+      else if (intent === "settle" && (!_ex.ctl || (now - _ex.ctlT) > 4)) {
+        _ex.ctl = "dial"; _ex.ctlT = now;
+      }
+      var ctlActive = seated && !!_ex.ctl && !!CTLS[_ex.ctl] && (now - _ex.ctlT) < 1.2;
+      var armLT = 0;
+      if (seated && intent === "settle") armLT = -0.1;
+      else if (seated && intent === "attend") armLT = -0.15;
+      if (braceK > 0) {
+        /* instinctive brace, both arms guarding — protective, never curious */
+        armLT = armLT * (1 - braceK) + (-0.35) * braceK;
+        leanT += 0.06 * braceK;   /* slight forward tuck */
+      }
+      /* suspicious vigilance saccades: discrete darts to the windows, the
+         dash or straight ahead (no mirror meshes exist, so these three real
+         directions stand in). Rate from vigilance; paused while bracing or
+         task-locked on a control. Target choice is the only random draw;
+         rate, amplitude and gating are all state-driven. */
+      _ex.sacT -= dt;
+      if (_ex.sacT <= 0 && seated && braceK < 0.3 && !ctlActive) {
+        _ex.sacT = 3.2 - 2.3 * vigilance + Math.random() * 0.8;
+        var sr = Math.random();
+        if (sr < 0.35) { _ex.sacYaw = -0.62; _ex.sacPitch = 0.02; }
+        else if (sr < 0.6) { _ex.sacYaw = 0.65; _ex.sacPitch = 0.02; }
+        else if (sr < 0.85) { _ex.sacYaw = 0; _ex.sacPitch = 0.42; }
+        else { _ex.sacYaw = 0; _ex.sacPitch = -0.02; }
+        _ex.sacHold = 0.45;
+      }
+      if (_ex.sacHold > 0) {
+        _ex.sacHold -= dt;
+        yawT = _ex.sacYaw;
+        pitchT = _ex.sacPitch;
+      }
+      if (!ctlActive && seated && intent === "attend") {
+        /* forward through the windshield, tracking road events (base terms
+           already carry jolt scan + braking pitch; ride publishes no curve-
+           direction channel, so curves read as alert scanning) */
+        yawT = Math.sin(now * 0.9) * 0.05
+          + Math.sin(now * 3.1) * 0.5 * alertK
+          + Math.sin(now * 9.0) * 0.25 * joltK;
+      } else if (!ctlActive && seated && intent === "calibrate"
+          && (now - _ex.intentT) < (0.4 + 2.2 * (0.15 + 0.85 * P.cars))) {
+        /* glance at the HUD/dash — briefly for the car-uninterested
+           (Phill: ~1 s), longer for the curious; then back to forward */
+        avRoot.updateWorldMatrix(true, false);
+        _v1.set(0, 0.35, 1.0);
+        avRoot.worldToLocal(_v1);
+        var ddx = _v1.x, ddy = _v1.y - 1.42, ddz = _v1.z;
+        yawT = exClamp(Math.atan2(ddx, ddz), -0.9, 0.9);
+        pitchT = exClamp(Math.atan2(-ddy, Math.sqrt(ddx * ddx + ddz * ddz)), -0.3, 0.7)
+          + Math.sin(now * 1.4) * 0.03 * moveGain;
+      }
+      /* 5) nod on fresh chat speech (+ module sync): utterance onset opens a
+            ~1.5 s nod window, refreshed while the speak module runs; the head
+            turns toward the experimenter (the viewing camera) with the nod */
+      if (speech !== _ex.lastSpeech) {
+        _ex.lastSpeech = speech;
+        if (speech) _ex.nodT = now;
+      }
+      if (cogModule === "speak" && speech) _ex.nodT = now;
+      var nodK = exClamp01(1 - (now - _ex.nodT) / 1.5);
+      var nodPitch = Math.sin(now * 8.5) * 0.07 * nodK;
+      var expW = (seated && nodK > 0.3) ? nodK * 0.6 : 0;
+      if (expW > 0.01) {
+        avHeadG.getWorldPosition(_v1);
+        _v2.copy(camera.position).sub(_v1);
+        var wyaw = Math.atan2(_v2.x, _v2.z);
+        avRoot.getWorldQuaternion(_q1);
+        _e1.setFromQuaternion(_q1, "YXZ");
+        var dyw = wyaw - _e1.y;
+        dyw = Math.atan2(Math.sin(dyw), Math.cos(dyw));
+        yawT = yawT * (1 - expW) + exClamp(dyw, -0.9, 0.9) * expW;
+      }
+      /* control look wins over everything: face the grab point, lean in */
+      if (ctlActive) {
+        var G = CTLS[_ex.ctl].grab;
+        var cdx = G[0], cdy = G[1] + 0.5 - 1.42, cdz = G[2] + 0.24;
+        yawT = exClamp(Math.atan2(cdx, cdz), -0.9, 0.9);
+        pitchT = exClamp(Math.atan2(-cdy, Math.sqrt(cdx * cdx + cdz * cdz)), -0.3, 0.7);
+        leanT = 0.12;
+      }
+      pitchT += nodPitch;   /* nod composes over every gaze */
+      /* ease everything (frame-rate independent lerp). Rates are
+         personality-split: confident reaches are decisive (fast arm),
+         tension stiffens the torso (slow lean). */
+      var k = 1 - Math.exp(-8 * dt);
+      var kArm = 1 - Math.exp(-(5 + 9 * P.confident) * dt);
+      var kLean = 1 - Math.exp(-(8 - 4 * tension) * dt);
+      _ex.yaw += (yawT - _ex.yaw) * k;
+      _ex.pitch += (pitchT - _ex.pitch) * k;
+      _ex.lean += (leanT - _ex.lean) * kLean;
+      _ex.armL += (armLT - _ex.armL) * k;
+      avHeadG.rotation.y = _ex.yaw;
+      avHeadG.rotation.x = _ex.pitch;
+      if (seated) avRoot.rotation.x = _ex.lean;
+      avArmL.rotation.x = _ex.armL;
+      /* right hand: rest pose -> control aim (single-joint shoulder aim at
+         the grab point; avatar-space dir from the shoulder pivot) */
+      _e2.set(-0.35 * braceK, 0, 0);
+      _qG.setFromEuler(_e2);
+      var aimT = ctlActive ? 1 : 0;
+      _ex.aim += (aimT - _ex.aim) * k;
+      if (_ex.aim > 0.01 && _ex.ctl && CTLS[_ex.ctl]) {
+        var G2 = CTLS[_ex.ctl].grab;
+        _v1.set(G2[0] - 0.26, (G2[1] + 0.5) - 1.32, (G2[2] + 0.24) - 0);
+        if (_v1.lengthSq() > 1e-8) {
+          _v1.normalize();
+          _qAim.setFromUnitVectors(_down, _v1);
+          _qG.slerp(_qAim, exClamp01(_ex.aim));
+        }
+      }
+      avArmR.quaternion.slerp(_qG, kArm);
+      /* 4) breathing synced to energy: ~13..35 breaths/min, shallower
+         under tension, steadier through curves */
+      var rate = 1.4 + 2.2 * exClamp01(energy);
+      var amp = (0.006 + 0.008 * exClamp01(energy))
+        * (1 - 0.55 * tension) * (1 - 0.2 * curveK);
+      avTorso.scale.y = 1 + Math.sin(now * rate) * amp;
+    }
     var avThighGeo = new THREE.CylinderGeometry(0.09, 0.078, 0.42, 12);
     var avShinGeo = new THREE.CylinderGeometry(0.075, 0.062, 0.42, 12);
     var avFootGeo = new THREE.BoxGeometry(0.14, 0.06, 0.2);
@@ -392,8 +679,17 @@ function boot() {
           setLegFold(1);
           avPhase = "seated";
           state.avatar = "seated";
+          /* the agent is aboard: tell the mind so it greets (LLM, bank
+             fallback) like a human settling in — fires on load and on every
+             replay; failure is silent, the ride never breaks */
+          try {
+            fetch("/api/entered", { method: "POST",
+              headers: { "Content-Type": "application/json" }, body: "{}" }
+            ).catch(function () {});
+          } catch (e) {}
         }
       }
+      stepExpression(now);
     }
     /* a seat click may now land on the figure sitting on the seat — walking
        the parent chain keeps click-to-focus working through it */
@@ -802,6 +1098,34 @@ function boot() {
     var seatCtl = { hgt: 38, rot: 0, lat: 0, lng: 0 };
     var seatSysOn = true;
     state.seat = seatCtl;
+    var seatLocalT = -1e9;   /* last local slider input (ms): defers the pull */
+    function postSeat(axis, value) {   /* world.Seat is authoritative */
+      try {
+        fetch("/api/seat", { method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ axis: axis, value: value }) }
+        ).catch(function () {});
+      } catch (e) {}
+    }
+    /* the mind moves the seat too (self_adjust): pull the rig toward
+       __COG_LIVE__.seat — published by cognitive.js from world.Seat — so
+       the agent's own settling is visible; never while the user drags */
+    function syncSeatFromCog(nowMs) {
+      if (nowMs - seatLocalT < 900) return;
+      var lastSync = syncSeatFromCog._t || 0;
+      if (nowMs - lastSync < 100) return;
+      syncSeatFromCog._t = nowMs;
+      var C = (typeof window !== "undefined" ? window.__COG_LIVE__ : null) || null;
+      var s = C && C.seat;
+      if (!s) return;
+      var h = +s.hgt, r = +s.rot, l = +s.sl;
+      if (h === seatCtl.hgt && r === seatCtl.rot && l === seatCtl.lng) return;
+      seatCtl.hgt = h; seatCtl.rot = r; seatCtl.lng = l;
+      if (seatHgtEl) seatHgtEl.value = h;
+      if (seatRotEl) seatRotEl.value = r;
+      if (seatLngEl) seatLngEl.value = l;
+      updateSeat();
+    }
     function updateSeat() {
       /* hard clamps: the sliders can never push the seat out of the cabin
          (inner walls x ±0.90, front/rear walls z ±1.30) and the rest pose
@@ -829,7 +1153,13 @@ function boot() {
       if (seatRotEl) seatCtl.rot = +seatRotEl.value;
       if (seatLatEl) seatCtl.lat = +seatLatEl.value;
       if (seatLngEl) seatCtl.lng = +seatLngEl.value;
+      seatLocalT = performance.now();
       updateSeat();
+      /* mirror the drag to the server so the mind's fit belief and the
+         cockpit panel converge on the same world.Seat (lat is view-only) */
+      postSeat("hgt", seatCtl.hgt * 10); /* cm -> mm on the wire */
+      postSeat("rot", seatCtl.rot);
+      postSeat("sl", 360 + seatCtl.lng * 10);
     }
     [seatHgtEl, seatRotEl, seatLatEl, seatLngEl].forEach(function (el) {
       if (el) el.addEventListener("input", readSeatSliders);
@@ -988,6 +1318,7 @@ function boot() {
       }
       paintClock();
       stepAvatar(now);
+      syncSeatFromCog(now);
       controls.update();
       if (camAnim) {
         /* flight owns the camera; controls.update() above keeps damping

@@ -266,9 +266,19 @@ def scripted_decision(agent) -> str:
             return _json(UNDO[last], "Hm. Let me put that back where it was.")
 
     # seat comfort: move toward the preferred setting when off target
+    # rotation compares CIRCULARLY (signed shortest arc) so this walker and
+    # the mind's settle both push the same way across the 0/360 wrap — a raw
+    # subtraction would walk the long way and fight the mind's swivel.
+    def gap_delta(k):
+        cur, want, t = getattr(s, k), pref[k], max(1, tol[k])
+        if k == "rotation_deg":
+            d = (want - cur) % 360
+            d = d - 360 if d > 180 else d
+            return abs(d) / t, d
+        return abs(want - cur) / t, want - cur
+
     off = [
-        (abs(pref[k] - getattr(s, k)) / max(1, tol[k]), pref[k] - getattr(s, k),
-         pos, neg)
+        (*gap_delta(k), pos, neg)
         for k, pos, neg in (
             ("slider_mm", "seat_forward", "seat_back"),
             ("height_mm", "seat_up", "seat_down"),

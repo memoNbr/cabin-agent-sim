@@ -9,8 +9,8 @@ import json
 import math
 
 from cabin_sim.cognition import (
-    EVENTS, GOAL_CD, HGT, ROT, THOUGHTS, Memory, Mind, ang_dist, fmt_time,
-    rate, shortest_delta, view_sector,
+    DIR_CONFIRM, EVENTS, GOAL_CD, HGT, ROT, THOUGHTS, Memory, Mind, ang_dist,
+    fmt_time, rate, shortest_delta, view_sector,
 )
 from cabin_sim.schema import check, empty_snapshot
 from cabin_sim.session import Session
@@ -56,24 +56,28 @@ def test_view_sector_matches_js():
 
 
 def test_comfort_target_worked_example(persona):
-    # forward-facing at the persona's preferred height -> 0.35 + 0.016 + 0.30
+    # forward-facing at the persona's preferred height + legroom ->
+    # 0.35 + 0.016 + 0.30 (fit is complete only when the slide matches too)
     cabin = Cabin()
     cabin.seat.rotation_deg = 0
     cabin.seat.height_mm = 440
+    cabin.seat.slider_mm = 330               # persona's legroom pref
     mind = make_mind(persona, cabin=cabin)
     assert abs(mind.comfort_target() - 0.6659) < 0.001
     fit = mind.seat_fit()
-    assert fit["rot"] == 1.0 and fit["overall"] == 1.0
+    assert fit["rot"] == 1.0 and fit["sl"] == 1.0
+    assert fit["overall"] == 1.0
 
 
 def test_seat_fit_gap_grows_with_turned_seat(persona):
-    cabin = Cabin()                       # as found: rot 90, hgt 38 cm
+    cabin = Cabin()                       # as found: rot 90, hgt 38 cm, sl 390
     mind = make_mind(persona, cabin=cabin)
     fit = mind.seat_fit()
     assert fit["rot"] == 0.5              # 90 deg off
     assert abs(fit["hgt"] - 0.25) < 1e-9  # 6 cm off of 8 cm span
+    assert abs(fit["sl"] - 0.25) < 1e-9   # 60 mm off of 80 mm legroom span
     gap = 1 - fit["overall"]
-    assert abs(gap - 0.625) < 1e-9
+    assert abs(gap - 2.0 / 3.0) < 1e-9    # (0.5 + 0.75 + 0.75) / 3
 
 
 def test_trust_value_worked_example(persona):
@@ -200,6 +204,18 @@ def test_event_impulses_hit_mood(persona):
     assert mind.mood["suspicion"] == min(1.0, base_susp + 0.20)
     assert mind.mood["comfort"] < 0.4
     assert mind.ride["jolt"] == 0.55 and mind.target_speed == 92
+    assert mind.ride["kind"] == "bump"
+
+
+def test_event_kind_clears_once_faded(persona):
+    mind = make_mind(persona)
+    mind.perceive_event({"t": 258, "kind": "bump", "g": 0.1, "jolt": 0.55,
+                         "spd": 92, "label": "Pothole"})
+    assert mind.ride["kind"] == "bump"
+    mind.ride["g"] = 0.05
+    mind.ride["jolt"] = 0.05
+    mind.step(0.5)
+    assert mind.ride["kind"] == ""
 
 
 def test_mood_relaxes_toward_persona_setpoint(persona):
@@ -264,6 +280,29 @@ def test_chat_trust_answers_track_live_trust(persona):
     assert ok in THOUGHTS["trustOk"]
 
 
+def test_directives_obeys_orders(persona):
+    """The experimenter dictates — imperative orders are EXECUTED (the
+    settle targets move), preference questions stay conversational."""
+    mind = make_mind(persona)
+    sl0, h0 = mind.target_slider_mm, mind.target_hgt_cm
+    r = mind.chat_send("give yourself more legroom")["reply"]
+    # more legroom = seat BACK = LOWER mm from the rearmost mount, clamped
+    assert mind.target_slider_mm == max(260, sl0 - mind.tol_sl_mm)   # obeyed
+    # the shared persona dict follows — the legacy walker can't fight it
+    assert persona["seat"]["slider_mm"] == int(mind.target_slider_mm)
+    assert r == DIR_CONFIRM["sl+"]                      # confirmed (rules mode)
+    assert mind.bdi["last"]["settle"] == -99.0          # may act immediately
+    mind.chat_send("raise the seat")
+    # +4 cm, clamped at the cabin's 46 cm ceiling (pref sits at 44 cm)
+    assert mind.target_hgt_cm == min(46.0, h0 + 4.0)     # obeyed on height too
+    assert persona["seat"]["height_mm"] == int(round(mind.target_hgt_cm * 10))
+    assert mind.chat_send("say Hallihallo")["reply"] == "Hallihallo"
+    # a preference QUESTION must not move anything
+    mind.chat_send("Would you like even more legroom?")
+    assert mind.target_slider_mm == max(260, sl0 - mind.tol_sl_mm)
+    assert mind.target_hgt_cm == min(46.0, h0 + 4.0)
+
+
 # ---- engine integration & priors ------------------------------------------
 
 
@@ -286,7 +325,8 @@ def test_empty_template_stays_neutral():
     assert empty["agent"]["intention"] is None
     assert empty["agent"]["thoughts"] == []
     assert empty["agent"]["trust"]["live"] is None
-    assert empty["ride"] == {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0}
+    assert empty["ride"] == {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0,
+                             "kind": ""}
 
 
 def test_same_seed_same_mind_different_seed_differs(persona, scripted):

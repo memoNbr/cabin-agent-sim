@@ -3,9 +3,11 @@
 import json
 
 from cabin_sim import schema
+from cabin_sim.provider import create_provider
+from cabin_sim.session import Session
 from cabin_sim.sim import SimEngine
 
-from conftest import make_session
+from conftest import PERSONA, make_session
 
 
 def test_empty_snapshot_is_json_and_versioned():
@@ -55,7 +57,22 @@ def test_port_slots_are_neutral_before_implementation():
     assert s["agent"]["trust"]["live"] is None
     assert s["agent"]["intention"] is None
     assert s["agent"]["thoughts"] == []
-    assert s["ride"] == {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0}
+    assert s["ride"] == {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0,
+                         "kind": ""}
+
+
+def test_empty_template_passes_its_own_validator():
+    assert schema.check(schema.empty_snapshot()) == []
+
+
+def test_snapshot_carries_persona_traits():
+    persona = dict(PERSONA)
+    persona["traits"] = ["introvert", "suspicious"]
+    engine = SimEngine(Session(persona, create_provider("scripted"),
+                               max_steps=10, seed=1), seed=1)
+    snap = engine.snapshot()
+    assert snap["agent"]["traits"] == ["introvert", "suspicious"]
+    assert schema.check(snap) == []
 
 
 def test_check_reports_contract_violations():

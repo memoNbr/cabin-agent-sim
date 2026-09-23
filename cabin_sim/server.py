@@ -110,6 +110,16 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/seat":
             self._set_seat(data)
 
+        elif path == "/api/entered":
+            # the view's avatar just sat down in the seat: greet like a human
+            # (LLM line, phrase-bank fallback) — same lock as chat, the ticker
+            # may be deliberating on the same mind
+            session = self.engine.session
+            with session._lock:
+                session.mind.greet()
+                speech = session.mind.speech
+            self._json({"ok": True, "speech": speech})
+
         elif path == "/api/control":
             self._control(data)
 

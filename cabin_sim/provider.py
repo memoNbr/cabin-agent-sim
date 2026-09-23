@@ -26,15 +26,26 @@ class GroqProvider:
         self.model = model or os.environ.get("GROQ_MODEL", "allam-2-7b")
 
     def complete(self, messages):
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.7,
+        }
+        # Reasoning models (gpt-oss, qwen3, …) think before they answer: cap
+        # the effort and give the completion its own budget, or the thinking
+        # eats `max_tokens` and `content` comes back empty (observed: every
+        # deliberate call). Legacy models reject these params (400), so they
+        # keep the plain field.
+        if self.model.startswith(("openai/", "qwen/")):
+            payload["reasoning_effort"] = "low"
+            payload["include_reasoning"] = False
+            payload["max_completion_tokens"] = 512
+        else:
+            payload["max_tokens"] = 240
         resp = self.client.post(
             "/chat/completions",
             headers={"Authorization": f"Bearer {self.key}"},
-            json={
-                "model": self.model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 240,
-            },
+            json=payload,
             timeout=60,
         )
         resp.raise_for_status()

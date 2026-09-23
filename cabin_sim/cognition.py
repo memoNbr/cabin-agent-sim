@@ -10,7 +10,8 @@ cabin_sim.schema and draws what it is told, it no longer reasons.
 Port fidelity: every constant, table and formula below is the one from
 cognitive.js (see docs in cabin-agent-sim/tutorial-cognitive.html):
 
-    seat fit      fitGap = (dr + dh)/2, dr = |rot - target|/180, dh = |hgt - target|/8
+    seat fit      fitGap = (dr + dh + ds)/3, dr = |rot - target|/180,
+                            dh = |hgt - target|/8, ds = |slider - target|/80
     comfort       0.35*rate(ROT,rot) + 0.35*rate(HGT,hgt) + 0.30*fit
     trust         0.34*comfort + 0.40*(1-susp) + 0.16*ev + 0.10*(1-fitGap)
     memory        act *= exp(-lambda*dt), lambda = 0.004/s, floor 0.09, cap 8
@@ -25,8 +26,10 @@ from __future__ import annotations
 import math
 import random
 import re
+import sys
 
 from . import actions
+from .world import Seat      # entry reset: back to the "as found" parked pose
 
 # --------------------------------------------------------------------------
 # reference data (thesis)
@@ -88,6 +91,8 @@ THOUGHTS = {
     "rain": ["Starting to spit on the glass.", "Wipers on, steady.", "Rain. It's handling it."],
     "arrive": ["There we are, parked up.", "Made it. Right on time, it seems."],
     "depart": ["Here we go.", "It's driving itself out.", "Off we go then."],
+    "greet": ["In we go — I'll get settled.", "Door's shut. Ready when you are.",
+              "Sitting in, getting comfortable. Let's ride."],
     "merge": ["Gliding onto the motorway on its own.", "No drama joining the traffic."],
     "seatLow": ["Sits a bit low, this. Can't see much bonnet.",
                 "Lowering again. My legs are bunching."],
@@ -126,7 +131,58 @@ CHAT_SEAT = re.compile(r"(seat|height|tall|lower|raise|rotate|rotation|adjust|se
 CHAT_TRUST = re.compile(r"(trust|safe|confidence|rely|sure)")
 CHAT_WELLBEING = re.compile(r"(feel|how|you|ok|okay|alright|comfort|fine|doing)")
 
-GOAL_CD = {"settle": 9.0, "attend": 3.2, "calibrate": 10.0}
+# ---- experimenter DIRECTIVES -------------------------------------------
+# This is an EXPERIMENT: the experimenter dictates, the agent obeys.
+# Imperative messages ("slide back", "raise the seat", "settle", "say …")
+# are executed — not discussed. A preference question ("would you like …?")
+# is conversational and returns None below.
+DIR_QUESTION = re.compile(
+    r"\b(?:would you (?:like|want)|do you (?:want|like|feel|prefer)|"
+    r"are you (?:okay|comfortable|happy)|how (?:do you feel|are you|is your)|"
+    r"should (?:i|we)|shall (?:i|we)|what (?:do you want|would you))\b")
+DIR_RULES = (
+    (re.compile(r"\b(?:more legroom|leg\s?room|space for (?:your|my) legs|"
+                r"slide (?:further )?back|move (?:further )?back|further back|"
+                r"more space|scoot back)\b"), "sl+"),
+    (re.compile(r"\b(?:less legroom|slide (?:further )?(?:forward|ahead)|"
+                r"move (?:further )?(?:forward|ahead)|further (?:forward|ahead)|"
+                r"scoot (?:forward|ahead))\b"), "sl-"),
+    (re.compile(r"\b(?:raise|lift|up) (?:the |your )?seat\b"
+                r"|\b(?:seat|height) (?:go(?:es)? )?up\b"
+                r"|\b(?:sit (?:a )?(?:bit )?higher|go (?:a )?bit higher)\b"), "up"),
+    (re.compile(r"\b(?:lower|drop|down) (?:the |your )?seat\b"
+                r"|\b(?:seat|height) (?:go(?:es)? )?down\b"
+                r"|\b(?:sit (?:a )?(?:bit )?lower|go (?:a )?bit lower)\b"), "down"),
+    (re.compile(r"\b(?:lean (?:further |a bit )?back|recline(?: (?:more|further|back))?|"
+                r"backrest (?:back|down))\b"), "rec+"),
+    (re.compile(r"\b(?:sit (?:up|straight|upright)|more upright|less recline|"
+                r"backrest (?:up|forward))\b"), "upr"),
+    (re.compile(r"\b(?:face|turn|swivel) (?:to (?:the )?)?"
+                r"(?:forward|straight|the road)\b"), "fwd"),
+    (re.compile(r"\b(?:face|turn|swivel) (?:to (?:the )?)?"
+                r"(?:me|around|the back|the rear)\b"), "about"),
+    (re.compile(r"\b(?:turn|swivel|face) (?:to (?:the )?)?(left|right)\b"), "side"),
+    (re.compile(r"\b(?:settle|adjust (?:your|the|this) seat|get comfortable|"
+                r"make yourself comfortable|get settled|find (?:your|a) "
+                r"(?:better )?(?:position|comfort))\b"), "settle"),
+)
+# deterministic confirmations — also the fallback when the LLM fails
+DIR_CONFIRM = {
+    "sl+": "Consider it done \u2014 sliding back for more legroom.",
+    "sl-": "Sure \u2014 moving forward a touch.",
+    "up": "On it \u2014 raising the seat.",
+    "down": "Right \u2014 lowering the seat.",
+    "rec+": "Reclining back a little.",
+    "upr": "Sitting up straighter.",
+    "fwd": "Turning to face the road.",
+    "about": "Turning round to face the cabin.",
+    "side": "Swivelling that way a touch.",
+    "settle": "Settling in \u2014 one moment.",
+    "say": "Understood.",
+}
+
+GOAL_CD = {"settle": 2.0, "attend": 3.2, "calibrate": 10.0}
+# settle re-engages fast: he keeps nudging the seat until the fit closes
 
 
 # --------------------------------------------------------------------------
@@ -256,8 +312,10 @@ class Mind:
         tol = persona.get("tolerance", {})
         self.target_rot = float(seat_pref.get("rotation_deg", 0))
         self.target_hgt_cm = float(seat_pref.get("height_mm", 440)) / 10.0
+        self.target_slider_mm = float(seat_pref.get("slider_mm", 330))  # legroom
         self.tol_rot = float(tol.get("rotation_deg", 20))
         self.tol_hgt_cm = float(tol.get("height_mm", 20)) / 10.0
+        self.tol_sl_mm = float(tol.get("slider_mm", 90))
 
         mood = persona.get("mood", {})
         self.talkativeness = float(persona.get("talkativeness", 0.55))
@@ -291,12 +349,13 @@ class Mind:
         }
 
         # ride dynamics
-        self.ride = {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0}
+        self.ride = {"speed": 0.0, "g": 0.0, "jolt": 0.0, "rain": 0.0,
+                     "kind": ""}
         self.target_speed = 0.0
 
         # BDI
         self.belief = {"fit_gap": 0.0, "fit_rot": 0.0, "fit_hgt": 0.0,
-                       "user_hands": False}
+                       "fit_sl": 0.0, "user_hands": False}
         self.bdi = {"intention": None, "since": 0.0, "last": {}}
         self.self_act = 0
 
@@ -333,7 +392,12 @@ class Mind:
         hgt_cm = seat.height_mm / 10.0
         dr = min(1.0, abs(rot - self.target_rot) / 180.0)
         dh = min(1.0, abs(hgt_cm - self.target_hgt_cm) / 8.0)
-        return {"rot": 1 - dr, "hgt": 1 - dh, "overall": 1 - (dr + dh) / 2}
+        # legroom is part of the fit: 80 mm of slide counts like 8 cm of
+        # height (same 0..1 full-scale), so "he wants more space for his
+        # legs" shows up in fit_gap and drives the settle desire
+        ds = min(1.0, abs(seat.slider_mm - self.target_slider_mm) / 80.0)
+        return {"rot": 1 - dr, "hgt": 1 - dh, "sl": 1 - ds,
+                "overall": 1 - (dr + dh + ds) / 3}
 
     def comfort_target(self) -> float:
         seat = self.cabin.seat
@@ -422,6 +486,26 @@ class Mind:
         if self.rng.random() < freq:
             self.speak(text)
 
+    def _spoken(self, situation, bank, force=False):
+        """LLM line for this situation; the phrase bank always answers."""
+        line = (self.reasoner.speak_line(self, situation, force=force)
+                if self.reasoner else None)
+        return line or self.pick_line(THOUGHTS.get(bank, THOUGHTS["idleN"]))
+
+    def greet(self):
+        """The avatar just climbed in and sat down: the seat is still in its
+        parked "as found" pose for this ride — put it back so the settling
+        (swivel, height, legroom) happens in front of the viewer, then say
+        hello like a human."""
+        if not self.belief.get("user_hands"):
+            self.cabin.seat = Seat()            # parked pose, world-clamped
+            self.bdi["last"]["settle"] = -99.0  # he may adjust immediately
+            self.perceive_fit()
+        return self.speak(self._spoken(
+            "You just climbed into the cabin, sat down in the driver's seat "
+            "and the ride is about to begin. Greet the experimenter briefly.",
+            "greet", force=True))
+
     # ---- perception: the ride script --------------------------------------
 
     def perceive_event(self, ev):
@@ -433,6 +517,7 @@ class Mind:
         self.target_speed = float(ev["spd"])
         self.ride["g"] = ev["g"]
         self.ride["jolt"] = ev["jolt"]
+        self.ride["kind"] = ev["kind"]
 
         if ev["jolt"] > 0.3:
             self.mood["suspicion"] = min(1.0, self.mood["suspicion"] + 0.20)
@@ -448,7 +533,10 @@ class Mind:
         self.set_module("perceive")
 
         if ev["jolt"] > 0.2 or (ev["g"] > 0.25 and self.rng.random() < 0.5):
-            self.maybe_speak(self.pick_line(THOUGHTS.get(ev["kind"], THOUGHTS["idleN"])))
+            self.maybe_speak(self._spoken(
+                f"Ride event just happened: {ev['label']} at {ev['spd']} km/h "
+                f"(g={ev['g']:.2f}, jolt={ev['jolt']:.2f}) — react out loud "
+                "as a passenger.", ev["kind"]))
         return ev
 
     def _fire_events(self):
@@ -464,17 +552,22 @@ class Mind:
         f = self.seat_fit()
         self.belief["fit_rot"] = 1 - f["rot"]
         self.belief["fit_hgt"] = 1 - f["hgt"]
+        self.belief["fit_sl"] = 1 - f["sl"]
         self.belief["fit_gap"] = 1 - f["overall"]
         self.belief["user_hands"] = (self.t - self._last_user_input) < 3
 
     def _desire(self, goal):
         b = self.belief
         if goal == "settle":
-            g = b["fit_gap"]
-            if g < 0.18:
+            if not self.seat_pending():
                 return 0.0
             ph = 1.3 if self.phase == "setup" else 0.9
-            return min(2.0, ph * g * (0.15 if b["user_hands"] else 1.0))
+            # (0.35 + gap) keeps settle the argmax WHILE any axis is off —
+            # the averaged fit_gap alone goes quiet ~30° of swivel early
+            # (rotation is 1/180 of the average and barely dents it)
+            g = self.belief["fit_gap"]
+            return min(2.0, ph * (0.35 + g)
+                       * (0.15 if b["user_hands"] else 1.0))
         if goal == "attend":
             top = self.memory.pick()
             base = 0.3 + top["act"] * 0.7 if top else 0.15
@@ -488,10 +581,25 @@ class Mind:
             return 0.35 + ramp * k
         return 0.0
 
+    def seat_pending(self) -> bool:
+        """Any axis still more than 35% of its tolerance off his preference?
+
+        Settle lives/dies on this, not on the averaged fit_gap: rotation is
+        only 1/180 of that average, so a 30°-still-swiveled seat would look
+        'settled' to the average and never finish turning forward.
+        """
+        seat = self.cabin.seat
+        return (abs(seat.height_mm - self.target_hgt_cm * 10)
+                > self.tol_hgt_cm * 10 * 0.35
+                or ang_dist(seat.rotation_deg, self.target_rot)
+                > self.tol_rot * 0.35
+                or abs(seat.slider_mm - self.target_slider_mm)
+                > self.tol_sl_mm * 0.35)
+
     def _pre(self, goal):
         b = self.belief
         if goal == "settle":
-            return b["fit_gap"] >= self.settle_thresh and not b["user_hands"]
+            return self.seat_pending() and not b["user_hands"]
         if goal == "attend":
             return True
         if goal == "calibrate":
@@ -499,33 +607,41 @@ class Mind:
         return False
 
     def self_adjust(self):
-        """Pull his own seat toward where his body says it goes (whitelisted)."""
+        """Pull his own seat toward where his body says it goes (whitelisted).
+
+        Each axis is driven while it sits more than 35% of its tolerance off
+        target — the same convergence rule as the scripted walker, so both
+        actuators land on the EXACT preference instead of the mind's coarse
+        fit gates stalling short (rot30 / h430 / sl330)."""
         seat = self.cabin.seat
         changed = False
 
-        if self.belief["fit_hgt"] > 0.22:
-            hgt_cm = seat.height_mm / 10.0
-            if hgt_cm < self.target_hgt_cm:
+        if abs(seat.height_mm - self.target_hgt_cm * 10) > self.tol_hgt_cm * 10 * 0.35:
+            if seat.height_mm < self.target_hgt_cm * 10:
                 ok, _ = actions.apply(self.cabin, "seat_up")
-                changed = changed or ok
-            elif hgt_cm > self.target_hgt_cm:
+            else:
                 ok, _ = actions.apply(self.cabin, "seat_down")
-                changed = changed or ok
+            changed = changed or ok
 
-        if self.belief["fit_rot"] > 0.22:
-            d = ang_dist(seat.rotation_deg, self.target_rot)
-            if d > self.tol_rot + 2:
-                delta = shortest_delta(seat.rotation_deg, self.target_rot)
-                ok, _ = actions.apply(self.cabin,
-                                      "rotate_cw" if delta > 0 else "rotate_ccw")
-                if ok:
-                    self._rot_changed = True
-                changed = changed or ok
+        d = ang_dist(seat.rotation_deg, self.target_rot)
+        if d > self.tol_rot * 0.35:
+            delta = shortest_delta(seat.rotation_deg, self.target_rot)
+            ok, _ = actions.apply(self.cabin,
+                                  "rotate_cw" if delta > 0 else "rotate_ccw")
+            if ok:
+                self._rot_changed = True
+            changed = changed or ok
+
+        dsl = seat.slider_mm - self.target_slider_mm
+        if abs(dsl) > self.tol_sl_mm * 0.35:
+            ok, _ = actions.apply(self.cabin,
+                                  "seat_back" if dsl > 0 else "seat_forward")
+            changed = changed or ok
 
         if changed:
             self.self_act += 1
             self.log_line("adj", f"self-settle \u2192 {int(seat.rotation_deg % 360)}\u00b0 / "
-                                 f"{seat.height_mm // 10} cm")
+                                 f"{seat.height_mm // 10} cm / sl {seat.slider_mm} mm")
         return changed
 
     def bdi_reason(self, dt):
@@ -573,7 +689,9 @@ class Mind:
         if best == "settle":
             if self.self_adjust():
                 if self.self_act % 2 == 0:
-                    self.speak(self.pick_line(THOUGHTS["settle"]))
+                    self.speak(self._spoken(
+                        "You are adjusting the seat to fit yourself — "
+                        "settling in. Say one short line out loud.", "settle"))
                 else:
                     self.think(self.pick_line(THOUGHTS["settle"]))
             else:
@@ -588,7 +706,9 @@ class Mind:
             elif tw <= 0.38:
                 line = self.pick_line(THOUGHTS["trustLow"])
                 self.think(line)
-                self.maybe_speak(line)
+                self.maybe_speak(self._spoken(
+                    "Your trust in the cabin is low and you are "
+                    "recalibrating — say one short line about it.", "trustLow"))
             else:
                 self.set_module("intend")
 
@@ -621,6 +741,8 @@ class Mind:
         self.mood["comfort"] += (ct - self.mood["comfort"]) * min(1.0, dt * 0.06)
         self.ride["g"] *= math.exp(-dt * 0.3)
         self.ride["jolt"] *= math.exp(-dt * 0.35)
+        if self.ride["g"] < 0.12 and self.ride["jolt"] < 0.1:
+            self.ride["kind"] = ""
         if 540 < self.t < 570:
             self.ride["rain"] = min(1.0, self.ride["rain"] + dt * 0.08)
         else:
@@ -658,6 +780,83 @@ class Mind:
             "ride": dict(self.ride),
         }
 
+    def _directive(self, raw):
+        """An ORDER from the experimenter — he obeys (it's an experiment).
+
+        Seat orders re-aim the settle TARGETS, so the change plays out
+        visibly through the settling walk and then STICKS: the experimenter's
+        word overrides his own persona prefs (he treats the ordered position
+        as his liking). Preference questions return None → normal chat.
+        Never raises: any failure degrades to the conversational path."""
+        text = str(raw or "").strip()
+        q = text.lower()
+        if DIR_QUESTION.search(q):
+            return None
+        m = re.match(r"^(?:please\s+)?say[:,]?\s+(.+)$", text, re.I)
+        if m:                                    # "say …" → speak that line
+            line = m.group(1).strip()
+            if line:
+                return line[:160]
+        hit = None
+        for pat, code in DIR_RULES:
+            m = pat.search(q)
+            if m:
+                hit = (code, m)
+                break
+        if not hit:
+            return None
+        code, m = hit
+        try:
+            seat = self.cabin.seat
+            # slider mm counts from the REARMOST mount: LOWER = seat further
+            # back = MORE legroom. Every changed target is also written back
+            # into the SHARED persona dict — the legacy session walker reads
+            # it live, so both actuators converge on the order instead of
+            # fighting it: the experimenter's word becomes his preference.
+            pref = self.persona.setdefault("seat", {})
+            if code in ("sl+", "sl-"):
+                step = max(60.0, self.tol_sl_mm) * (1 if code == "sl-" else -1)
+                self.target_slider_mm = min(Seat.SLIDER_MAX,
+                                            max(Seat.SLIDER_MIN,
+                                                self.target_slider_mm + step))
+                pref["slider_mm"] = int(self.target_slider_mm)
+            elif code in ("up", "down"):
+                step = 4.0 * (1 if code == "up" else -1)      # cm
+                self.target_hgt_cm = min(Seat.HEIGHT_MAX / 10.0,
+                                         max(Seat.HEIGHT_MIN / 10.0,
+                                             self.target_hgt_cm + step))
+                pref["height_mm"] = int(round(self.target_hgt_cm * 10))
+            elif code == "rec+":
+                seat.move("recline_deg", 6)
+            elif code == "upr":
+                seat.move("recline_deg", -6)
+            elif code == "fwd":
+                self.target_rot = 0.0
+            elif code == "about":
+                self.target_rot = 180.0
+            elif code == "side":
+                self.target_rot = ((self.target_rot
+                                    + (45.0 if m.group(1) == "right" else -45.0))
+                                   % 360.0)
+            if code in ("fwd", "about", "side"):
+                pref["rotation_deg"] = int(self.target_rot) % 360
+            if code in ("rec+", "upr"):
+                pref["recline_deg"] = int(seat.recline_deg)
+            # "settle" needs no state change — only permission below
+            self.perceive_fit()
+            self.bdi["last"]["settle"] = -99.0   # he may act on it NOW
+            self.log_line("dir", f"directive \u00b7 {code}")
+            self.remember("directive", f"Experimenter ordered: {text}", 0.5, True)
+            rule = DIR_CONFIRM[code]
+            if self.reasoner:                    # LLM words it, rule always answers
+                prompt = f"{text} [you already obeyed: {rule}]"
+                return (self.reasoner.chat(self, prompt[:300], rule) or rule)
+            return rule
+        except Exception as exc:                 # noqa: BLE001 - degrade, never crash
+            print(f"cognition: directive failed ({exc}) — chat used.",
+                  file=sys.stderr)
+            return None
+
     def _chat_reply(self, text):
         self.perceive_fit()                   # answer from the CURRENT seat,
         q = text.lower()                      # even between ticks
@@ -692,7 +891,8 @@ class Mind:
         self.chat.append({"who": "experimenter", "t": self.t, "text": text})
         self.log_line("chat", f"experimenter \u00b7 {text}")
         self.remember("chat", f"Experimenter: {text}", 0.5, True)
-        reply = self._chat_reply(text)
+        # experimenter ORDERS are obeyed first (directive), questions chat
+        reply = self._directive(text) or self._chat_reply(text)
         self.chat.append({"who": "phill", "t": self.t, "text": reply})
         del self.chat[: max(0, len(self.chat) - 40)]
         self.speak(reply)

@@ -914,7 +914,7 @@ def phase(self) -&gt; str:                # cabin_sim/cognition.py
       <pre><code>SCHEMA_VERSION = 1
 SCHEMA_NAME    = "cabin-agent.v1"
 SEAT_AXES   = ("slider_mm", "height_mm", "recline_deg", "rotation_deg")
-SEAT_LIMITS = {"slider_mm": (260, 460), "height_mm": (380, 460),
+SEAT_LIMITS = {"slider_mm": (260, 440), "height_mm": (380, 460),
                "recline_deg": (80, 110), "rotation_deg": (0, 359)}   # = world.Seat
 
 def empty_snapshot() -&gt; dict:      # neutral template before any producer runs
@@ -1336,7 +1336,7 @@ cabin_sim.reasoning.py   owns WORDING and CHOICE among legal options
       <table>
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
         <tbody>
-          <tr><td class="m">seat ranges (schema SEAT_LIMITS)</td><td class="num">rot 0–359 · hgt 380–460 mm · sl 260–460 · rec 80–110</td><td class="desc">hard clamps — mirrored from <code>world.Seat</code>, drift-tested by <code>test_world.py</code></td></tr>
+          <tr><td class="m">seat ranges (schema SEAT_LIMITS)</td><td class="num">rot 0–359 · hgt 380–460 mm · sl 260–440 · rec 80–110</td><td class="desc">hard clamps — mirrored from <code>world.Seat</code>, drift-tested by <code>test_world.py</code></td></tr>
           <tr><td class="m">fit normalisers (dr, dh)</td><td class="num">180° / 8 cm</td><td class="desc">denominators in <code>seat_fit()</code> — how far is "totally wrong"</td></tr>
           <tr><td class="m">actuation gates (fit_hgt / fit_rot)</td><td class="num">&gt; 0.22</td><td class="desc"><code>self_adjust()</code> only moves when the perceived error is large</td></tr>
           <tr><td class="m">rotation gate / steps</td><td class="num">beyond tol+2 · ±10°</td><td class="desc">angular distance check, then whitelisted <code>rotate_cw/ccw</code></td></tr>

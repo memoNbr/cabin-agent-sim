@@ -23,10 +23,20 @@ def test_session_log_reproducible_same_seed():
 
 
 def test_different_seed_changes_trajectory():
-    a = _steps(1, 20)
-    b = _steps(2, 20)
-    assert a["cabin"] != b["cabin"]
-    assert a["mood"] != b["mood"]
+    """The seed drives his whims, not his body.
+
+    The seat settles to the same body-determined preference on every seed
+    (deterministic tolerance-walker), so the divergence lives in the rng-rich
+    decision trajectory: suspicion undos, spontaneous says, action timing.
+    """
+    def _log(seed):
+        session = Session(PERSONA, create_provider("scripted"),
+                          max_steps=40, seed=seed)
+        for _ in range(20):
+            session.step_once()
+        return session.log
+
+    assert _log(1) != _log(2)
 
 
 def test_engine_run_reproducible_snapshots():

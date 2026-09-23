@@ -335,7 +335,7 @@
         <tbody>
           <tr><td class="m">rotation_deg</td><td class="num">0 … 359</td><td class="m">90 (turned to the door)</td><td class="desc">clamped, <b>no wrap</b> — travel stops at the 0/359 seam; 10° actuation steps</td></tr>
           <tr><td class="m">height_mm</td><td class="num">380 … 460</td><td class="m">380 (38 cm, bottom)</td><td class="desc">38–46 cm travel, the same axis as the old JS <code>hgt</code>; ±10 mm steps</td></tr>
-          <tr><td class="m">slider_mm</td><td class="num">260 … 460</td><td class="m">390</td><td class="desc">centre 360; the view shows ±cm around that centre</td></tr>
+          <tr><td class="m">slider_mm</td><td class="num">260 … 440</td><td class="m">390</td><td class="desc">centre 360; the forward end keeps the seat (toes included) behind the dash face of the drawn cabin, the rear end has over a metre of wall clearance</td></tr>
           <tr><td class="m">recline_deg</td><td class="num">80 … 110</td><td class="m">103</td><td class="desc">backrest, untouched by the port</td></tr>
         </tbody>
       </table>
@@ -763,7 +763,7 @@ if jolt &gt; 0.2 or (g &gt; 0.25 and rng &lt; 0.5): maybe_speak(THOUGHTS[kind])<
         <tbody>
           <tr><td class="m">target rotation / height</td><td class="num">0° / 440 mm (44 cm)</td><td class="desc"><code>personas/phill.json → seat</code>, read by <code>Mind.seat_fit</code>, <code>self_adjust</code></td></tr>
           <tr><td class="m">tolerances</td><td class="num">20° / 20 mm / 90 mm / 12°</td><td class="desc">HUD comfort zone; rotation gate uses <code>tolRot+2 = 22°</code></td></tr>
-          <tr><td class="m">seat ranges</td><td class="num">rot 0–359 · hgt 380–460 mm · sl 260–460 · rec 80–110</td><td class="desc"><code>world.Seat</code> clamps — mirrored by <code>schema.SEAT_LIMITS</code></td></tr>
+          <tr><td class="m">seat ranges</td><td class="num">rot 0–359 · hgt 380–460 mm · sl 260–440 · rec 80–110</td><td class="desc"><code>world.Seat</code> clamps — mirrored by <code>schema.SEAT_LIMITS</code></td></tr>
           <tr><td class="m">as-found pose</td><td class="num">rot 90 · hgt 380 · sl 390 · rec 103</td><td class="desc">turned toward the door, bottom of travel → immediate settle job</td></tr>
           <tr><td class="m">userHands window</td><td class="num">3 s</td><td class="desc"><code>mind.t − last_user_input &lt; 3</code></td></tr>
           <tr><td class="m">fit normalisers (dr, dh)</td><td class="num">180° / 8 cm</td><td class="desc">denominators in <code>seat_fit()</code></td></tr>

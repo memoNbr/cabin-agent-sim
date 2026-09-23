@@ -146,8 +146,13 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const SLIDER = { min: 260, max: 460, px0: 250, px1: 540 };
-const HEIGHT = { min: 240, max: 330, top0: 310, top1: 230 };
+/* Seat travel mirrors cabin_sim.world.Seat's clamps (drift-tested by
+   tests/test_world.py): slide 260..440 mm, height 380..460 mm, recline
+   80..110 deg. px1 = 506 puts the 74 px cushion's front edge on the rail
+   end (580) at full forward travel, top0/top1 are the cushion top px at
+   the height rail's min/max. ROT is only the pointer's scale, not a range. */
+const SLIDER = { min: 260, max: 440, px0: 250, px1: 506 };
+const HEIGHT = { min: 380, max: 460, top0: 310, top1: 230 };
 const RECLINE = { min: 80, max: 110 };
 const ROT = { min: -8, max: 8 };
 

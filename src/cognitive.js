@@ -57,7 +57,8 @@
   /* ===== view state: a mirror of the last snapshot (never reasoned about) */
   var V = {
     rot: 90, hgt: 38, sl: 3, t: 0, running: true, phase: "setup", done: false,
-    speed: 0, g: 0, jolt: 0, rain: 0,
+    speed: 0, g: 0, jolt: 0, rain: 0, kind: "",
+    traits: [],
     mood: { comfort: 0.4, energy: 0.6, suspicion: 0.5 },
     trust: { score: null, live: null },
     prefs: { rot: 0, hgt: 44, tolRot: 20, tolHgt: 2 },
@@ -90,6 +91,7 @@
     var ride = s.ride || {};
     V.speed = ride.speed || 0; V.g = ride.g || 0;
     V.jolt = ride.jolt || 0; V.rain = ride.rain || 0;
+    V.kind = (ride.kind && typeof ride.kind === "string") ? ride.kind : "";
     var ag = s.agent || {};
     if (ag.mood) {
       V.mood.comfort = ag.mood.comfort != null ? ag.mood.comfort : V.mood.comfort;
@@ -101,6 +103,7 @@
       V.trust.score = ag.trust.score != null ? ag.trust.score : V.trust.score;
     }
     if (ag.prefs && ag.prefs.rot != null) V.prefs = ag.prefs;
+    if (ag.traits instanceof Array) V.traits = ag.traits.slice();
     V.bdi.intention = ag.intention || null;
     V.bdi.since = ag.intentionSince || 0;
     if (ag.speech) V.speech = ag.speech;   /* keep last spoken line on empty */
@@ -931,6 +934,7 @@
   if (!cogLive || typeof cogLive !== "object") { cogLive = {}; window.__COG_LIVE__ = cogLive; }
   if (!cogLive.mood) cogLive.mood = {};
   if (!cogLive.ride) cogLive.ride = {};
+  if (!cogLive.persona || typeof cogLive.persona !== "object") cogLive.persona = {};
   var cogPriors = { rides: 0, trust: null };
   cogLive.priors = cogPriors;
   function publishCog() {
@@ -939,14 +943,19 @@
     cogLive.mood.suspicion = V.mood.suspicion;
     cogLive.trust = V.trust.score != null ? V.trust.score : (V.trust.live || 0.5);
     cogLive.intention = V.bdi.intention || null;
+    cogLive.module = V.module || null;
     cogLive.ride.speed = V.speed;
     cogLive.ride.g = V.g;
     cogLive.ride.jolt = V.jolt;
+    cogLive.ride.rain = V.rain;
+    cogLive.ride.kind = V.kind || "";
+    cogLive.persona.traits = (V.traits instanceof Array) ? V.traits.slice() : [];
     cogLive.ride.rain = V.rain;
     cogLive.ride.phase = V.phase;
     cogLive.ride.t = V.t;
     cogLive.thoughts = V.thoughts.length ? V.thoughts[0].text : "";
     cogLive.speech = V.speech || "";
+    cogLive.module = V.module || "";    /* active module: perceive|intend|think|memorize|forget|speak */
     var p = V.priors;
     cogPriors.rides = p ? (p.rides || 0) : 0;
     cogPriors.trust = (p && typeof p.trust === "number") ? p.trust : null;
