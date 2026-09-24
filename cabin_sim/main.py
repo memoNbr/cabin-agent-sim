@@ -88,16 +88,23 @@ def main(argv=None):
         chat_provider = create_provider(args.provider, model=chat_model,
                                         keep_alive=keep_alive)
 
+    from . import prompts as prompt_files
     from .session import Session
 
+    env_path, env_text = prompt_files.default_environment()
     session = Session(persona, provider, max_steps=args.steps,
                       step_interval=args.interval, duration=args.duration,
                       seed=args.seed, reasoning=args.reasoning,
-                      chat_provider=chat_provider)
+                      chat_provider=chat_provider,
+                      environment=env_text,
+                      environment_path=str(env_path) if env_path else None,
+                      persona_path=str(prompt_files.resolve(args.persona)))
     mode = session.reasoner.kind if session.reasoner else "rules"
     if chat_provider is not None and session.reasoner is not None:
         mode += f"   chat: {chat_model}"
     print(f"Reasoning: {mode}", flush=True)
+    if session.environment_path:
+        print(f"Environment prompt: {session.environment_path}", flush=True)
 
     from .sim import SimEngine
 

@@ -819,6 +819,43 @@
   });
   if ($("btnReplay")) $("btnReplay").addEventListener("click", restart);
 
+  /* ===== live prompts: apply code edits / cycle files + source links ===== */
+  function paintPromptUI(st) {
+    if (!st) return;
+    if ($("promptEnvName")) {
+      $("promptEnvName").textContent = (st.environment && st.environment.name) || "—";
+      $("promptEnvName").title = (st.environment && st.environment.path)
+        || "no environment prompt file";
+    }
+    if ($("promptPersonaName")) {
+      $("promptPersonaName").textContent = (st.persona && st.persona.name) || "—";
+      $("promptPersonaName").title = (st.persona && st.persona.path) || "";
+    }
+    function src(el, info) {                 /* the actual link to the code */
+      if (!el) return;
+      if (info && info.path) {
+        el.href = "vscode://file/" + encodeURI(String(info.path).replace(/\\/g, "/"));
+        el.title = "open " + info.path + " in the editor";
+      } else {
+        el.href = "#";
+      }
+    }
+    src($("promptEnvCode"), st.environment);
+    src($("promptPersonaCode"), st.persona);
+  }
+  function cyclePrompt(kind) {
+    post("/api/prompt", { kind: kind })
+      .then(function (r) { return (r && r.json) ? r.json() : null; })
+      .then(paintPromptUI)
+      .catch(function () {});
+  }
+  if ($("promptEnv")) $("promptEnv").addEventListener("click", function () { cyclePrompt("environment"); });
+  if ($("promptPersona")) $("promptPersona").addEventListener("click", function () { cyclePrompt("persona"); });
+  fetch("/api/prompt", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(paintPromptUI)
+    .catch(function () {});
+
   /* ===== end-of-ride summary (server has the score; view draws it) ====== */
   function evidenceAnswers() {             /* display-only, from the snapshot */
     var t = V.trust.live != null ? V.trust.live : (V.trust.score || 0.5);

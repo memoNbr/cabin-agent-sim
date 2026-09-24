@@ -77,6 +77,33 @@ def test_llm_action_giant_delta_is_clamped_and_reported():
     assert "clamped" in why                        # the outcome tells the model
 
 
+def test_llm_rotation_wraps_through_the_seam():
+    """A turntable folds through 0/359 — every heading stays reachable."""
+    c = Cabin()
+    c.seat.rotation_deg = 350
+    ok, detail, name = actions.apply_llm_action(
+        c, {"kind": "seat", "axis": "rotation_deg", "delta": 20})
+    assert ok and c.seat.rotation_deg == 10 and name == "seat_move"
+    assert "wrapped" in detail                      # the outcome says so
+    ok, detail, _ = actions.apply_llm_action(
+        c, {"kind": "seat", "axis": "rotation_deg", "delta": -30})
+    assert ok and c.seat.rotation_deg == 340 and "wrapped" in detail
+    assert 0 <= c.seat.rotation_deg <= 359          # schema bounds still hold
+
+
+def test_llm_rotation_plain_turn_reads_like_any_axis():
+    c = Cabin()                                     # rotation 90 by default
+    ok, detail, _ = actions.apply_llm_action(
+        c, {"kind": "seat", "axis": "rotation_deg", "delta": 15})
+    assert ok and c.seat.rotation_deg == 105 and "wrapped" not in detail
+
+
+def test_llm_rotation_zero_delta_is_honest_about_not_moving():
+    ok, why, _ = actions.apply_llm_action(
+        Cabin(), {"kind": "seat", "axis": "rotation_deg", "delta": 0})
+    assert not ok and "did not move" in why
+
+
 def test_llm_action_vending_and_table():
     c = Cabin()
     ok, _, name = actions.apply_llm_action(

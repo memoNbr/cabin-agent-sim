@@ -203,6 +203,37 @@ A persona file holds: name, background story, traits, preferred seat
 settings + tolerance, starting mood (energy, suspicion), vending interest
 and curiosity. Copy the file, change the numbers and the story, and run
 `python -m cabin_sim.main --persona personas/you.json` to try it out.
+`personas/phill.json` and `personas/nadia.json` ship as a pair and can be
+switched LIVE from the sim (see below).
+
+## Live prompts (the sim's four prompt buttons)
+
+The prompt layer is plain code — two editable resources:
+
+    prompts/environment-*.md   THE WORLD: a fully autonomous vehicle, what
+                               the cabin offers, its physical seat
+                               envelope ({seat_envelope} is filled from
+                               world.Seat, so the numbers never go stale)
+                               and how a settled passenger behaves — set a
+                               position and keep it;
+    personas/*.json            WHO: the persona files above.
+
+The kiosk bar carries four controls, all backed by `cabin_sim/prompts.py`:
+
+- **env ▸** — one click applies your latest edits from the source file;
+  click again to switch to the next `prompts/environment-*.md`.
+- **persona ▸** — the same for `personas/*.json`; a persona click
+  hot-applies the new person to the RUNNING mind (preferences,
+  tolerances, talkativeness, the prompt layer) without resetting the ride.
+- **env ⌨ code** / **persona ⌨ code** — open the ACTUAL source files
+  (VS Code URIs): what you write there is what the sim runs.
+
+Every decide/chat message also carries the live seat envelope
+(`slide 260–440 mm · height 380–460 mm · recline 80–110° · rotate
+0–359° …`) generated from `world.Seat`, so the model always knows the
+real limits it is reasoning inside; and the model's swivel wraps through
+the 0/359 seam (LLM door only — rules/world behaviour is untouched), so
+every seat position, rotation included, stays reachable.
 
 ## Project layout
 
@@ -214,11 +245,13 @@ cabin_sim/
   reasoning.py       LLM lanes: decide (the closed loop), speech,
                      chat_act (order interpretation), outcome feedback,
                      free-tier throttle, quiet-beat fallback
+  prompts.py         live prompt files: environment world + persona
+                     cycling (the sim UI's four prompt buttons)
   provider.py        groq | ollama | scripted backends (think/token caps)
   sim.py             SimEngine — the only clock: phases, ride script, priors
   schema.py          build_snapshot — the single JSON contract for the views
   server.py          stdlib HTTP: / · /api/state · /api/snapshot · /api/chat
-                     · /api/seat · /api/control + the ticker thread
+                     · /api/seat · /api/control · /api/prompt + the ticker
   session.py         1 session = engine + mind + event log + questionnaire
   world.py           car interior: Seat + VendingMachine + Table (pure state)
   actions.py         the agent's action whitelist; every change is clamped
@@ -228,8 +261,9 @@ cabin_sim/
   MIGRATION.md       JS → Python port notes
 web/index.html       inline-SVG visual served on :8000 (polls /api/state)
 src/                 three.js view adapter + archived pre-port mind
-tests/               pytest suite — 100 tests
-personas/            editable persona JSON files
+tests/               pytest suite — 115 tests
+prompts/             environment prompt files (the WORLD the model gets)
+personas/            editable persona JSON files (Phill, Nadia, ...)
 tutorial-cognitive.html         architecture tutorial (kiosk, 8 sections)
 tutorial-cognitive-python.html  companion walkthrough
 public/              interior reference photos + live sim captures
@@ -238,7 +272,7 @@ public/              interior reference photos + live sim captures
 ## Tests & tutorials
 
 ```bash
-python -m pytest tests -q     # 100 passed
+python -m pytest tests -q     # 115 passed
 npm run build                 # exit 0
 ```
 

@@ -413,6 +413,10 @@
     padding:5px 7px; font:inherit;}
   .sim-jump::placeholder{color:#666;}
   .sim-jump:focus{outline:none; border-color:#888;}
+  /* ---- live prompt controls: cycle/apply + links to the source files ---- */
+  .sim-bar a.sim-link{display:inline-block; text-decoration:none; line-height:1.55;}
+  .sim-bar .sim-name{min-width:0; max-width:178px; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; text-transform:none; letter-spacing:.02em; color:#e2e2e2;}
   .sim-speed{background:#141416; border:1px solid #3a3a3a; color:#cfcfcf; border-radius:5px;
     padding:5px 6px; font:inherit; cursor:pointer;}
   .sim-speed:focus{outline:none; border-color:#888;}
@@ -555,6 +559,13 @@
           <label class="seat-lbl" title="lateral rail: 0 = driver seat, −25 cm = left (clamped inside the cabin)">lat<input type="range" id="seatLat" min="-25" max="0" step="1" value="0" aria-label="lateral rail, 0 to minus 25 centimetres"><span class="seat-val" id="seatLatV">0</span></label>
           <label class="seat-lbl" title="longitudinal rail: −20 cm back … +10 cm forward">lng<input type="range" id="seatLng" min="-20" max="10" step="1" value="0" aria-label="longitudinal rail, minus 20 to plus 10 centimetres"><span class="seat-val" id="seatLngV">0</span></label>
         </div>
+        <!-- live prompts: apply your code edits / cycle files + open the source -->
+        <button class="kbtn" id="promptEnv" type="button" title="environment prompt — click: apply your edits from the source file; click again: switch to the next environment file">env ▸</button>
+        <span class="sim-clock mono sim-name" id="promptEnvName" title="active environment prompt file">—</span>
+        <button class="kbtn" id="promptPersona" type="button" title="persona prompt — click: apply your edits from the source file; click again: switch to the next persona">persona ▸</button>
+        <span class="sim-clock mono sim-name" id="promptPersonaName" title="active persona file">—</span>
+        <a class="kbtn sim-link" id="promptEnvCode" href="#" target="_blank" rel="noopener" title="open the environment prompt SOURCE file in the editor — what you write there is what the sim runs">env ⌨ code</a>
+        <a class="kbtn sim-link" id="promptPersonaCode" href="#" target="_blank" rel="noopener" title="open the persona SOURCE file in the editor — what you write there is what the sim runs">persona ⌨ code</a>
       </div>
       <!-- cognitive HUD: the avatar's live state, fed by window.__COG_LIVE__ -->
       <div class="cog-hud" id="cogHud" role="group" aria-label="avatar cognitive state: intention, active module, ride, trust and mood">

@@ -17,7 +17,7 @@ from cabin_sim.reasoning import (
 from cabin_sim.schema import check
 from cabin_sim.session import Session
 from cabin_sim.sim import SimEngine
-from cabin_sim.world import Cabin
+from cabin_sim.world import Cabin, Seat
 
 
 class FakeProvider:
@@ -71,6 +71,46 @@ def test_rules_mode_leaves_mind_untouched():
     assert mind.reasoner is None
     mind.step(1.0)
     assert mind._pending_thought is None
+
+
+# ---- the prompt layer: environment world + live swapping -------------------
+
+def test_system_prompt_carries_the_environment_world_and_voice():
+    reasoner = LLMReasoner(FakeProvider(["{}"]), {"name": "Phill"})
+    assert "ENVIRONMENT" in reasoner.system
+    assert "autonomous" in reasoner.system.lower()   # the builtin world text
+    assert "Voice:" in reasoner.system
+
+
+def test_environment_and_persona_swap_rebuild_the_system_prompt():
+    reasoner = LLMReasoner(FakeProvider(["{}"]),
+                           {"name": "X", "self": "You are X."},
+                           environment="THE LAB, 3am.")
+    assert "THE LAB, 3am." in reasoner.system
+    reasoner.set_environment("THE DESERT AT NOON")
+    assert "THE DESERT AT NOON" in reasoner.system
+    assert "THE LAB" not in reasoner.system          # old world is gone
+    reasoner.set_persona({"name": "Y", "self": "You are Y.",
+                          "voice": "flat, clipped sentences"})
+    assert "You are Y." in reasoner.system
+    assert "Voice: flat, clipped sentences" in reasoner.system
+
+
+def test_every_decide_and_chat_message_carries_the_real_seat_envelope(persona):
+    seen = []
+
+    class Spy(FakeProvider):
+        def complete(self, messages):
+            seen.append(messages[1]["content"])
+            return super().complete(messages)
+
+    reasoner = LLMReasoner(Spy([DECIDE_OK]), persona)
+    mind = Mind(persona, Cabin(), seed=1, reasoner=reasoner)
+    mind.step(1.0)                                  # one decide beat
+    assert "ENVELOPE (physical):" in seen[0]
+    assert str(Seat.SLIDER_MIN) in seen[0]          # real numbers, not prose
+    reasoner.chat_act(mind, "face the window")
+    assert "ENVELOPE (physical):" in seen[-1]       # the chat lane too
 
 
 # ---- the decide cycle: examine -> reconsider -> act -----------------------

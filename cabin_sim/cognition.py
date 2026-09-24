@@ -315,38 +315,13 @@ class Mind:
     def __init__(self, persona, cabin, seed=1, reasoner=None):
         self.persona = persona
         self.cabin = cabin
-        cog = persona.get("cognition", {})
         # reasoning mode: None = deterministic rules (the port as shipped);
         # an LLMReasoner picks the intention/wording among Python-legal
         # options (see cabin_sim/reasoning.py)
         self.reasoner = reasoner
 
-        # persona-derived preferences (mm/deg canonical, converted where the
-        # formulas want cm like the JS original)
-        seat_pref = persona.get("seat", {})
-        tol = persona.get("tolerance", {})
-        self.target_rot = float(seat_pref.get("rotation_deg", 0))
-        self.target_hgt_cm = float(seat_pref.get("height_mm", 440)) / 10.0
-        self.target_slider_mm = float(seat_pref.get("slider_mm", 330))  # legroom
-        self.tol_rot = float(tol.get("rotation_deg", 20))
-        self.tol_hgt_cm = float(tol.get("height_mm", 20)) / 10.0
-        self.tol_sl_mm = float(tol.get("slider_mm", 90))
-
-        mood = persona.get("mood", {})
-        self.talkativeness = float(persona.get("talkativeness", 0.55))
-        self.suspicion_base = float(mood.get("suspicion", 0.5))
-        self.energy_drain = 0.00018
-
-        # tunables (cognition block, with JS defaults)
-        self.memory_lambda = float(cog.get("memory_lambda", 0.004))
-        self.memory_cap = int(cog.get("memory_cap", 8))
-        self.forget_floor = float(cog.get("forget_floor", 0.09))
-        self.rehearsal_boost = float(cog.get("rehearsal_boost", 0.22))
-        self.settle_thresh = float(cog.get("settle_thresh", 0.22))
-        self.settle_step_mm = int(cog.get("settle_step_mm", 10))
-        self.settle_step_deg = int(cog.get("settle_step_deg", 10))
-        self.ride_start = float(cog.get("ride_start", RIDE_START))
-        self.ride_end = float(cog.get("ride_end", RIDE_END))
+        self.apply_persona(persona)   # prefs, tolerances, talkativeness,
+        self.energy_drain = 0.00018   # suspicion set-point, cog tunables
 
         self.rng = random.Random(seed)
         self.memory = Memory(lam=self.memory_lambda, cap=self.memory_cap,
@@ -357,6 +332,7 @@ class Mind:
         self.finished = False
 
         # affect
+        mood = persona.get("mood", {})
         self.mood = {
             "comfort": 0.4,
             "energy": float(mood.get("energy", 0.6)),
@@ -398,6 +374,48 @@ class Mind:
         self._rot_changed = False
         self._pending_thought = None     # LLM thought from this tick's choice
         self.priors = None
+
+    def apply_persona(self, persona):
+        """(Re)derive everything in the mind that comes from the persona.
+
+        Called once from __init__, and again on a LIVE persona switch (the
+        sim UI's [persona] button): seat preferences + tolerances,
+        talkativeness, the suspicion set-point and the cognition
+        tunables. Mid-run the clock, the mood values and the memory
+        traces are KEPT — only the person behind them changes (the live
+        memory picks up the new decay rate in place).
+        """
+        self.persona = persona
+        cog = persona.get("cognition", {})
+
+        # persona-derived preferences (mm/deg canonical, converted where the
+        # formulas want cm like the JS original)
+        seat_pref = persona.get("seat", {})
+        tol = persona.get("tolerance", {})
+        self.target_rot = float(seat_pref.get("rotation_deg", 0))
+        self.target_hgt_cm = float(seat_pref.get("height_mm", 440)) / 10.0
+        self.target_slider_mm = float(seat_pref.get("slider_mm", 330))  # legroom
+        self.tol_rot = float(tol.get("rotation_deg", 20))
+        self.tol_hgt_cm = float(tol.get("height_mm", 20)) / 10.0
+        self.tol_sl_mm = float(tol.get("slider_mm", 90))
+
+        mood = persona.get("mood", {})
+        self.talkativeness = float(persona.get("talkativeness", 0.55))
+        self.suspicion_base = float(mood.get("suspicion", 0.5))
+
+        # tunables (cognition block, with JS defaults)
+        self.memory_lambda = float(cog.get("memory_lambda", 0.004))
+        self.memory_cap = int(cog.get("memory_cap", 8))
+        self.forget_floor = float(cog.get("forget_floor", 0.09))
+        self.rehearsal_boost = float(cog.get("rehearsal_boost", 0.22))
+        self.settle_thresh = float(cog.get("settle_thresh", 0.22))
+        self.settle_step_mm = int(cog.get("settle_step_mm", 10))
+        self.settle_step_deg = int(cog.get("settle_step_deg", 10))
+        self.ride_start = float(cog.get("ride_start", RIDE_START))
+        self.ride_end = float(cog.get("ride_end", RIDE_END))
+
+        if getattr(self, "memory", None) is not None:   # live persona switch:
+            self.memory.lam = self.memory_lambda        # keep traces, new rate
 
     # ---- derived state ---------------------------------------------------
 

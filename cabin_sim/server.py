@@ -9,9 +9,11 @@ Endpoints:
   GET  /               the SVG visual (web/index.html)
   GET  /api/state      session feed (existing shape, polled by web/index.html)
   GET  /api/snapshot   canonical schema snapshot (the view adapter polls this)
+  GET  /api/prompt     active environment/persona prompt files + choices
   POST /api/chat       experimenter chat      {"text": "..."}
   POST /api/seat       set a seat axis        {"axis": "rot|hgt|sl", "value": n}
   POST /api/control    play/pause             {"running": true|false}
+  POST /api/prompt     apply prompt edits / switch files  {"kind": "environment|persona"}
 """
 
 import json
@@ -20,6 +22,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from . import prompts as prompt_files
 from .schema import build_snapshot
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -80,6 +83,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json(self.engine.session.state())
         elif path == "/api/snapshot":
             self._json(build_snapshot(self.engine))
+        elif path == "/api/prompt":
+            with self.engine.session._lock:
+                self._json(prompt_files.status(self.engine.session))
         else:
             self.send_error(404)
 
@@ -123,6 +129,20 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/control":
             self._control(data)
 
+        elif path == "/api/prompt":
+            # one click: apply the on-disk edit of the active prompt file,
+            # or advance to the next one (cabin_sim/prompts.py)
+            session = self.engine.session
+            kind = data.get("kind")
+            try:
+                with session._lock:
+                    result = prompt_files.cycle(
+                        session, kind if isinstance(kind, str) else "")
+                self._json(result, 200 if result.get("error") is None else 400)
+            except ValueError as exc:        # an unusable persona file: 400,
+                self._json({"ok": False,  # never a dead ticker
+                            "error": str(exc)}, 400)
+
         else:
             self.send_error(404)
 
@@ -137,7 +157,11 @@ class Handler(BaseHTTPRequestHandler):
                             max_steps=old.max_steps,
                             step_interval=old.step_interval,
                             duration=old.duration, seed=engine.seed,
-                            reasoning=getattr(old, "reasoning", "auto"))
+                            reasoning=getattr(old, "reasoning", "auto"),
+                            environment=getattr(old, "environment_text", None),
+                            environment_path=getattr(old, "environment_path",
+                                                     None),
+                            persona_path=getattr(old, "persona_path", None))
             self.server.engine = SimEngine(
                 fresh, seed=engine.seed, tick_dt=engine.tick_dt,
                 ride_start=engine.ride_start, priors_path=engine.priors_path)

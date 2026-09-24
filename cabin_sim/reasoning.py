@@ -33,6 +33,12 @@ crowd the free tier at once.
 Mode selection: --reasoning auto|rules|llm (env REASONING). "auto" enables the
 LLM whenever the provider is a real backend (groq/ollama); scripted always
 means rules, so pytest stays deterministic.
+
+The system prompt = persona + ENVIRONMENT (the world text from
+cabin_sim/prompts.py prompt files), swappable live through the sim UI's
+env/persona buttons (set_environment / set_persona), and every
+decide/chat message carries the seat's real travel envelope
+(prompts.seat_envelope, generated from world.Seat).
 """
 
 from __future__ import annotations
@@ -41,6 +47,8 @@ import json
 import re
 import sys
 import time
+
+from .prompts import DEFAULT_ENVIRONMENT, seat_envelope
 
 MAX_THOUGHT = 160
 MAX_REPLY = 240
@@ -61,12 +69,14 @@ SPEAK_FORCE_S = 10.0    # floor between FORCED lines: the entry greeting skips
                         # the gap, but never faster than this
 
 
-def create_reasoner(provider, mode="auto", persona=None, chat_provider=None):
+def create_reasoner(provider, mode="auto", persona=None, chat_provider=None,
+                    environment=None):
     """Build the reasoner for this session (None = rules mode).
 
     `chat_provider` is an optional SECOND backend used only for experimenter
     replies (hybrid: the fast model ticks, a bigger model chats); None means
-    one provider does everything.
+    one provider does everything. `environment` is the world text (the
+    prompts/ environment file) folded into the system prompt.
 
     Never raises: an unusable 'llm' request degrades to rules with a warning,
     so a missing key or stopped Ollama can never take the ride down.
@@ -80,7 +90,9 @@ def create_reasoner(provider, mode="auto", persona=None, chat_provider=None):
             print("reasoning: 'llm' needs a real provider (groq/ollama) — "
                   "using rule-based reasoning.", file=sys.stderr)
         else:
-            return LLMReasoner(provider, persona, chat_provider=chat_provider)
+            return LLMReasoner(provider, persona,
+                               chat_provider=chat_provider,
+                               environment=environment)
     return None
 
 
@@ -88,7 +100,11 @@ def create_reasoner(provider, mode="auto", persona=None, chat_provider=None):
 # prompt construction
 # --------------------------------------------------------------------------
 
-def _system_prompt(persona):
+DEFAULT_VOICE = ("Voice: dry, practical, British understatement; short "
+                 "first-person lines, never cheerful, never robotic.")
+
+
+def _system_prompt(persona, environment=None):
     persona = persona or {}
     name = persona.get("name", "a passenger")
     blurb = str(persona.get("blurb", ""))[:200]
@@ -97,15 +113,22 @@ def _system_prompt(persona):
                 f"cabin. {blurb}")
     traits = persona.get("traits")
     traits_line = f"Traits: {', '.join(traits)}.\n" if traits else ""
+    voice = persona.get("voice")
+    voice_line = (str(voice) if str(voice).lower().startswith("voice")
+                  else f"Voice: {voice}") if voice else DEFAULT_VOICE
+    world = (DEFAULT_ENVIRONMENT if environment is None
+             else str(environment)).strip()
     return (
         f"{intro}\n"
         f"{traits_line}"
+        "ENVIRONMENT — the world you are in (from the experimenter's "
+        "environment prompt):\n"
+        f"{world}\n"
         "You act like the person you are, never like an assistant or a "
         "robot: you notice what your body wants, fiddle with the cabin when "
         "you feel like it, follow the experimenter's orders, and change "
         "your mind when something does not work the way you meant.\n"
-        "Voice: dry, practical, British understatement; short first-person "
-        "lines, never cheerful, never robotic.\n"
+        f"{voice_line}\n"
         "RULES: every fact comes from the STATE / OUTCOME lines supplied "
         "with each request — never invent numbers, seat angles, events or "
         "history. You never break character and never mention being a "
@@ -207,15 +230,32 @@ class LLMReasoner:
 
     mode = "llm"
 
-    def __init__(self, provider, persona=None, chat_provider=None):
+    def __init__(self, provider, persona=None, chat_provider=None,
+                 environment=None):
         self.provider = provider            # decide + speak (fast lane)
         self.chat_provider = chat_provider or provider   # experimenter lane
         self.kind = f"llm:{getattr(provider, 'name', 'llm')}"
-        self.system = _system_prompt(persona)
+        self.persona = persona or {}
+        self.environment = (DEFAULT_ENVIRONMENT if environment is None
+                            else str(environment))
+        self.system = _system_prompt(self.persona, self.environment)
         self.calls = 0                      # observability (tests, HUD)
         self._last_decide_t = -1e9          # decide() sim-time throttle
         self._last_wall = 0.0               # shared rate-gap stamp (all lanes)
         self._last_forced = -1e9            # forced-line floor (entry greet)
+
+    # ---- live prompt switching (the sim UI's env/persona buttons) --------
+
+    def set_environment(self, environment):
+        """Swap the WORLD text in the system prompt (next call sees it)."""
+        self.environment = (DEFAULT_ENVIRONMENT if environment is None
+                            else str(environment))
+        self.system = _system_prompt(self.persona, self.environment)
+
+    def set_persona(self, persona):
+        """Swap WHO is reasoning; the system prompt is rebuilt."""
+        self.persona = persona or {}
+        self.system = _system_prompt(self.persona, self.environment)
 
     # ---- transport --------------------------------------------------------
 
@@ -248,6 +288,7 @@ class LLMReasoner:
                             for c in mind.chat[-4:])
         return (
             f"STATE: {state_block(mind)}\n"
+            f"ENVELOPE (physical): {seat_envelope()}\n"
             f"LAST OUTCOME: {outcome_block(getattr(mind, 'last_outcome', None))}\n"
             f"{order}\n"
             f"RECENT CHAT: {recent or 'none'}\n"
@@ -395,6 +436,7 @@ class LLMReasoner:
                  if getattr(mind, "instruction", None) else "")
         msg = (
             f"STATE: {state_block(mind)}\n"
+            f"ENVELOPE (physical): {seat_envelope()}\n"
             f"LAST OUTCOME: {outcome_block(getattr(mind, 'last_outcome', None))}\n"
             f"RECENT CHAT: {history or 'none'}\n"
             f'THE EXPERIMENTER SAYS: "{text[:300]}"'

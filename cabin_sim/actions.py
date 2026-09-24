@@ -8,7 +8,10 @@ Two doors into the cabin, both safety gates:
                       seat axis + the model's own delta, vending item,
                       table state. Python checks only the vocabulary and
                       lets the world clamp to physical travel — no step
-                      table picks a value for the model.
+                      table picks a value for the model. The swivel (LLM
+                      door only) additionally WRAPS through the 0/359
+                      seam like a real turntable, so every heading stays
+                      reachable; every other axis clamps to its limits.
 
 Every change is validated and clamped by the Cabin before it touches
 anything: the interior can never go out of bounds, whatever the reasoner
@@ -87,6 +90,28 @@ def describe(action: str) -> str:
 AXES = ("slider_mm", "height_mm", "recline_deg", "rotation_deg")
 
 
+def _rotate(cabin: Cabin, delta: float):
+    """Swivel with wrap-around: a turntable folds through the 0/359 seam.
+
+    Only the LLM door does this — the rules/world paths keep their
+    clamped, no-wrap contract. The model's angular intent ("face the
+    window" from 350° means −20°, not +340°) then always lands on the
+    real heading instead of being refused at the seam, so every swivel
+    position stays reachable. Whole degrees, like the world's rotation
+    field; `detail` reports what actually happened for the OUTCOME line.
+    """
+    if delta == 0:
+        return False, "delta 0: the seat did not move", "seat_move"
+    before = float(cabin.seat.rotation_deg)
+    raw = before + delta
+    new = int(round(raw % 360.0)) % 360
+    cabin.seat.rotation_deg = new
+    detail = f"rotation_deg {before:g} \u2192 {new:g}"
+    if raw < 0.0 or raw >= 360.0:
+        detail += " (wrapped through the 0/359 seam)"
+    return True, detail, "seat_move"
+
+
 def apply_llm_action(cabin: Cabin, action):
     """Validate and apply ONE model-proposed action. Returns (ok, detail, name).
 
@@ -109,6 +134,8 @@ def apply_llm_action(cabin: Cabin, action):
                 "seat_move"
         if isinstance(delta, bool) or not isinstance(delta, (int, float)):
             return False, "delta refused: not a number", "seat_move"
+        if axis == "rotation_deg":
+            return _rotate(cabin, float(delta))    # swivel wraps, see above
         before = getattr(cabin.seat, axis)
         actual = cabin.seat.move(axis, delta)   # world clamps to travel limits
         if actual == 0:

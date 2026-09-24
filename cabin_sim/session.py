@@ -18,16 +18,25 @@ from .world import Cabin
 
 class Session:
     def __init__(self, persona, provider, max_steps=300, step_interval=1.2,
-                 duration=0.0, seed=1, reasoning="auto", chat_provider=None):
+                 duration=0.0, seed=1, reasoning="auto", chat_provider=None,
+                 environment=None, environment_path=None, persona_path=None):
         self.persona = persona
         self.reasoning = reasoning       # requested mode (auto|rules|llm)
+        # live prompt state (cabin_sim/prompts.py): the environment text the
+        # reasoner is built with + the source files behind the UI buttons
+        self.environment_text = environment
+        self.environment_path = environment_path
+        self.persona_path = persona_path
+        self._environment_mtime = None   # set on apply — see prompts.cycle()
+        self._persona_mtime = None
         self.cabin = Cabin()
         # the reasoner decides WHO words/chooses: None = deterministic rules,
         # LLMReasoner = provider-backed reasoning (see cabin_sim/reasoning.py).
         # chat_provider = optional second backend for experimenter replies only
         # (hybrid: small/fast model ticks, bigger model chats).
         self.reasoner = create_reasoner(provider, reasoning, persona,
-                                        chat_provider=chat_provider)
+                                        chat_provider=chat_provider,
+                                        environment=environment)
         self.mind = Mind(persona, self.cabin, seed=seed,
                          reasoner=self.reasoner)
         self.agent = CognitiveAgent(persona, provider, self.cabin, seed=seed,
