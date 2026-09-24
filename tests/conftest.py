@@ -4,7 +4,7 @@ from cabin_sim.provider import create_provider
 from cabin_sim.session import Session
 
 # Minimal valid persona for deterministic scripted runs (matches the shape of
-# personas/phill.json: seat prefs, tolerance, mood, talkativeness, vending).
+# personas/phill.py: seat prefs, tolerance, mood, talkativeness, vending).
 PERSONA = {
     "name": "Phill",
     "blurb": "test persona for the deterministic suite",

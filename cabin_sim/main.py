@@ -5,7 +5,7 @@ Not running a template: this is the CLI of the sim.
   python -m cabin_sim.main                  # browser view on :8000
   python -m cabin_sim.main --duration 300   # 5-minute browser session
   python -m cabin_sim.main --steps 40       # headless run, prints the log
-  python -m cabin_sim.main --persona personas/phill.json --provider groq
+  python -m cabin_sim.main --persona personas/phill.py --provider groq
 """
 
 import argparse
@@ -21,8 +21,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def _parse(argv):
     parser = argparse.ArgumentParser(description="Cabin Agent Sim")
-    parser.add_argument("--persona", default="personas/phill.json",
-                        help="path to a persona JSON file")
+    parser.add_argument("--persona", default="personas/phill.py",
+                        help="path to a persona file (.py with PERSONA = {...} "
+                             "or .json)")
     parser.add_argument("--provider", default=None,
                         help="groq | ollama | scripted (default: from .env)")
     parser.add_argument("--reasoning", default="auto",
@@ -60,11 +61,8 @@ def _parse(argv):
 
 
 def _load_persona(path):
-    resolved = Path(path)
-    if not resolved.is_absolute():
-        resolved = ROOT / resolved
-    with open(resolved, encoding="utf-8") as fh:
-        return json.load(fh)
+    from . import prompts as prompt_files   # .py (PERSONA = {...}) or .json
+    return prompt_files.load_persona(prompt_files.resolve(path))
 
 
 def main(argv=None):

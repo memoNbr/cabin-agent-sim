@@ -296,7 +296,9 @@ class LLMReasoner:
             "clamped at a travel limit, or refused?), then reconsider what "
             "you want now as this person, and choose ONE next move — or "
             "none (\"action\": null) if you are content to sit. Every value "
-            "is yours to choose; the cabin only enforces its physical "
+            "is yours to choose — \"delta\" in mm (slider/height) or degrees "
+            "(recline/rotation), never 0 (0 is not a move; use null to "
+            "stay still); the cabin only enforces its physical "
             "travel limits, and a clamped or refused outcome is exactly "
             "what you should examine.\n"
             "Respond ONLY with JSON:\n"
@@ -442,16 +444,25 @@ class LLMReasoner:
             f'THE EXPERIMENTER SAYS: "{text[:300]}"'
             f"{order}\n"
             "Reply as Phill (max 30 words): answer a question from STATE, "
-            "chat naturally otherwise, and if it is an INSTRUCTION follow "
-            "it — confirm in character, offer an immediate action now if "
-            "one makes sense, and set \"standing\": true when carrying it "
-            "out will take you several moves (you will keep getting the "
-            "order until you report \"order_done\": true in a decide call). "
-            'Give "action": null when nothing needs moving. Respond with '
+            "chat naturally otherwise, and if it is an INSTRUCTION carry it "
+            "out — an order ONE move can fulfil (turn the seat, raise it, "
+            "recline, fetch water) MUST return that action in this very "
+            "reply, not just a promise; confirm it in character. For an "
+            "order that takes several moves, make the FIRST move now too "
+            'and set "standing": true (you keep the order until you report '
+            '"order_done": true in a decide call). Give "action": null '
+            "only when nothing needs moving. The seat axes are exactly: "
+            "slider_mm, height_mm, recline_deg, rotation_deg. "
+            '"delta" is the move YOU choose, in mm (slider/height) or '
+            "degrees (recline/rotation) — never 0: when the order does not "
+            "name a direction or amount, pick one yourself and make a "
+            "noticeable real move (e.g. 15-45 degrees of swivel), then say "
+            "what you did. Respond with "
             "JSON:\n"
             '{"reply": "<your answer, max 30 words>", '
-            '"action": {"kind": "seat", "axis": "<axis>", "delta": <n>} or '
-            '{"kind": "vending", "item": "<item>"} or {"kind": "table", '
+            '"action": {"kind": "seat", "axis": '
+            '"<slider_mm|height_mm|recline_deg|rotation_deg>", "delta": <n>} '
+            'or {"kind": "vending", "item": "<item>"} or {"kind": "table", '
             '"folded": <bool>} or null, "standing": true|false}'
         )
         try:

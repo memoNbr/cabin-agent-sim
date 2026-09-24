@@ -413,10 +413,31 @@
     padding:5px 7px; font:inherit;}
   .sim-jump::placeholder{color:#666;}
   .sim-jump:focus{outline:none; border-color:#888;}
-  /* ---- live prompt controls: cycle/apply + links to the source files ---- */
-  .sim-bar a.sim-link{display:inline-block; text-decoration:none; line-height:1.55;}
-  .sim-bar .sim-name{min-width:0; max-width:178px; overflow:hidden; text-overflow:ellipsis;
-    white-space:nowrap; text-transform:none; letter-spacing:.02em; color:#e2e2e2;}
+  /* ---- live prompt editor: the actual source file, on this page --------- */
+  .prompt-panel{position:fixed; left:14px; bottom:14px; z-index:40; display:none;
+    flex-direction:column; gap:7px; width:min(600px, calc(100vw - 28px));
+    padding:10px 12px; background:rgba(10,10,12,.96); border:1px solid #3a3a3a;
+    border-radius:10px; box-shadow:0 14px 34px rgba(0,0,0,.6); backdrop-filter:blur(6px);
+    font:11px/1.45 ui-monospace,Consolas,monospace; color:#c8c8c8;}
+  .prompt-panel.open{display:flex;}
+  .pp-head{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:#9a9a9a;
+    border-bottom:1px solid #2c2c2c; padding-bottom:6px;}
+  .pp-head b{color:#e6e6e6; font-weight:600; letter-spacing:.1em;}
+  .pp-close{background:none; border:0; color:#8f8f8f; font-size:12px; cursor:pointer; padding:0 2px;}
+  .pp-close:hover{color:#e6e6e6;}
+  .pp-who{font-size:10.5px; color:#8f8f8f; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis;}
+  .pp-file{background:#0b0b0d; border:1px solid #3a3a3a; color:#ddd; border-radius:5px;
+    padding:5px 7px; font:inherit;}
+  .pp-code{width:100%; box-sizing:border-box; min-height:170px; max-height:44vh;
+    resize:vertical; background:#0b0b0d; border:1px solid #3a3a3a; color:#d8d8d8;
+    border-radius:6px; padding:8px 9px;
+    font:11px/1.5 "Consolas","Cascadia Mono",monospace; tab-size:4;}
+  .pp-code:focus{outline:none; border-color:#888;}
+  .pp-row{display:flex; align-items:center; gap:10px;}
+  .pp-note{font-size:10px; color:#8c8c8c; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap;}
   .sim-speed{background:#141416; border:1px solid #3a3a3a; color:#cfcfcf; border-radius:5px;
     padding:5px 6px; font:inherit; cursor:pointer;}
   .sim-speed:focus{outline:none; border-color:#888;}
@@ -559,13 +580,22 @@
           <label class="seat-lbl" title="lateral rail: 0 = driver seat, −25 cm = left (clamped inside the cabin)">lat<input type="range" id="seatLat" min="-25" max="0" step="1" value="0" aria-label="lateral rail, 0 to minus 25 centimetres"><span class="seat-val" id="seatLatV">0</span></label>
           <label class="seat-lbl" title="longitudinal rail: −20 cm back … +10 cm forward">lng<input type="range" id="seatLng" min="-20" max="10" step="1" value="0" aria-label="longitudinal rail, minus 20 to plus 10 centimetres"><span class="seat-val" id="seatLngV">0</span></label>
         </div>
-        <!-- live prompts: apply your code edits / cycle files + open the source -->
-        <button class="kbtn" id="promptEnv" type="button" title="environment prompt — click: apply your edits from the source file; click again: switch to the next environment file">env ▸</button>
-        <span class="sim-clock mono sim-name" id="promptEnvName" title="active environment prompt file">—</span>
-        <button class="kbtn" id="promptPersona" type="button" title="persona prompt — click: apply your edits from the source file; click again: switch to the next persona">persona ▸</button>
-        <span class="sim-clock mono sim-name" id="promptPersonaName" title="active persona file">—</span>
-        <a class="kbtn sim-link" id="promptEnvCode" href="#" target="_blank" rel="noopener" title="open the environment prompt SOURCE file in the editor — what you write there is what the sim runs">env ⌨ code</a>
-        <a class="kbtn sim-link" id="promptPersonaCode" href="#" target="_blank" rel="noopener" title="open the persona SOURCE file in the editor — what you write there is what the sim runs">persona ⌨ code</a>
+        <!-- live prompts: TWO buttons — the actual source opens on this page -->
+        <button class="kbtn" id="promptEnvBtn" type="button" title="environment prompt — open the WORLD file the model is told, edit it right here, apply it live">environment prompt</button>
+        <button class="kbtn" id="promptPersonaBtn" type="button" title="persona prompt — open the WHO file the model plays, edit it right here, apply it live">persona prompt</button>
+      </div>
+
+      <!-- live prompt editor: the real file, editable on this page ---------- -->
+      <div class="prompt-panel" id="promptPanel" role="dialog" aria-label="live prompt editor">
+        <div class="pp-head"><span id="ppTitle"><b>—</b></span>
+          <button class="pp-close" id="ppClose" type="button" aria-label="close prompt editor">✕</button></div>
+        <div class="pp-who" id="ppWho" title="what this prompt is">—</div>
+        <select class="pp-file" id="ppFile" aria-label="prompt file — switch between files" title="switch the prompt file"></select>
+        <textarea class="pp-code" id="ppCode" spellcheck="false" aria-label="prompt source — edit it and press apply"></textarea>
+        <div class="pp-row">
+          <button class="kbtn" id="ppApply" type="button" title="save this text to the file on disk and apply it to the running mind">apply changes ▸</button>
+          <span class="pp-note" id="ppNote"></span>
+        </div>
       </div>
       <!-- cognitive HUD: the avatar's live state, fed by window.__COG_LIVE__ -->
       <div class="cog-hud" id="cogHud" role="group" aria-label="avatar cognitive state: intention, active module, ride, trust and mood">
@@ -925,6 +955,7 @@
       .then(function (res) {
         answer(res && res.ok && res.reply ? String(res.reply)
           : (res && res.error) || "(no reply — Python mind not reachable)", pend);
+        if (res && res.outcome) line("Cabin", res.outcome);  /* the physical result */
       })
       .catch(function () {
         answer("(no reply — Python mind not reachable)", pend);

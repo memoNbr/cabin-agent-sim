@@ -1011,6 +1011,7 @@ class Mind:
         self.log_line("chat", f"experimenter \u00b7 {text}")
         self.remember("chat", f"Experimenter: {text}", 0.5, True)
         reply = None
+        res, outcome = None, None
         if self.reasoner is not None:
             # llm mode: the MODEL interprets the message itself — question,
             # small talk, or an order to carry out. An immediate move runs
@@ -1027,20 +1028,33 @@ class Mind:
                 action = res.get("action")
                 if (isinstance(action, dict)
                         and action.get("kind") not in (None, "none")):
-                    self._perform(action, source="chat")
+                    # the PHYSICAL result, so the chat can show it: the seat
+                    # moved as asked / was refused — not just the promise
+                    ok, detail, _ = self._perform(action, source="chat")
+                    outcome = detail if ok else f"REFUSED \u2014 {detail}"
                 if res.get("standing"):
                     self.instruction = text
                     self.remember("order", f"Standing order: {text}", 0.6, True)
                     self.log_line("dir", f"directive \u00b7 standing order \u00b7 "
                                          f"{text[:60]}")
+                    if outcome is None:
+                        outcome = ("order accepted \u2014 first move on the "
+                                   "next think beat")
         if reply is None:
             # rules mode — and the degrade path when the model is
             # unreachable: orders by regex, then phrase-bank conversation
             reply = self._directive(text) or self._chat_reply(text)
         self.chat.append({"who": "phill", "t": self.t, "text": reply})
+        if outcome:
+            # who="cabin" is not validated by the schema; the chat panel
+            # prints it as the machine's line right after Phill's reply
+            self.chat.append({"who": "cabin", "t": self.t, "text": outcome})
         del self.chat[: max(0, len(self.chat) - 40)]
         self.speak(reply)
-        return {"ok": True, "reply": reply, "state": self.chat_state()}
+        result = {"ok": True, "reply": reply, "state": self.chat_state()}
+        if res is not None:                # llm lane only: rules shape kept
+            result["outcome"] = outcome
+        return result
 
     # ---- priors (persisted across rides, no personal data) -------------------
 

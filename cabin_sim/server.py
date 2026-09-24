@@ -10,10 +10,15 @@ Endpoints:
   GET  /api/state      session feed (existing shape, polled by web/index.html)
   GET  /api/snapshot   canonical schema snapshot (the view adapter polls this)
   GET  /api/prompt     active environment/persona prompt files + choices
+                       + the active file's `content` (editable on the page)
   POST /api/chat       experimenter chat      {"text": "..."}
   POST /api/seat       set a seat axis        {"axis": "rot|hgt|sl", "value": n}
   POST /api/control    play/pause             {"running": true|false}
-  POST /api/prompt     apply prompt edits / switch files  {"kind": "environment|persona"}
+  POST /api/prompt     the two prompt buttons:
+                       {"kind": "environment|persona", "text": "<edited source>"}
+                           save the panel's edit to the file + apply it live;
+                       {"kind": "...", "file": "name.md"}  switch to that file;
+                       {"kind": "..."}                     legacy cycle click.
 """
 
 import json
@@ -130,14 +135,22 @@ class Handler(BaseHTTPRequestHandler):
             self._control(data)
 
         elif path == "/api/prompt":
-            # one click: apply the on-disk edit of the active prompt file,
-            # or advance to the next one (cabin_sim/prompts.py)
+            # two buttons: {"text"} saves the panel's edit to the source
+            # file and applies it, {"file"} switches to a named file, no
+            # payload = the legacy cycle click (cabin_sim/prompts.py)
             session = self.engine.session
             kind = data.get("kind")
+            kind = kind if isinstance(kind, str) else ""
             try:
                 with session._lock:
-                    result = prompt_files.cycle(
-                        session, kind if isinstance(kind, str) else "")
+                    if isinstance(data.get("file"), str):
+                        result = prompt_files.select(session, kind,
+                                                     data["file"])
+                    elif isinstance(data.get("text"), str):
+                        result = prompt_files.save(session, kind,
+                                                   data["text"])
+                    else:
+                        result = prompt_files.cycle(session, kind)
                 self._json(result, 200 if result.get("error") is None else 400)
             except ValueError as exc:        # an unusable persona file: 400,
                 self._json({"ok": False,  # never a dead ticker

@@ -261,6 +261,38 @@ def test_chat_llm_sees_live_state(persona):
     assert "live_trust=" in seen["user"]
 
 
+# ---- chat orders: the PHYSICAL outcome reaches the panel -------------------
+
+
+def test_chat_action_reports_the_physical_outcome_to_the_panel(persona):
+    mind, _ = llm_mind(
+        persona,
+        ['{"reply": "Turning it now.", '
+         '"action": {"kind": "seat", "axis": "rotation_deg", "delta": 10}}'])
+    rot = mind.cabin.seat.rotation_deg                # as found: 90°
+    res = mind.chat_send("please rotate the seat")
+    assert res["reply"] == "Turning it now."
+    assert mind.cabin.seat.rotation_deg == (rot + 10) % 360   # it REALLY moved
+    assert res["outcome"] and "rotation_deg" in res["outcome"]
+    assert mind.chat[-1]["who"] == "cabin"            # the panel's machine line
+
+
+def test_chat_standing_order_without_a_move_says_when_it_lands(persona):
+    mind, _ = llm_mind(
+        persona,
+        ['{"reply": "On it \u2014 working through it.", "standing": true}'])
+    res = mind.chat_send("recline all the way and sit tall")
+    assert mind.instruction == "recline all the way and sit tall"
+    assert "next think beat" in (res["outcome"] or "")
+    assert mind.last_outcome is None                  # nothing has moved yet
+
+
+def test_chat_degrade_keeps_the_rules_response_shape(persona):
+    mind, _ = llm_mind(persona, ["no json here"])
+    res = mind.chat_send("how are you doing?")
+    assert res["ok"] and "outcome" not in res         # rules payload unchanged
+
+
 # ---- hybrid: separate chat provider ---------------------------------------
 
 def test_hybrid_chat_provider_gets_chat_ticks_keep_their_own(persona):

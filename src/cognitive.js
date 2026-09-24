@@ -56,7 +56,7 @@
 
   /* ===== view state: a mirror of the last snapshot (never reasoned about) */
   var V = {
-    rot: 90, hgt: 38, sl: 3, t: 0, running: true, phase: "setup", done: false,
+    rot: 90, hgt: 38, sl: 3, recline: 103, t: 0, running: true, phase: "setup", done: false,
     speed: 0, g: 0, jolt: 0, rain: 0, kind: "",
     traits: [],
     mood: { comfort: 0.4, energy: 0.6, suspicion: 0.5 },
@@ -84,6 +84,7 @@
     V.rot = ((seat.rotation_deg == null ? 90 : seat.rotation_deg) % 360 + 360) % 360;
     V.hgt = seat.height_mm != null ? seat.height_mm / 10 : 38;
     V.sl = seat.slider_mm != null ? (seat.slider_mm - 360) / 10 : 3;
+    V.recline = seat.recline_deg != null ? seat.recline_deg : 103;
     V.t = s.t || 0;
     V.phase = s.phase || "setup";
     V.done = !!s.done;
@@ -612,6 +613,12 @@
     $("slThumb").style.left = "calc(" + x + "% - 9px)";
     $("slRead").textContent = (V.sl >= 0 ? "+" : "") + V.sl;
   }
+  function renderRecline() {
+    if (!$("rcThumb")) return;
+    var pct = Math.max(0, Math.min(100, ((V.recline - 80) / 30) * 100));
+    $("rcThumb").style.left = "calc(" + pct + "% - 9px)";
+    if ($("rcRead")) $("rcRead").textContent = (V.recline - 70) + "\u00b0";   /* drawn-rig units: world 80..110 -> 10..40 */
+  }
   function renderGauges() {
     if (!$("gRotV")) return;
     var aR = Math.round(rate(ROT, V.rot) * 100), aH = Math.round(rate(HGT, V.hgt) * 100);
@@ -685,7 +692,7 @@
   }
   function renderAll() {
     renderClock(); renderSceneFx(); renderSeatScene(); renderDial();
-    renderRail(); renderSlide(); renderGauges(); renderMood(); renderMemory();
+    renderRail(); renderSlide(); renderRecline(); renderGauges(); renderMood(); renderMemory();
     renderThoughts(); renderLog(); paintSpeech(); setModule(V.module);
     syncPlay();
   }
@@ -728,6 +735,13 @@
     V.sl = s;
     renderAll();
     post("/api/seat", { axis: "sl", value: 360 + s * 10 });
+  }
+  function setRec(v) {
+    v = Math.max(80, Math.min(110, Math.round(v)));
+    if (v === V.recline) return;
+    V.recline = v;
+    renderAll();
+    post("/api/seat", { axis: "rec", value: v });
   }
 
   // dial pointer
@@ -774,13 +788,29 @@
     slTrack.addEventListener("pointerup", function () { draggingSl = false; });
   }
 
-  // keyboard: arrows + space
+  // recline track (seatback 80..110 deg, drawn as 10..40)
+  var rcTrack = $("rcTrack");
+  function recFromEvent(e) {
+    var r = rcTrack.getBoundingClientRect();
+    var x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    return 80 + x * 30;
+  }
+  var draggingRc = false;
+  if (rcTrack) {
+    rcTrack.addEventListener("pointerdown", function (e) { draggingRc = true; rcTrack.setPointerCapture && rcTrack.setPointerCapture(e.pointerId); setRec(recFromEvent(e)); });
+    rcTrack.addEventListener("pointermove", function (e) { if (draggingRc) setRec(recFromEvent(e)); });
+    rcTrack.addEventListener("pointerup", function () { draggingRc = false; });
+  }
+
+  // keyboard: arrows + space + [ ] recline
   window.addEventListener("keydown", function (e) {
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (e.key === "ArrowLeft") setRot(V.rot - 5);
     else if (e.key === "ArrowRight") setRot(V.rot + 5);
     else if (e.key === "ArrowUp") setHgt(V.hgt + 1);
     else if (e.key === "ArrowDown") setHgt(V.hgt - 1);
+    else if (e.key === "[") setRec(V.recline - 3);
+    else if (e.key === "]") setRec(V.recline + 3);
     else if (/^[aAdD]$/.test(e.key)) setSl(e.key.toLowerCase() === "a" ? V.sl - 1 : V.sl + 1);
     else if (e.key === " ") { e.preventDefault(); togglePlay(); }
   });
@@ -819,42 +849,95 @@
   });
   if ($("btnReplay")) $("btnReplay").addEventListener("click", restart);
 
-  /* ===== live prompts: apply code edits / cycle files + source links ===== */
-  function paintPromptUI(st) {
-    if (!st) return;
-    if ($("promptEnvName")) {
-      $("promptEnvName").textContent = (st.environment && st.environment.name) || "—";
-      $("promptEnvName").title = (st.environment && st.environment.path)
-        || "no environment prompt file";
+  /* ===== live prompts: TWO buttons, the source opens on this page ====== */
+  var ppKind = null;            /* environment | persona — which file is open */
+  var PP_TITLES = {
+    environment: "environment prompt — the WORLD the model is told",
+    persona: "persona prompt — WHO the model is"
+  };
+  function paintPromptPanel(st) {
+    if (!st || !ppKind) return;
+    var info = st[ppKind] || {};
+    if ($("ppTitle")) $("ppTitle").textContent = PP_TITLES[ppKind];
+    var who = $("ppWho");
+    if (who) {
+      var desc = ppKind === "environment"
+        ? (info.title || "")
+        : ((info.who ? info.who + " — " : "") + (info.blurb || ""));
+      who.textContent = desc || info.name || "—";
+      who.title = info.path || "";
     }
-    if ($("promptPersonaName")) {
-      $("promptPersonaName").textContent = (st.persona && st.persona.name) || "—";
-      $("promptPersonaName").title = (st.persona && st.persona.path) || "";
+    var sel = $("ppFile");
+    if (sel) {
+      var names = ppKind === "environment" ? st.environments : st.personas;
+      sel.innerHTML = "";
+      (names || []).forEach(function (n) {
+        var o = document.createElement("option");
+        o.value = n; o.textContent = n;
+        if (n === info.name) o.selected = true;
+        sel.appendChild(o);
+      });
     }
-    function src(el, info) {                 /* the actual link to the code */
-      if (!el) return;
-      if (info && info.path) {
-        el.href = "vscode://file/" + encodeURI(String(info.path).replace(/\\/g, "/"));
-        el.title = "open " + info.path + " in the editor";
-      } else {
-        el.href = "#";
-      }
-    }
-    src($("promptEnvCode"), st.environment);
-    src($("promptPersonaCode"), st.persona);
+    var code = $("ppCode");
+    if (code && document.activeElement !== code) code.value = info.content || "";
+    var note = $("ppNote");
+    if (note) note.textContent = info.path || "";
   }
-  function cyclePrompt(kind) {
-    post("/api/prompt", { kind: kind })
+  function openPrompt(kind) {
+    ppKind = kind;
+    var panel = $("promptPanel");
+    if (panel) panel.classList.add("open");
+    if ($("ppNote")) $("ppNote").textContent = "loading…";
+    fetch("/api/prompt", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(paintPromptPanel)
+      .catch(function () { if ($("ppNote")) $("ppNote").textContent = "offline — start the mind"; });
+  }
+  function togglePrompt(kind) {
+    var panel = $("promptPanel");
+    if (panel && panel.classList.contains("open") && ppKind === kind) {
+      panel.classList.remove("open");
+      ppKind = null;
+      return;
+    }
+    openPrompt(kind);
+  }
+  function applyPromptFile() {
+    if (!ppKind) return;
+    var text = $("ppCode") ? $("ppCode").value : "";
+    var note = $("ppNote");
+    if (note) note.textContent = "applying…";
+    post("/api/prompt", { kind: ppKind, text: text })
       .then(function (r) { return (r && r.json) ? r.json() : null; })
-      .then(paintPromptUI)
-      .catch(function () {});
+      .then(function (st) {
+        if (!st) { if (note) note.textContent = "offline — nothing applied"; return; }
+        paintPromptPanel(st);
+        if (note) note.textContent = st.error
+          ? st.error
+          : "applied ✓ " + ((st[ppKind] || {}).name || "");
+      })
+      .catch(function () { if (note) note.textContent = "offline — nothing applied"; });
   }
-  if ($("promptEnv")) $("promptEnv").addEventListener("click", function () { cyclePrompt("environment"); });
-  if ($("promptPersona")) $("promptPersona").addEventListener("click", function () { cyclePrompt("persona"); });
-  fetch("/api/prompt", { cache: "no-store" })
-    .then(function (r) { return r.json(); })
-    .then(paintPromptUI)
-    .catch(function () {});
+  function switchPromptFile(name) {
+    if (!ppKind || !name) return;
+    if ($("ppNote")) $("ppNote").textContent = "switching…";
+    post("/api/prompt", { kind: ppKind, file: name })
+      .then(function (r) { return (r && r.json) ? r.json() : null; })
+      .then(function (st) {
+        paintPromptPanel(st || null);
+        if (st && st.error && $("ppNote")) $("ppNote").textContent = st.error;
+      })
+      .catch(function () { if ($("ppNote")) $("ppNote").textContent = "offline"; });
+  }
+  if ($("promptEnvBtn")) $("promptEnvBtn").addEventListener("click", function () { togglePrompt("environment"); });
+  if ($("promptPersonaBtn")) $("promptPersonaBtn").addEventListener("click", function () { togglePrompt("persona"); });
+  if ($("ppClose")) $("ppClose").addEventListener("click", function () {
+    var p = $("promptPanel");
+    if (p) p.classList.remove("open");
+    ppKind = null;
+  });
+  if ($("ppApply")) $("ppApply").addEventListener("click", applyPromptFile);
+  if ($("ppFile")) $("ppFile").addEventListener("change", function () { switchPromptFile(this.value); });
 
   /* ===== end-of-ride summary (server has the score; view draws it) ====== */
   function evidenceAnswers() {             /* display-only, from the snapshot */

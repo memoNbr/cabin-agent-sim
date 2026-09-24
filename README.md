@@ -188,25 +188,34 @@ body, trust words answer from the live trust score, everything else goes
 to the model. The console hook keeps its legacy shape:
 
 ```js
-window.__EXPERIMENTER_CHAT__.send("Do you trust this car?")   // → {ok, reply, state}
-window.__EXPERIMENTER_CHAT__.history()                        // [{who, t, text}] oldest first
+window.__EXPERIMENTER_CHAT__.send("rotate the seat")   // → {ok, reply, outcome, state}
+window.__EXPERIMENTER_CHAT__.history()                 // [{who, t, text}] oldest first
 ```
+
+An obeyed order also prints the **physical result** as a `Cabin:` line
+right under Phill's reply — `rotation_deg 90 → 100`, or
+`REFUSED — axis …` — so the chat shows what actually moved, not just the
+promise. A multi-move order replies `order accepted — first move on the
+next think beat` and the seat follows on the next decide cycle.
 
 ## Personas
 
-`personas/phill.json` ships as the first persona: *Phill, 33, entry-level
+`personas/phill.py` ships as the first persona: *Phill, 33, entry-level
 officer from Aachen, married, no kids, weekend commute, first time in a
 highly automated interior.* Introvert, suspicious, confident, uninterested
 in the car — he wants a functional neutral seat and to get somewhere.
 
 A persona file holds: name, background story, traits, preferred seat
 settings + tolerance, starting mood (energy, suspicion), vending interest
-and curiosity. Copy the file, change the numbers and the story, and run
-`python -m cabin_sim.main --persona personas/you.json` to try it out.
-`personas/phill.json` and `personas/nadia.json` ship as a pair and can be
+and curiosity. Personas are **Python** — the file defines
+`PERSONA = {...}` and comments are welcome (the loader executes the file,
+so treat persona files as local code); `.json` personas still load too.
+Copy the file, change the numbers and the story, and run
+`python -m cabin_sim.main --persona personas/you.py` to try it out.
+`personas/phill.py` and `personas/nadia.py` ship as a pair and can be
 switched LIVE from the sim (see below).
 
-## Live prompts (the sim's four prompt buttons)
+## Live prompts (the sim's TWO prompt buttons + the on-page editor)
 
 The prompt layer is plain code — two editable resources:
 
@@ -216,17 +225,20 @@ The prompt layer is plain code — two editable resources:
                                world.Seat, so the numbers never go stale)
                                and how a settled passenger behaves — set a
                                position and keep it;
-    personas/*.json            WHO: the persona files above.
+    personas/*.py | *.json     WHO: the persona files above.
 
-The kiosk bar carries four controls, all backed by `cabin_sim/prompts.py`:
+The kiosk bar carries exactly two buttons, backed by
+`cabin_sim/prompts.py`:
 
-- **env ▸** — one click applies your latest edits from the source file;
-  click again to switch to the next `prompts/environment-*.md`.
-- **persona ▸** — the same for `personas/*.json`; a persona click
-  hot-applies the new person to the RUNNING mind (preferences,
-  tolerances, talkativeness, the prompt layer) without resetting the ride.
-- **env ⌨ code** / **persona ⌨ code** — open the ACTUAL source files
-  (VS Code URIs): what you write there is what the sim runs.
+- **environment prompt** — opens the ACTIVE `prompts/*.md` file's source
+  ON THE SAME PAGE: edit it in the panel, press **apply changes ▸**, and
+  the running reasoner picks it up immediately. The file dropdown in the
+  panel switches between environment files.
+- **persona prompt** — the same for `personas/*.py` (or `.json`);
+  switching or saving hot-applies the new person to the RUNNING mind
+  (preferences, tolerances, talkativeness, the prompt layer) without
+  resetting the ride. A persona that does not parse is an error note in
+  the panel — the file on disk and the running person stay untouched.
 
 Every decide/chat message also carries the live seat envelope
 (`slide 260–440 mm · height 380–460 mm · recline 80–110° · rotate
@@ -246,7 +258,7 @@ cabin_sim/
                      chat_act (order interpretation), outcome feedback,
                      free-tier throttle, quiet-beat fallback
   prompts.py         live prompt files: environment world + persona
-                     cycling (the sim UI's four prompt buttons)
+                     select/save/cycle (the sim UI's two prompt buttons)
   provider.py        groq | ollama | scripted backends (think/token caps)
   sim.py             SimEngine — the only clock: phases, ride script, priors
   schema.py          build_snapshot — the single JSON contract for the views
@@ -261,9 +273,9 @@ cabin_sim/
   MIGRATION.md       JS → Python port notes
 web/index.html       inline-SVG visual served on :8000 (polls /api/state)
 src/                 three.js view adapter + archived pre-port mind
-tests/               pytest suite — 115 tests
+tests/               pytest suite — 123 tests
 prompts/             environment prompt files (the WORLD the model gets)
-personas/            editable persona JSON files (Phill, Nadia, ...)
+personas/            editable persona Python files (PERSONA = {...}: Phill, Nadia, ...)
 tutorial-cognitive.html         architecture tutorial (kiosk, 8 sections)
 tutorial-cognitive-python.html  companion walkthrough
 public/              interior reference photos + live sim captures
@@ -272,7 +284,7 @@ public/              interior reference photos + live sim captures
 ## Tests & tutorials
 
 ```bash
-python -m pytest tests -q     # 115 passed
+python -m pytest tests -q     # 123 passed
 npm run build                 # exit 0
 ```
 
