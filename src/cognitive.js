@@ -711,6 +711,7 @@
       ? "ride complete · trust " + Math.round(score * 100) + "/100" : "ride complete";
     else if (!V.running) n.textContent = "paused · press play to resume the ride";
     else if (V.phase === "setup") n.textContent = "setup · ⏭ skips to the ride · you can adjust the seat";
+    else if (V.phase === "done") n.textContent = "ride script finished (600 s) · chat, orders and the seat keep working · restart for a fresh ride";
     else n.textContent = "ride in progress · you can still adjust the seat";
   }
 

@@ -1040,10 +1040,25 @@ class Mind:
                     if outcome is None:
                         outcome = ("order accepted \u2014 first move on the "
                                    "next think beat")
+                        if self.finished:
+                            # the step cap ended the session: no further
+                            # decide beats exist — never promise a beat that
+                            # can never come
+                            outcome = ("order received \u2014 the session "
+                                       "ENDED at its step cap; restart the "
+                                       "ride to carry it out")
         if reply is None:
             # rules mode — and the degrade path when the model is
             # unreachable: orders by regex, then phrase-bank conversation
             reply = self._directive(text) or self._chat_reply(text)
+            if self.reasoner is not None:
+                # llm lane, the model call FAILED: that fallback line may
+                # SOUND compliant while nothing moves (the rules walker is
+                # disabled in llm mode) — say so, so a rate-limited no-op
+                # can never pass for success in the panel
+                outcome = ("the model did not answer this time (rate limit "
+                           "or network) \u2014 the line above is a fallback, "
+                           "no seat move was made")
         self.chat.append({"who": "phill", "t": self.t, "text": reply})
         if outcome:
             # who="cabin" is not validated by the schema; the chat panel
@@ -1052,8 +1067,8 @@ class Mind:
         del self.chat[: max(0, len(self.chat) - 40)]
         self.speak(reply)
         result = {"ok": True, "reply": reply, "state": self.chat_state()}
-        if res is not None:                # llm lane only: rules shape kept
-            result["outcome"] = outcome
+        if self.reasoner is not None:      # llm lane: always report honestly;
+            result["outcome"] = outcome   # rules mode's payload is untouched
         return result
 
     # ---- priors (persisted across rides, no personal data) -------------------

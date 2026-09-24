@@ -287,10 +287,33 @@ def test_chat_standing_order_without_a_move_says_when_it_lands(persona):
     assert mind.last_outcome is None                  # nothing has moved yet
 
 
-def test_chat_degrade_keeps_the_rules_response_shape(persona):
+def test_chat_degrade_says_no_move_honestly(persona):
+    """A failed model call must never masquerade as compliance: the fallback
+    line may sound agreeable while nothing moved, so the llm lane always
+    carries an outcome line that says exactly that."""
     mind, _ = llm_mind(persona, ["no json here"])
     res = mind.chat_send("how are you doing?")
+    assert res["ok"]
+    assert "did not answer" in res["outcome"]
+    assert "no seat move was made" in res["outcome"]
+    assert mind.chat[-1]["who"] == "cabin"            # the panel shows it too
+
+
+def test_rules_mode_chat_payload_has_no_outcome_key(persona):
+    """Rules mode's response shape stays byte-stable (determinism contract)."""
+    mind = Mind(persona, Cabin(), seed=1)             # no reasoner
+    res = mind.chat_send("how are you doing?")
     assert res["ok"] and "outcome" not in res         # rules payload unchanged
+
+
+def test_chat_standing_order_after_the_step_cap_says_the_session_ended(persona):
+    """After the step cap no decide beat will ever come — never promise one."""
+    mind, _ = llm_mind(
+        persona,
+        ['{"reply": "Queued.", "standing": true}'])
+    mind.finished = True                              # session.finish() ran
+    res = mind.chat_send("raise the seat")
+    assert "ENDED" in res["outcome"]
 
 
 # ---- hybrid: separate chat provider ---------------------------------------

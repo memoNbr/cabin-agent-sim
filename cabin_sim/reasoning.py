@@ -451,7 +451,9 @@ class LLMReasoner:
             "order that takes several moves, make the FIRST move now too "
             'and set "standing": true (you keep the order until you report '
             '"order_done": true in a decide call). Give "action": null '
-            "only when nothing needs moving. The seat axes are exactly: "
+            "only when nothing needs moving. Confirming an order with "
+            '"action": null AND "standing": false is never acceptable — '
+            "either act now or set standing. The seat axes are exactly: "
             "slider_mm, height_mm, recline_deg, rotation_deg. "
             '"delta" is the move YOU choose, in mm (slider/height) or '
             "degrees (recline/rotation) — never 0: when the order does not "

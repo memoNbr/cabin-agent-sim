@@ -138,8 +138,14 @@ pip install -r requirements.txt
 python -m cabin_sim.main --provider groq    # mind + view → http://127.0.0.1:8000
 ```
 
-The session runs 5 minutes (`--duration 300`), ticking a decision every
-1.2 s (`--interval`). Open the URL and watch the persona iterate.
+The browser session ticks a decision every 1.2 s (`--interval`) and runs
+**until you press restart** — the `--steps` cap is unlimited by default so
+a chat session can never silently freeze mid-conversation (the old default,
+300 steps, stopped the ticker after ~6 wall-minutes). Pass `--steps 300` to
+get the designed ~6-minute ride that ends with the questionnaire and summary
+overlay; `--duration` is inert in browser mode. The ride *script* itself
+ends at 600 sim-seconds: events stop, but chat, the two prompt buttons and
+seat orders keep working.
 
 Prefer the three.js cabin? In a second terminal:
 

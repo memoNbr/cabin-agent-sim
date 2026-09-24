@@ -35,12 +35,17 @@ def _parse(argv):
                         help="model used ONLY for experimenter chat replies "
                              "(default: .env CHAT_MODEL; unset = same model as "
                              "ticks) — hybrid: fast model ticks, big model chats")
-    parser.add_argument("--steps", type=int, default=300,
-                        help="decision steps: total (headless) or safety cap (server)")
+    parser.add_argument("--steps", type=int, default=None,
+                        help="decision steps: total for --headless (default "
+                             "300 = the full ride); safety cap for the "
+                             "browser session (default: unlimited — the mind "
+                             "keeps working until you press restart; 300 = "
+                             "the designed ~6-min ride with questionnaire)")
     parser.add_argument("--interval", type=float, default=1.2,
                         help="seconds between decisions in the browser run")
     parser.add_argument("--duration", type=float, default=300.0,
-                        help="seconds the browser session runs (default 300 = 5 min)")
+                        help="inert: browser session length is governed by "
+                             "--steps (kept for compatibility)")
     parser.add_argument("--seed", type=int, default=1,
                         help="random seed for reproducible runs")
     parser.add_argument("--port", type=int, default=8000,
@@ -65,10 +70,25 @@ def _load_persona(path):
     return prompt_files.load_persona(prompt_files.resolve(path))
 
 
+UNLIMITED_STEPS = 10 ** 9
+
+
+def _resolve_steps(headless, steps):
+    """--steps semantics: explicit >0 wins; otherwise the headless default
+    is 300 (the full 600 sim-s ride) and the BROWSER default is unlimited —
+    a browser session must never silently freeze at a step cap while the
+    experimenter is still chatting with it (the old default, 300 steps,
+    stopped the ticker after ~6 wall-minutes mid-conversation)."""
+    if steps and steps > 0:
+        return steps
+    return 300 if headless else UNLIMITED_STEPS
+
+
 def main(argv=None):
     args = _parse(argv)
     load_dotenv()
 
+    steps = _resolve_steps(args.headless, args.steps)
     persona = _load_persona(args.persona)
     from .provider import create_provider
 
@@ -90,7 +110,7 @@ def main(argv=None):
     from .session import Session
 
     env_path, env_text = prompt_files.default_environment()
-    session = Session(persona, provider, max_steps=args.steps,
+    session = Session(persona, provider, max_steps=steps,
                       step_interval=args.interval, duration=args.duration,
                       seed=args.seed, reasoning=args.reasoning,
                       chat_provider=chat_provider,
@@ -117,10 +137,9 @@ def main(argv=None):
     from .server import serve
 
     url = f"http://127.0.0.1:{args.port}"
-    if args.duration > 0:
-        session_txt = f"Session: {args.duration / 60:.2g} min."
-    else:
-        session_txt = "Session: unlimited."   # --duration 0 runs until Ctrl+C
+    cap = ("unlimited" if steps >= UNLIMITED_STEPS
+           else f"{steps} steps ({steps * args.tick_dt:g} sim-s)")
+    session_txt = f"Session: {cap}."   # the ride script itself ends at 600 s
     print(f"Open {url} in your browser. {session_txt} "
           f"(Ctrl+C to stop)", flush=True)
     try:
