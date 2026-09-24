@@ -11,10 +11,16 @@ personas and watch their behaviour and their trust answers change.
 Editing a persona is editing one JSON file — the agent code stays the same.
 
 **The mind is Python; the browser only watches.** `cabin_sim/cognition.py`
-owns state and decides (BDI); the pages poll a versioned snapshot and
-forward input back. A real LLM (Groq free tier by default) words the
-thoughts, picks among *legal* goals and answers the chat — anything it
-can't do falls back to deterministic rules, so a run never breaks.
+owns state and the body; the pages poll a versioned snapshot and
+forward input back. A real LLM (Groq free tier by default) is the
+**reasoner**: each beat it examines the real outcome of its last action,
+reconsiders from its persona and picks the next move *with its own values*
+— which seat axis, how far, or to just sit — while Python only
+whitelists the vocabulary and clamps to physical travel. Chat is
+interpreted by the model too (questions get answers, orders get carried
+out). With no LLM configured the deterministic rules the test suite pins
+take over, and a failed call merely makes that beat quiet — a run never
+breaks.
 
 ## Preview
 
@@ -90,15 +96,23 @@ documents the JS → Python port.
 
 1. **Perceive** — reads the cabin state and its own mood (comfort, energy, suspicion).
 2. **Reason** — with `--reasoning auto` (the default when the provider is
-   `groq`/`ollama`) an LLM answers *"as this person, what do I do next?"*:
-   it may only choose among **goals Python considers legal**, and it words
-   the inner-monologue thought. `--reasoning rules` uses the deterministic
-   phrase banks only — that is what the test suite runs on.
-3. **Validate** — the chosen action is checked against a whitelist; the cabin clamps every change, so nothing can go out of bounds.
+   `groq`/`ollama`) one LLM call runs the whole loop: it **examines the
+   real outcome** of its previous action (as asked, clamped at a travel
+   limit, or refused), **reconsiders** from its persona, and proposes the
+   next action **with its own values** — which axis, how far, or nothing
+   at all. Experimenter chat enters the same loop: the model interprets a
+   question, small talk, or an order (standing until it reports it done).
+   `--reasoning rules` uses the deterministic desire-argmax and phrase
+   banks only — that is what the test suite runs on.
+3. **Validate** — the proposed action is checked against the vocabulary
+   whitelist and every number against the cabin's physical travel limits;
+   the real result (including any clamp or refusal) is fed back for the
+   next reason step to examine.
 4. **Act + narrate** — the action is applied, mood updates, and the persona's words show in the browser.
 
-Bad JSON, an illegal goal, a `429`, or a dead network all mean **rules for
-that tick** — the ride keeps ticking (and pytest stays green).
+With no LLM configured the deterministic rules answer every tick; bad
+JSON, a `429`, or a dead network simply make that beat **quiet** — the
+ride keeps ticking (and pytest stays green).
 
 **Trust questionnaire** — at the end of the session the persona rates the
 automated cabin on the 16-item MDMT:
@@ -194,10 +208,12 @@ and curiosity. Copy the file, change the numbers and the story, and run
 
 ```
 cabin_sim/
-  cognition.py       the Mind (authoritative): BDI perceive → desire →
-                     intention → act, mood/trust/memory, chat — pure Python
-  reasoning.py       LLM layer: deliberation + thoughts + chat, legal-set
-                     validation, free-tier throttle, rules fallback
+  cognition.py       the Mind (authoritative): perceive → LLM cycle
+                     (examine → reconsider → act) or rules BDI, mood/
+                     trust/memory, chat, the safety bridge — pure Python
+  reasoning.py       LLM lanes: decide (the closed loop), speech,
+                     chat_act (order interpretation), outcome feedback,
+                     free-tier throttle, quiet-beat fallback
   provider.py        groq | ollama | scripted backends (think/token caps)
   sim.py             SimEngine — the only clock: phases, ride script, priors
   schema.py          build_snapshot — the single JSON contract for the views
@@ -212,7 +228,7 @@ cabin_sim/
   MIGRATION.md       JS → Python port notes
 web/index.html       inline-SVG visual served on :8000 (polls /api/state)
 src/                 three.js view adapter + archived pre-port mind
-tests/               pytest suite — 81 tests
+tests/               pytest suite — 100 tests
 personas/            editable persona JSON files
 tutorial-cognitive.html         architecture tutorial (kiosk, 8 sections)
 tutorial-cognitive-python.html  companion walkthrough
@@ -222,7 +238,7 @@ public/              interior reference photos + live sim captures
 ## Tests & tutorials
 
 ```bash
-python -m pytest tests -q     # 81 passed
+python -m pytest tests -q     # 100 passed
 npm run build                 # exit 0
 ```
 

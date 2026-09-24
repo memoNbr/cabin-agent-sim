@@ -1,10 +1,13 @@
-"""Tests for cabin_sim.reasoning — LLM reasoning with rules-mode safety.
+"""Tests for cabin_sim.reasoning — the LLM decide loop, rules safety.
 
 Two contracts are pinned here:
   1. rules mode is untouched (create_reasoner -> None, snapshots identical);
-  2. in llm mode the model CHOOSES AND WORDS, but Python stays the referee:
-     illegal intentions, bad JSON, empty lines and provider errors all fall
-     back to the deterministic rule answer for that tick.
+  2. in llm mode the MODEL reasons end to end: decide() examines the REAL
+     outcome of its last action, reconsiders from its persona and proposes
+     the next action with its own values — Python only whitelists the
+     vocabulary and lets the world clamp (safety), and a throttled beat,
+     bad JSON or a provider error stays QUIET: no rule fallback, no
+     invented behaviour, the ride never breaks.
 """
 
 from cabin_sim.cognition import THOUGHTS, Mind
@@ -70,62 +73,130 @@ def test_rules_mode_leaves_mind_untouched():
     assert mind._pending_thought is None
 
 
-# ---- deliberation ---------------------------------------------------------
+# ---- the decide cycle: examine -> reconsider -> act -----------------------
 
-def test_llm_choice_wins_when_legal_and_words_the_thought(persona):
-    # as-found seat: rule argmax would say settle (desire ~0.81 > 0.15)
-    mind, provider = llm_mind(persona, [
-        '{"intention": "attend", "thought": "Counting the poles as we pass."}'])
+DECIDE_OK = (
+    '{"examine": "Went back further than I meant.", '
+    '"reconsider": "That is enough recline, try the height next.", '
+    '"action": {"kind": "seat", "axis": "slider_mm", "delta": 25}, '
+    '"say": "There. Better.", "order_done": false}')
+
+
+def test_llm_cycle_applies_the_models_own_delta_and_records_outcome(persona):
+    mind, provider = llm_mind(persona, [DECIDE_OK])
+    before = mind.cabin.seat.slider_mm
     mind.step(1.0)
-    assert mind.bdi["intention"] == "attend"       # LLM overrode the argmax
-    assert mind.thoughts[0]["text"] == "Counting the poles as we pass."
-    assert provider.calls == 1                     # one call per decision step
+    # the model's number lands — no fixed step table chose it
+    assert mind.cabin.seat.slider_mm == before + 25
+    assert mind.last_outcome["ok"] is True
+    assert mind.cycle["name"] == "seat_move"
+    assert mind.thoughts[0]["text"].startswith("Went back")   # examine on top
+    assert mind.speech == "There. Better."
+    assert provider.calls == 1                     # one call per decision beat
 
 
-def test_illegal_intention_falls_back_to_rule_argmax(persona):
-    mind, _ = llm_mind(persona, ['{"intention": "calibrate"}'])  # setup: illegal
+def test_real_outcome_is_fed_back_into_the_next_decide_call(persona):
+    seen = []
+
+    class Spy(FakeProvider):
+        def complete(self, messages):
+            seen.append(messages[1]["content"])
+            return super().complete(messages)
+
+    provider = Spy([DECIDE_OK,
+                    '{"examine": "still short", "reconsider": "again", '
+                    '"action": null, "say": "", "order_done": false}'])
+    mind = Mind(persona, Cabin(), seed=1, reasoner=LLMReasoner(provider, persona))
+    mind.step(1.0)                                  # first beat: acts (390 → 415)
+    mind.reasoner._last_decide_t = -1e9            # the next beat is due
+    mind.reasoner._last_wall = 0.0
     mind.step(1.0)
-    assert mind.bdi["intention"] == "settle"       # Python's legality stands
-    assert mind.thoughts[0]["text"] in THOUGHTS["settle"]   # rule wording too
+    assert len(seen) == 2
+    assert "LAST OUTCOME: done: slider_mm 390 \u2192 415" in seen[1]
+    assert "seat now" in seen[1]                   # what REALLY happened
 
 
-def test_prose_reply_falls_back_without_crashing(persona):
+def test_refused_action_is_reported_and_never_applied(persona):
+    mind, _ = llm_mind(persona, [
+        '{"examine": "-", "reconsider": "-", "say": "", "order_done": false, '
+        '"action": {"kind": "seat", "axis": "doors", "delta": 5}}'])
+    before = mind.cabin.seat.as_dict()
+    mind.step(1.0)
+    assert mind.cabin.seat.as_dict() == before       # nothing moved
+    assert mind.last_outcome["ok"] is False
+    assert "refused" in mind.last_outcome["detail"]  # the model examines it
+    assert mind.cycle["name"] == "seat_move"         # still counted as an attempt
+    assert mind.cycle["ok"] is False
+
+
+def test_clamped_move_reports_the_limit_for_the_model_to_examine(persona):
+    mind, _ = llm_mind(persona, [
+        '{"examine": "-", "reconsider": "-", "say": "", "order_done": false, '
+        '"action": {"kind": "seat", "axis": "slider_mm", "delta": 5000}}'])
+    mind.step(1.0)
+    assert mind.cabin.seat.slider_mm == mind.cabin.seat.SLIDER_MAX
+    assert mind.last_outcome["ok"] is True          # it DID move — to the stop
+    assert "clamped" in mind.last_outcome["detail"]
+
+
+def test_decide_is_throttled_so_the_gap_stays_quiet(persona):
+    mind, provider = llm_mind(persona, [DECIDE_OK])
+    mind.step(1.0)
+    mind.step(1.0)                                  # too soon: THROTTLE_S
+    assert provider.calls == 1 and mind.t == 2.0    # quiet, no rule fallback
+
+
+def test_non_json_and_failed_provider_keep_the_ride_running(persona):
     mind, _ = llm_mind(persona, ["I think you should settle the seat."])
-    mind.step(1.0)
-    assert mind.bdi["intention"] == "settle"
-
-
-def test_provider_error_falls_back_for_that_tick(persona):
+    mind.step(1.0)                                  # prose: no JSON → quiet beat
+    assert mind.cycle is None and mind.thoughts == []
     mind, _ = llm_mind(persona, [RuntimeError("groq unreachable")])
     mind.step(1.0)
-    assert mind.bdi["intention"] == "settle"
+    assert mind.last_outcome is None and mind.cycle is None
     mind.step(1.0)                                  # and keeps running
     assert mind.t == 2.0
 
 
-def test_no_llm_call_when_no_goal_is_legal(persona):
-    mind, provider = llm_mind(persona, ['{"intention": "attend"}'])
-    mind.memory.traces.clear()
-    mind.mood["comfort"] = 1.0
-    mind.cabin.seat.rotation_deg = 0               # settle desire 0 / gap low
-    mind.cabin.seat.height_mm = 440
-    mind.t = mind.ride_end                         # calibrate precondition off
-    mind.bdi["last"] = {g: mind.t for g in ("settle", "attend", "calibrate")}
-    mind.perceive_fit()
-    mind.bdi_reason(1.0)
-    assert mind.bdi["intention"] is None
-    assert provider.calls == 0                     # nothing legal -> no call
+# ---- chat: the model interprets question vs order --------------------------
 
-
-# ---- chat -----------------------------------------------------------------
-
-def test_chat_uses_llm_reply_but_keeps_rule_side_effects(persona):
+def test_chat_reply_alone_leaves_no_order_and_moves_nothing(persona):
     mind, provider = llm_mind(
         persona, ['{"reply": "It sits well enough — I nudged it myself."}'])
     res = mind.chat_send("Could you adjust the seat?")
     assert res["ok"] and res["reply"] == "It sits well enough — I nudged it myself."
-    assert mind.bdi["last"]["settle"] == -99.0     # side effect still authoritative
+    assert mind.instruction is None                 # not a standing order
+    assert mind.last_outcome is None                # nothing was moved
     assert provider.calls == 1
+
+
+def test_chat_order_is_obeyed_now_and_stands_until_the_model_reports_done(persona):
+    mind, provider = llm_mind(persona, [
+        '{"reply": "Fine — moving it back.", "standing": true, '
+        '"action": {"kind": "seat", "axis": "recline_deg", "delta": 6}}',
+        '{"examine": "It went where he wanted.", '
+        '"reconsider": "Job done, back to sitting.", '
+        '"action": null, "say": "", "order_done": true}'])
+    recl = mind.cabin.seat.recline_deg                # as found: 103°
+    res = mind.chat_send("recline the backrest a bit")
+    assert res["reply"] == "Fine — moving it back."
+    assert mind.cabin.seat.recline_deg == recl + 6    # obeyed at once
+    assert mind.instruction == "recline the backrest a bit"
+    assert mind.last_outcome and mind.last_outcome["ok"]
+    # the next decide beat carries the STANDING ORDER + that chat outcome...
+    mind.reasoner._last_wall = 0.0                    # ...and is due now
+    mind.step(1.0)
+    assert mind.instruction is None                   # ...and clears it when done
+
+
+def test_session_llm_step_narrates_and_counts_the_minds_action(persona):
+    session = Session(persona, FakeProvider([DECIDE_OK]), max_steps=5, seed=1)
+    session.step_once()                              # auto → llm ("fake")
+    assert session.mind.cabin.seat.slider_mm == 415  # 390 + the model's 25
+    events = [e["event"] for e in session.log]
+    assert "decide" in events and "act" in events
+    assert session.agent.succeeded == 1
+    assert session.state()["intention"] == "settle"  # HUD label only
+    assert session.mind.mood["suspicion"] < 0.5      # seat_move parity
 
 
 def test_chat_falls_back_to_rule_reply_on_garbage(persona):
@@ -153,7 +224,8 @@ def test_chat_llm_sees_live_state(persona):
 # ---- hybrid: separate chat provider ---------------------------------------
 
 def test_hybrid_chat_provider_gets_chat_ticks_keep_their_own(persona):
-    ticks = FakeProvider(['{"intention": "attend", "thought": "Poles again."}'])
+    ticks = FakeProvider(['{"examine": "poles again", "reconsider": "steady", '
+                          '"action": null, "say": "", "order_done": false}'])
     chat = FakeProvider(['{"reply": "Ask me after the merge."}'])
     reasoner = LLMReasoner(ticks, persona, chat_provider=chat)
     mind = Mind(persona, Cabin(), seed=1, reasoner=reasoner)
@@ -193,8 +265,9 @@ def test_snapshot_reports_the_reasoning_mode(persona, scripted):
 
 def test_snapshot_reports_llm_mode_when_reasoner_present(persona, scripted):
     session = Session(persona, scripted, max_steps=10, seed=1)
-    session.reasoner = LLMReasoner(FakeProvider(['{"intention": "attend"}']),
-                                   persona)
+    session.reasoner = LLMReasoner(
+        FakeProvider(['{"examine": "-", "reconsider": "-", "action": null, '
+                      '"say": "", "order_done": false}']), persona)
     session.mind.reasoner = session.reasoner
     engine = SimEngine(session, seed=1, tick_dt=2.0)
     engine.tick(3)

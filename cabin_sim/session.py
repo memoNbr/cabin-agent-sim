@@ -65,6 +65,28 @@ class Session:
     def step_once(self):
         with self._lock:
             self.step += 1
+            if self.mind.reasoner is not None:
+                # ONE reasoning mind: mind.step runs the LLM cycle
+                # (examine the real outcome -> reconsider -> act,
+                # safety-clamped) and records what happened; the session
+                # only narrates it and counts the result.
+                self.mind.step(self.tick_dt)
+                cycle = self.mind.consume_cycle()
+                if cycle:
+                    self.note("decide", action=cycle.get("name"),
+                              say=cycle.get("say") or "")
+                    say = cycle.get("say") or ""
+                    if say:
+                        self.agent.last_say = say
+                    self.agent.memory.append({"action": cycle.get("name"),
+                                              "say": say})
+                    del self.agent.memory[:-6]
+                res = self.mind.consume_action_result()
+                if res:
+                    self.note("act", ok=res["ok"], detail=res["detail"],
+                              action=res["name"])
+                    self.agent.observe(res["name"], res["ok"])
+                return
             decision = self.agent.decide()
             self.note("decide", action=decision.action, say=decision.say)
             if decision.action:

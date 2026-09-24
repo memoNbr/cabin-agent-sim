@@ -17,6 +17,21 @@ cognitive.js (see docs in cabin-agent-sim/tutorial-cognitive.html):
     memory        act *= exp(-lambda*dt), lambda = 0.004/s, floor 0.09, cap 8
     BDI           settle / attend / calibrate, cooldowns 9 / 3.2 / 10 s
 
+Reasoning modes (who picks the next action):
+
+    rules  (reasoner is None)  the ported BDI above — Python computes
+           desires/cooldowns and the argmax acts (what the deterministic
+           suite pins).
+    llm    (reasoner present)  the MODEL reasons: every allowed beat
+           _llm_cycle() hands it the state plus the REAL outcome of its
+           last action, it examines that outcome, reconsiders from its
+           persona and proposes the next action WITH ITS OWN VALUES —
+           Python keeps only the body (the dynamics above) and the safety
+           clamps inside actions.apply_llm_action(). Chat orders are
+           interpreted by the model too (chat_act: obey now, or keep a
+           standing order until it reports order_done); the regex directive
+           table below is the rules-mode/degrade path only.
+
 Determinism: the ONLY randomness is self.rng (a seeded random.Random), so two
 engines built with the same seed produce byte-identical snapshots.
 """
@@ -368,6 +383,14 @@ class Mind:
         self.samples = []
         self.trail = []
 
+        # the LLM decide loop (llm mode; inert in rules mode)
+        self.last_outcome = None   # what the cabin ACTUALLY did last — the
+                                   # OUTCOME line the model examines next
+        self.instruction = None    # standing order from the experimenter, or None
+        self.cycle = None          # last cycle {examine, reconsider, say,
+                                   # action, name, ok} for the session log
+        self._action_result = None # queued {name, ok, detail} for observe()
+
         # bookkeeping
         self._fired = set()
         self._last_user_input = -99.0
@@ -644,6 +667,89 @@ class Mind:
                                  f"{seat.height_mm // 10} cm / sl {seat.slider_mm} mm")
         return changed
 
+    # ---- the LLM decide cycle (llm mode; see the module docstring) -------
+
+    def _perform(self, action, source="llm"):
+        """Apply ONE model-proposed action and record the REAL outcome.
+
+        The value choices are the model's (which axis, how far, when);
+        Python only runs the vocabulary whitelist and lets the world clamp
+        to its physical travel limits. Whatever actually happened — as
+        asked, clamped, or refused — lands in `last_outcome`, the OUTCOME
+        line the next decide() call examines, and in `_action_result` for
+        the session to narrate and count.
+        """
+        ok, detail, name = actions.apply_llm_action(self.cabin, action)
+        seat = self.cabin.seat
+        self.last_outcome = {
+            "action": dict(action), "ok": ok, "detail": detail, "name": name,
+            "seat": {"rotation_deg": seat.rotation_deg % 360,
+                     "height_mm": seat.height_mm,
+                     "slider_mm": seat.slider_mm,
+                     "recline_deg": seat.recline_deg},
+            "t": self.t,
+        }
+        self._action_result = {"name": name, "ok": ok, "detail": detail}
+        self.log_line("adj", f"{source} \u00b7 {name or 'action'} \u2014 {detail}")
+        if name:
+            # HUD label only — schema.check() knows just these three words.
+            # The choice itself was the model's; this is how it is DISPLAYED.
+            label = "attend" if action.get("kind") == "vending" else "settle"
+            if self.bdi["intention"] != label:
+                self.bdi["intention"] = label
+                self.bdi["since"] = self.t
+        return ok, detail, name
+
+    def _llm_cycle(self):
+        """One reasoning beat: examine the real outcome -> reconsider -> act.
+
+        Everything the model decides — whether to move, which axis, how far,
+        what to say — arrives as its own values from decide(). Python
+        contributes only safety: the vocabulary whitelist and the world's
+        travel clamps, whose effect is written into last_outcome for the
+        model to examine on the next beat. A throttled or failed beat stays
+        quiet: no rule fallback, no invented behaviour.
+        """
+        try:
+            decision = self.reasoner.decide(self)
+        except Exception as exc:                # noqa: BLE001 - never crash a tick
+            print(f"cognition: llm cycle failed ({exc})", file=sys.stderr)
+            decision = None
+        if not decision:
+            return                              # quiet beat (throttle/failure)
+        self.set_module("intend")
+        # his inner monologue, newest on top: what the outcome meant, then
+        # what he wants now
+        if decision.get("reconsider"):
+            self.think(decision["reconsider"])
+        if decision.get("examine"):
+            self.think(decision["examine"])
+        name, ok = None, False
+        action = decision.get("action")
+        if (isinstance(action, dict)
+                and action.get("kind") not in (None, "none")):
+            ok, _, name = self._perform(action, source="llm")
+        if decision.get("say"):
+            self.speak(decision["say"])
+        if self.instruction and decision.get("order_done"):
+            self.log_line("dir", f"order done \u00b7 {self.instruction[:60]}")
+            self.instruction = None
+        self.cycle = {"t": self.t,
+                      "examine": decision.get("examine"),
+                      "reconsider": decision.get("reconsider"),
+                      "say": decision.get("say"),
+                      "action": action, "name": name, "ok": ok}
+
+    def consume_cycle(self):
+        """Pop this step's LLM cycle for the session log (None = quiet beat)."""
+        cycle, self.cycle = self.cycle, None
+        return cycle
+
+    def consume_action_result(self):
+        """Pop the {name, ok, detail} of an action applied this step."""
+        res, self._action_result = self._action_result, None
+        return res
+
     def bdi_reason(self, dt):
         self.perceive_fit()
 
@@ -655,29 +761,24 @@ class Mind:
             self.mood["suspicion"] = min(1.0, self.mood["suspicion"]
                                          + dt * 0.006 * gb * hands)
 
+        if self.reasoner is not None:
+            # llm mode: the MODEL reasons — examine the real outcome of its
+            # last action, reconsider from its persona, pick the next action
+            # (values and all). Python contributes only the body (the
+            # dynamics above) and the safety clamps in actions.py; a
+            # throttled or failed beat simply stays quiet.
+            self._llm_cycle()
+            return
+
         best, best_v = None, 0.0
-        offered = []                                   # (goal, desire), legal only
         for goal in GOAL_CD:
             if self.t - self.bdi["last"].get(goal, -99.0) < GOAL_CD[goal]:
                 continue                                   # cooldown
             if not self._pre(goal):
                 continue                                   # precondition
             v = self._desire(goal)
-            if v > 0:
-                offered.append((goal, v))
-                if v > best_v:
-                    best, best_v = goal, v                  # argmax = rule pick
-
-        # LLM deliberation: the model chooses among `offered` ONLY — legality
-        # (cooldowns, preconditions) was decided above in Python, and any
-        # illegal/absent answer falls back to the rule argmax.
-        self._pending_thought = None
-        if self.reasoner and offered:
-            choice, thought = self.reasoner.deliberate(
-                self, [g for g, _ in offered], best)
-            if choice in {g for g, _ in offered}:
-                best = choice
-            self._pending_thought = thought
+            if v > best_v:
+                best, best_v = goal, v                      # argmax = rule pick
 
         if best:
             self.bdi["intention"] = best
@@ -891,8 +992,33 @@ class Mind:
         self.chat.append({"who": "experimenter", "t": self.t, "text": text})
         self.log_line("chat", f"experimenter \u00b7 {text}")
         self.remember("chat", f"Experimenter: {text}", 0.5, True)
-        # experimenter ORDERS are obeyed first (directive), questions chat
-        reply = self._directive(text) or self._chat_reply(text)
+        reply = None
+        if self.reasoner is not None:
+            # llm mode: the MODEL interprets the message itself — question,
+            # small talk, or an order to carry out. An immediate move runs
+            # through the same safety bridge as the decide cycle; a longer
+            # order stands as `instruction` until a decide beat reports it
+            # done. No regex directive table runs on this path.
+            try:
+                res = self.reasoner.chat_act(self, text)
+            except Exception as exc:            # noqa: BLE001 - degrade, never crash
+                print(f"cognition: chat_act failed ({exc})", file=sys.stderr)
+                res = None
+            if res:
+                reply = res["reply"]
+                action = res.get("action")
+                if (isinstance(action, dict)
+                        and action.get("kind") not in (None, "none")):
+                    self._perform(action, source="chat")
+                if res.get("standing"):
+                    self.instruction = text
+                    self.remember("order", f"Standing order: {text}", 0.6, True)
+                    self.log_line("dir", f"directive \u00b7 standing order \u00b7 "
+                                         f"{text[:60]}")
+        if reply is None:
+            # rules mode — and the degrade path when the model is
+            # unreachable: orders by regex, then phrase-bank conversation
+            reply = self._directive(text) or self._chat_reply(text)
         self.chat.append({"who": "phill", "t": self.t, "text": reply})
         del self.chat[: max(0, len(self.chat) - 40)]
         self.speak(reply)

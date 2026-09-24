@@ -141,8 +141,9 @@ class CognitiveAgent:
                 self.mood["energy"] = min(1.0, self.mood["energy"] + 0.20)
             elif action in ("get_water", "get_snack"):
                 self.mood["energy"] = min(1.0, self.mood["energy"] + 0.12)
-            if action in actions.DEFAULT_STEP:
-                # a seat step that lands lowers suspicion a little
+            if action in actions.DEFAULT_STEP or action == "seat_move":
+                # a seat move that lands lowers suspicion a little
+                # ("seat_move" = one LLM-proposed move through the bridge)
                 self.mood["suspicion"] = max(0.0, self.mood["suspicion"] - 0.02)
         else:
             self.blocked += 1

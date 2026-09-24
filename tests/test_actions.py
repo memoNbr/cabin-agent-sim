@@ -39,3 +39,56 @@ def test_table_toggle_is_idempotent():
     assert ok and not c.table.folded
     ok, why = actions.apply(c, "deploy_table")
     assert not ok and "already" in why
+
+
+# ---- the LLM door: model-chosen values, world-clamped ---------------------
+
+
+def test_llm_action_uses_the_models_own_delta():
+    c = Cabin()
+    ok, detail, name = actions.apply_llm_action(
+        c, {"kind": "seat", "axis": "slider_mm", "delta": 37})
+    assert ok and c.seat.slider_mm == 390 + 37      # not a fixed step table
+    assert name == "seat_move" and "390 \u2192 427" in detail
+
+
+def test_llm_action_refuses_unknown_axis_or_kind():
+    c = Cabin()
+    before = c.seat.as_dict()
+    ok, why, _ = actions.apply_llm_action(
+        c, {"kind": "seat", "axis": "doors", "delta": 5})
+    assert not ok and "refused" in why
+    ok, why, _ = actions.apply_llm_action(c, {"kind": "teleport"})
+    assert not ok and "unknown" in why
+    assert c.seat.as_dict() == before               # nothing moved
+
+
+def test_llm_action_non_numeric_delta_refused():
+    ok, why, _ = actions.apply_llm_action(
+        Cabin(), {"kind": "seat", "axis": "height_mm", "delta": "lots"})
+    assert not ok and "number" in why
+
+
+def test_llm_action_giant_delta_is_clamped_and_reported():
+    c = Cabin()
+    ok, why, _ = actions.apply_llm_action(
+        c, {"kind": "seat", "axis": "slider_mm", "delta": 5000})
+    assert ok and c.seat.slider_mm == c.seat.SLIDER_MAX
+    assert "clamped" in why                        # the outcome tells the model
+
+
+def test_llm_action_vending_and_table():
+    c = Cabin()
+    ok, _, name = actions.apply_llm_action(
+        c, {"kind": "vending", "item": "water"})
+    assert ok and name == "get_water" and c.vending.stock["water"] == 4
+    ok, _, name = actions.apply_llm_action(c, {"kind": "table", "folded": False})
+    assert ok and not c.table.folded
+    ok, why, _ = actions.apply_llm_action(c, {"kind": "table", "folded": False})
+    assert not ok and "already" in why
+
+
+def test_llm_action_none_kind_is_not_an_action():
+    c = Cabin()
+    ok, why, name = actions.apply_llm_action(c, {"kind": "none"})
+    assert not ok and why == "no action" and name is None
