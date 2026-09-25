@@ -19,7 +19,8 @@ from .world import Cabin
 class Session:
     def __init__(self, persona, provider, max_steps=300, step_interval=1.2,
                  duration=0.0, seed=1, reasoning="auto", chat_provider=None,
-                 environment=None, environment_path=None, persona_path=None):
+                 environment=None, environment_path=None, persona_path=None,
+                 persona_guard=True):
         self.persona = persona
         self.reasoning = reasoning       # requested mode (auto|rules|llm)
         # live prompt state (cabin_sim/prompts.py): the environment text the
@@ -27,6 +28,8 @@ class Session:
         self.environment_text = environment
         self.environment_path = environment_path
         self.persona_path = persona_path
+        self.persona_guard = bool(persona_guard)  # sim toggle: ON = persona
+        # defends itself against chat meta-instructions; OFF = experimenter
         self._environment_mtime = None   # set on apply — see prompts.cycle()
         self._persona_mtime = None
         self.cabin = Cabin()
@@ -34,9 +37,12 @@ class Session:
         # LLMReasoner = provider-backed reasoning (see cabin_sim/reasoning.py).
         # chat_provider = optional second backend for experimenter replies only
         # (hybrid: small/fast model ticks, bigger model chats).
+        self.chat_provider = chat_provider   # kept so /api/control reset can
+        # rebuild the SAME hybrid setup (main.py passes it at startup only)
         self.reasoner = create_reasoner(provider, reasoning, persona,
                                         chat_provider=chat_provider,
-                                        environment=environment)
+                                        environment=environment,
+                                        persona_guard=self.persona_guard)
         self.mind = Mind(persona, self.cabin, seed=seed,
                          reasoner=self.reasoner)
         self.agent = CognitiveAgent(persona, provider, self.cabin, seed=seed,

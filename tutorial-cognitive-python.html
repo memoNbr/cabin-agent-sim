@@ -1443,6 +1443,15 @@ cabin_sim.reasoning.py   owns the reasoning itself (this file, an LLM
         </tbody>
       </table>
 
+      <p>Next to the two buttons sits the <b>persona guard</b> — a one-click toggle for who wins
+      when a chat line tries to break the persona. <b>on</b> (default) = the persona hears such
+      lines as words and stays himself; the defense lives in the prompt layer (a RULES line in
+      the system prompt plus an exception clause on every chat message). <b>off</b> = the
+      experimenter's chat decides — it may direct even who the model is (persona edits proper
+      still go through the persona button). Transport:
+      <code>POST /api/control {"persona_guard": bool}</code>, state painted from the same
+      <code>GET /api/prompt</code> payload the panel fetches; the flag survives a ride restart.</p>
+
       <pre><code># cabin_sim/prompts.py — the loader behind both buttons
 PROMPTS_DIR  = ROOT / "prompts"      # environment-*.md   (the world)
 PERSONAS_DIR = ROOT / "personas"     # *.py (PERSONA = {...}) | *.json legacy

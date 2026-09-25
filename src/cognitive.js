@@ -852,12 +852,14 @@
 
   /* ===== live prompts: TWO buttons, the source opens on this page ====== */
   var ppKind = null;            /* environment | persona — which file is open */
+  var guardOn = true;           /* persona guard: true = persona defends */
   var PP_TITLES = {
     environment: "environment prompt — the WORLD the model is told",
     persona: "persona prompt — WHO the model is"
   };
   function paintPromptPanel(st) {
     if (!st || !ppKind) return;
+    paintGuard(st.persona_guard !== false);
     var info = st[ppKind] || {};
     if ($("ppTitle")) $("ppTitle").textContent = PP_TITLES[ppKind];
     var who = $("ppWho");
@@ -932,6 +934,26 @@
   }
   if ($("promptEnvBtn")) $("promptEnvBtn").addEventListener("click", function () { togglePrompt("environment"); });
   if ($("promptPersonaBtn")) $("promptPersonaBtn").addEventListener("click", function () { togglePrompt("persona"); });
+  function paintGuard(v) {
+    guardOn = !!v;
+    var b = $("guardBtn");
+    if (b) b.textContent = "persona guard: " + (guardOn ? "on" : "off");
+  }
+  if ($("guardBtn")) {
+    /* initial state from the same payload the prompt panel fetches */
+    fetch("/api/prompt", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (st) { paintGuard(st.persona_guard !== false); })
+      .catch(function () { /* offline — label keeps its default */ });
+    $("guardBtn").addEventListener("click", function () {
+      post("/api/control", { persona_guard: !guardOn })
+        .then(function (r) { return r ? r.json() : null; })
+        .then(function (d) {
+          if (d && typeof d.persona_guard === "boolean") paintGuard(d.persona_guard);
+        })
+        .catch(function () {});
+    });
+  }
   if ($("ppClose")) $("ppClose").addEventListener("click", function () {
     var p = $("promptPanel");
     if (p) p.classList.remove("open");

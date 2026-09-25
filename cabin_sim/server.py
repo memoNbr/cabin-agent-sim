@@ -90,7 +90,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(build_snapshot(self.engine))
         elif path == "/api/prompt":
             with self.engine.session._lock:
-                self._json(prompt_files.status(self.engine.session))
+                st = prompt_files.status(self.engine.session)
+                # the persona-guard toggle rides along: the prompt panel's
+                # button paints from the same payload it already fetches
+                st["persona_guard"] = getattr(self.engine.session,
+                                              "persona_guard", True)
+                self._json(st)
         else:
             self.send_error(404)
 
@@ -171,6 +176,11 @@ class Handler(BaseHTTPRequestHandler):
                             step_interval=old.step_interval,
                             duration=old.duration, seed=engine.seed,
                             reasoning=getattr(old, "reasoning", "auto"),
+                            # rebuild the SAME setup: hybrid chat backend and
+                            # persona-guard state are session properties, not
+                            # something to silently drop on restart
+                            chat_provider=getattr(old, "chat_provider", None),
+                            persona_guard=getattr(old, "persona_guard", True),
                             environment=getattr(old, "environment_text", None),
                             environment_path=getattr(old, "environment_path",
                                                      None),
@@ -188,6 +198,19 @@ class Handler(BaseHTTPRequestHandler):
                 engine.tick(1)
                 limit += 1
             self._json({"ok": True, "t": engine.t})
+            return
+        if "persona_guard" in data:
+            # the persona-guard button: ON = the persona hears chat
+            # meta-instructions as words, OFF = the experimenter decides
+            on = bool(data.get("persona_guard"))
+            session = engine.session
+            with session._lock:
+                session.persona_guard = on
+                if session.reasoner is not None:
+                    session.reasoner.set_persona_guard(on)
+                session.mind.log_line(
+                    "ctrl", f"persona guard {'on' if on else 'off'}")
+            self._json({"ok": True, "persona_guard": on})
             return
         running = bool(data.get("running", engine.running))
         engine.running = running
