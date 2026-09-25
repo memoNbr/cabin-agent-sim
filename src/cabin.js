@@ -1096,6 +1096,12 @@ function boot() {
        y = height, z = longitudinal rail) and rotation.y (swivel) live; the
        pedestal stretches so it always reaches the floor; readouts mirror. */
     var seatCtl = { hgt: 38, rot: 0, lat: 0, lng: 0 };
+    /* The mind (or a slider) sets the GOAL; the rig GLIDES toward it every
+       frame (exponential ease, frame-rate independent) so a seat move reads
+       as mechanical motion instead of a snap. SEAT_TAU = seconds: ~95% of
+       the travel lands in ~3x tau (~1.1 s at 0.38) — one knob for the feel. */
+    var seatGoal = { hgt: 38, rot: 0, lat: 0, lng: 0 };
+    var SEAT_TAU = 0.38;
     var seatSysOn = true;
     state.seat = seatCtl;
     var seatLocalT = -1e9;   /* last local slider input (ms): defers the pull */
@@ -1119,12 +1125,11 @@ function boot() {
       var s = C && C.seat;
       if (!s) return;
       var h = +s.hgt, r = +s.rot, l = +s.sl;
-      if (h === seatCtl.hgt && r === seatCtl.rot && l === seatCtl.lng) return;
-      seatCtl.hgt = h; seatCtl.rot = r; seatCtl.lng = l;
+      if (h === seatGoal.hgt && r === seatGoal.rot && l === seatGoal.lng) return;
+      seatGoal.hgt = h; seatGoal.rot = r; seatGoal.lng = l;  /* rig glides (glideSeat) */
       if (seatHgtEl) seatHgtEl.value = h;
       if (seatRotEl) seatRotEl.value = r;
       if (seatLngEl) seatLngEl.value = l;
-      updateSeat();
     }
     function updateSeat() {
       /* hard clamps: the sliders can never push the seat out of the cabin
@@ -1148,18 +1153,45 @@ function boot() {
       if (seatLatV) seatLatV.textContent = String(seatCtl.lat);
       if (seatLngV) seatLngV.textContent = (seatCtl.lng > 0 ? "+" : "") + seatCtl.lng;
     }
-    function readSeatSliders() {
-      if (seatHgtEl) seatCtl.hgt = +seatHgtEl.value;
-      if (seatRotEl) seatCtl.rot = +seatRotEl.value;
-      if (seatLatEl) seatCtl.lat = +seatLatEl.value;
-      if (seatLngEl) seatCtl.lng = +seatLngEl.value;
-      seatLocalT = performance.now();
+    /* ease the rig toward the goal: exponential approach (frame-rate
+       independent), rotation along the SHORTEST arc so 350° -> 10° spins
+       20°, never 340°. The seated avatar, the stretching pedestal and the
+       numeric readouts all ride updateSeat(), so they follow the glide. */
+    function glideSeat(dt) {
+      var k = 1 - Math.exp(-dt / SEAT_TAU);
+      var dRot = ((seatGoal.rot - seatCtl.rot) % 360 + 540) % 360 - 180;
+      var dh = seatGoal.hgt - seatCtl.hgt;
+      var dl = seatGoal.lat - seatCtl.lat;
+      var dg = seatGoal.lng - seatCtl.lng;
+      if (Math.abs(dh) < 0.02 && Math.abs(dl) < 0.02 && Math.abs(dg) < 0.02
+          && Math.abs(dRot) < 0.05) {
+        if (seatCtl.hgt !== seatGoal.hgt || seatCtl.rot !== seatGoal.rot
+            || seatCtl.lat !== seatGoal.lat || seatCtl.lng !== seatGoal.lng) {
+          seatCtl.hgt = seatGoal.hgt; seatCtl.rot = seatGoal.rot;
+          seatCtl.lat = seatGoal.lat; seatCtl.lng = seatGoal.lng;
+          updateSeat();                     /* land exactly on the goal */
+        }
+        return;
+      }
+      seatCtl.hgt += dh * k;
+      seatCtl.lat += dl * k;
+      seatCtl.lng += dg * k;
+      seatCtl.rot = ((seatCtl.rot + dRot * k) % 360 + 360) % 360;
       updateSeat();
+    }
+    function readSeatSliders() {
+      if (seatHgtEl) seatGoal.hgt = +seatHgtEl.value;
+      if (seatRotEl) seatGoal.rot = +seatRotEl.value;
+      if (seatLatEl) seatGoal.lat = +seatLatEl.value;
+      if (seatLngEl) seatGoal.lng = +seatLngEl.value;
+      seatLocalT = performance.now();
+      /* the pose itself is carried by glideSeat(): a drag sets the goal and
+         the seat follows with the same mechanical ease */
       /* mirror the drag to the server so the mind's fit belief and the
          cockpit panel converge on the same world.Seat (lat is view-only) */
-      postSeat("hgt", seatCtl.hgt * 10); /* cm -> mm on the wire */
-      postSeat("rot", seatCtl.rot);
-      postSeat("sl", 360 + seatCtl.lng * 10);
+      postSeat("hgt", seatGoal.hgt * 10); /* cm -> mm on the wire */
+      postSeat("rot", seatGoal.rot);
+      postSeat("sl", 360 + seatGoal.lng * 10);
     }
     [seatHgtEl, seatRotEl, seatLatEl, seatLngEl].forEach(function (el) {
       if (el) el.addEventListener("input", readSeatSliders);
@@ -1319,6 +1351,7 @@ function boot() {
       paintClock();
       stepAvatar(now);
       syncSeatFromCog(now);
+      glideSeat(dt);           /* seat moves glide, they don't snap */
       controls.update();
       if (camAnim) {
         /* flight owns the camera; controls.update() above keeps damping

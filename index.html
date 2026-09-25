@@ -517,9 +517,179 @@
     border-radius:50%; background:#cfcfcf; border:1px solid #000; box-shadow:0 0 0 1px #555; cursor:grab;}
   .seat-portal .sp-rng::-moz-range-thumb{width:11px; height:11px; border-radius:50%; background:#cfcfcf;
     border:1px solid #000; box-shadow:0 0 0 1px #555; cursor:grab;}
+
+  /* =======================================================================
+     THEME — "coral noir"  ·  inspired by "Inside the Mind of Samuel Day"
+     (Awwwards SOTD · 2-colour system: #000 + #FF9398 · film-grain, hairline
+     frames, oversized type).  Pure presentation layer: no text, no ids, no
+     JS touched — the whole UI recolours from the tokens below.
+     ======================================================================= */
+  :root{
+    --bg:#030304; --panel:#0b0b0d; --panel2:#101013; --panel3:#08080a;
+    --ink:#F1EEEA; --muted:#98948d; --faint:#5b5750;
+    /* the site's coral takes over the accent slot (was gold) */
+    --gold:#FF9398; --gold-hi:#FFC4C6; --gold-dim:#6d3a3d;
+    --danger:#c8504a; --ok:#c9b58a; --teal:#8fbfa8;
+    --line:#242228;
+    --coral:#FF9398; --coral-hi:#FFC4C6; --coral-dim:#6d3a3d;
+    --hair:rgba(255,255,255,.075);              /* hairline borders */
+    --glass:rgba(9,9,11,.78);                   /* floating card fill    */
+    --coral-glass:rgba(255,147,152,.10);
+  }
+  html{background:var(--bg);}
+  body{letter-spacing:.005em;}
+  ::selection{background:var(--coral); color:#0b0b0d;}
+  :focus-visible{outline:1px solid var(--coral); outline-offset:2px;}
+
+  /* ---- the two signature layers: film grain + hairline frame ------------ */
+  .grain{position:fixed; inset:-12%; z-index:60; pointer-events:none; opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.62'/%3E%3C/svg%3E");
+    background-size:180px 180px; animation:grain .8s steps(4) infinite;}
+  @keyframes grain{
+    0%{transform:translate(0,0)} 25%{transform:translate(-3%,2%)}
+    50%{transform:translate(2%,-3%)} 75%{transform:translate(-2%,-2%)} 100%{transform:translate(0,0)}}
+  .frame{position:fixed; inset:10px; z-index:45; pointer-events:none; border-radius:16px;
+    border:1px solid rgba(255,255,255,.05);
+    background:
+      linear-gradient(var(--coral),var(--coral)) 0 0/14px 1px no-repeat,
+      linear-gradient(var(--coral),var(--coral)) 0 0/1px 14px no-repeat,
+      linear-gradient(var(--coral),var(--coral)) 100% 0/14px 1px no-repeat,
+      linear-gradient(var(--coral),var(--coral)) 100% 0/1px 14px no-repeat,
+      linear-gradient(var(--coral),var(--coral)) 0 100%/14px 1px no-repeat,
+      linear-gradient(var(--coral),var(--coral)) 0 100%/1px 14px no-repeat,
+      linear-gradient(var(--coral),var(--coral)) 100% 100%/14px 1px no-repeat,
+      linear-gradient(var(--coral),var(--coral)) 100% 100%/1px 14px no-repeat;}
+  @media (prefers-reduced-motion: reduce){
+    .grain{animation:none;} .scene-card{animation:none !important;}}
+
+  /* ---- cinematic vignette + load reveal over the 3D shell ---------------- */
+  .scene-card{border-radius:0; animation:reveal .9s cubic-bezier(.2,.7,.2,1) both;}
+  @keyframes reveal{from{opacity:0; transform:scale(1.014);} to{opacity:1; transform:none;}}
+  .scene-card::before{content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.5), transparent 16%, transparent 70%, rgba(0,0,0,.62)),
+      radial-gradient(125% 95% at 50% 45%, transparent 55%, rgba(0,0,0,.4));}
+  .scene-photo img{filter:grayscale(1) contrast(1.07) brightness(.93);}
+
+  /* ---- display type: the clock is the one glanceable number ------------- */
+  .sim-clock{font-size:27px; font-weight:600; color:var(--coral-hi); background:transparent;
+    border:0; padding:0 10px; min-width:88px; letter-spacing:.01em; line-height:1;
+    text-shadow:0 0 18px rgba(255,147,152,.28);}
+  .sim-bar{background:var(--glass); border:1px solid var(--hair); border-radius:13px;
+    padding:9px 12px; backdrop-filter:blur(10px);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 20px 44px rgba(0,0,0,.55);}
+  .sim-jump{background:rgba(255,255,255,.04); border:1px solid var(--hair); color:var(--ink);}
+  .sim-speed{background:rgba(255,255,255,.04); border:1px solid var(--hair); color:var(--ink);}
+
+  /* ---- controls: hairline chips, coral fill on state ------------------- */
+  .kbtn{background:rgba(255,255,255,.035); border:1px solid rgba(255,147,152,.30);
+    color:#d4cfca; border-radius:8px;}
+  .kbtn:hover{background:var(--coral-glass); border-color:var(--coral); color:var(--coral-hi);}
+  .kbtn.on, .viewer-tools .btn.on{background:var(--coral); color:#0b0b0d;
+    border-color:var(--coral); font-weight:700;}
+  .viewer-tools .btn{background:var(--glass); border:1px solid var(--hair); color:#d4cfca;
+    border-radius:8px; backdrop-filter:blur(8px);}
+  .viewer-tools .btn:hover{background:var(--coral-glass); border-color:var(--coral); color:var(--coral-hi);}
+  .seat-sys{border-left:1px solid var(--hair);}
+  .seat-lbl{color:var(--muted);}
+  .seat-lbl input[type=range]{background:linear-gradient(90deg,#4a4340,#26232a);}
+  .seat-lbl input[type=range]::-webkit-slider-thumb{background:var(--coral); border:1px solid #0b0b0d;
+    box-shadow:0 0 0 1px var(--coral-dim), 0 0 10px rgba(255,147,152,.45);}
+  .seat-lbl input[type=range]::-moz-range-thumb{background:var(--coral); border:1px solid #0b0b0d;
+    box-shadow:0 0 0 1px var(--coral-dim);}
+  .seat-val{color:#e6e1db;}
+
+  /* ---- scene captions ---------------------------------------------------- */
+  .scene-card h3{color:#d9d4cd; letter-spacing:.28em; font-size:10px;}
+  .scene-card h3::before{content:""; display:inline-block; width:5px; height:5px;
+    border-radius:50%; background:var(--coral); box-shadow:0 0 8px rgba(255,147,152,.8);
+    margin-right:9px; vertical-align:middle;}
+  .viewer-hint{background:rgba(6,6,8,.55); border:1px solid var(--hair);
+    border-left:2px solid var(--coral); border-radius:0 9px 9px 0; color:#b9b4ae;
+    backdrop-filter:blur(8px); padding:8px 14px;}
+  .viewer-hint kbd{background:rgba(255,147,152,.09); border:1px solid var(--coral-dim);
+    color:var(--coral-hi);}
+  .viewer-status{background:var(--glass); border:1px solid var(--hair); color:var(--muted);
+    backdrop-filter:blur(8px);}
+  .viewer-status.err{color:var(--danger); border-color:var(--danger);}
+  .event-banner{background:var(--glass); border:1px solid var(--coral-dim); color:var(--coral-hi);
+    backdrop-filter:blur(8px);}
+
+  /* ---- shared glass-card language (HUD · music · prompts · chat) --------- */
+  .cog-hud, .music, .prompt-panel, .xp-panel{
+    background:var(--glass); border:1px solid var(--hair); border-radius:14px;
+    backdrop-filter:blur(10px); box-shadow:inset 0 1px 0 rgba(255,255,255,.045),
+      0 22px 48px rgba(0,0,0,.5);}
+  .cog-hud{min-width:236px; padding:11px 14px 12px;}
+  .cog-hud .ch-head, .music .mu-head, .xp-head, .pp-head{
+    border-bottom:1px solid var(--hair); color:var(--muted);}
+  .cog-hud .ch-head::before, .music .mu-head::before, .xp-head span::before{
+    content:""; display:inline-block; width:5px; height:5px; border-radius:50%;
+    background:var(--coral); box-shadow:0 0 8px rgba(255,147,152,.8);
+    margin-right:7px; vertical-align:middle;}
+  .cog-hud .ch-mod{border-color:var(--hair);}
+  .cog-hud .ch-mod.on{color:var(--coral-hi); border-color:var(--coral-dim); background:var(--coral-glass);}
+  .cog-hud .ch-intent.settle{color:var(--coral-hi); border-color:var(--coral-dim); background:var(--coral-glass);}
+  .cog-hud .ch-intent.attend{color:#d9c79a; border-color:#5b4c2a; background:rgba(217,199,154,.08);}
+  .cog-hud .ch-bar .track, .music .mu-bar::before{background:rgba(255,255,255,.05);
+    border:1px solid var(--hair);}
+  /* the agent's own thread of thought — coral, italic, in his words */
+  .cog-hud .ch-plan{font-size:9.5px; font-style:italic; color:#5f5b56; letter-spacing:.02em;
+    max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    text-align:right; transition:color .3s;}
+  .cog-hud .ch-plan.on{color:var(--coral-hi); text-shadow:0 0 12px rgba(255,147,152,.25);}
+  .cog-hud .ch-bar .fill{background:var(--coral);}
+  .cog-hud .ch-bar .fill.energy{background:var(--teal);}
+  .cog-hud .ch-bar .fill.susp{background:var(--danger);}
+  .cog-hud .ch-bar b, .cog-hud .ch-ride .num{color:#e9e4de;}
+
+  /* music */
+  .music .mu-title{color:var(--coral-hi); font-size:12.5px;}
+  .music .mu-fill{background:linear-gradient(90deg, var(--coral-dim), var(--coral));}
+  .music .mu-play{background:var(--coral); border-color:var(--coral-hi);
+    box-shadow:0 0 16px rgba(255,147,152,.4);}
+  .music .mu-play:hover{background:var(--coral-hi);}
+  .music .mu-list{background:rgba(255,255,255,.04); border-color:var(--hair); color:var(--ink);}
+  .music .mu-list:hover{border-color:var(--coral);}
+  .music .mu-list option{background:#0b0b0d; color:var(--ink);}
+  .music input[type=range]::-webkit-slider-thumb{background:var(--coral-hi);
+    border:1px solid #0b0b0d; box-shadow:0 0 8px rgba(255,147,152,.55);}
+  .music input[type=range]::-moz-range-thumb{background:var(--coral-hi); border:1px solid #0b0b0d;}
+
+  /* prompt editor */
+  .pp-file, .pp-code, .xp-in{background:rgba(255,255,255,.04); border:1px solid var(--hair);
+    color:#dcd7d1;}
+  .pp-code:focus, .xp-in:focus{border-color:var(--coral);}
+
+  /* chat */
+  .xp-fab{background:var(--glass); border:1px solid var(--hair); color:#d4cfca;
+    backdrop-filter:blur(8px);}
+  .xp-fab:hover{background:var(--coral); color:#0b0b0d; border-color:var(--coral);}
+  .xp-msg b{color:var(--coral-hi);}
+  .xp-log{scrollbar-width:thin; scrollbar-color:var(--coral-dim) transparent;}
+  .xp-log::-webkit-scrollbar, .pp-code::-webkit-scrollbar{width:6px;}
+  .xp-log::-webkit-scrollbar-thumb, .pp-code::-webkit-scrollbar-thumb{
+    background:rgba(255,147,152,.28); border-radius:3px;}
+  .xp-row{border-top:1px solid var(--hair);}
+  .xp-send{background:var(--coral); border-color:var(--coral); color:#0b0b0d; font-weight:700;}
+  .xp-send:hover{background:var(--coral-hi); border-color:var(--coral-hi);}
+
+  /* classic (non-kiosk) bits pick up the same tokens for free */
+  .btn{border-color:var(--coral-dim); color:var(--coral-hi);}
+  .btn:hover{background:var(--coral); color:#0b0b0d; border-color:var(--coral);}
+  .btn.primary{background:var(--coral); color:#0b0b0d; border-color:var(--coral);}
+  .btn.primary:hover{background:var(--coral-hi);}
+  .phase{border-color:var(--coral-dim); color:var(--coral-hi);}
+  .phase.ride{border-color:var(--coral); color:var(--coral-hi);}
+  .speech{border-left-color:var(--coral);}
+  .tl-marker, .rail-thumb, .slide-thumb{background:var(--coral); box-shadow:0 0 10px rgba(255,147,152,.45);}
 </style>
 </head>
 <body>
+
+<!-- theme layers (presentation only): film grain + hairline frame -->
+<div class="grain" aria-hidden="true"></div>
+<div class="frame" aria-hidden="true"></div>
 
 <header>
   <div class="title">CABIN<span>AGENT</span>.SIM <span>·</span> SUV</div>
@@ -602,6 +772,7 @@
       <div class="cog-hud" id="cogHud" role="group" aria-label="avatar cognitive state: intention, active module, ride, trust and mood">
         <div class="ch-head"><span>avatar · cognition</span><span class="ch-mod" id="chMod" title="active cognitive module"><i class="dot"></i><span id="chModT">—</span></span></div>
         <div class="ch-row"><span class="ch-k">intention</span><span class="ch-intent none" id="chInt">none</span></div>
+        <div class="ch-row"><span class="ch-k">plan</span><span class="ch-plan" id="chPlan" title="the agent's own thread of thought — its own words, carried across beats">—</span></div>
         <div class="ch-ride"><span class="ch-k">ride</span><span class="ch-phase" id="chPhase">—</span><span class="num" id="chSpd">— km/h</span><span class="g" id="chG">— g</span></div>
         <div class="ch-bars">
           <div class="ch-bar gauge"><span class="k">trust</span><span class="track"><i class="fill" id="chTrustF"></i></span><b id="chTrustV">—</b></div>
@@ -990,7 +1161,7 @@
 (function () {
   function $(id) { return document.getElementById(id); }
   var el = {
-    phase: $("chPhase"), int: $("chInt"), mod: $("chMod"), modT: $("chModT"),
+    phase: $("chPhase"), int: $("chInt"), plan: $("chPlan"), mod: $("chMod"), modT: $("chModT"),
     spd: $("chSpd"), g: $("chG"),
     fill: { trust: $("chTrustF"), comfort: $("chCF"), energy: $("chEF"), susp: $("chSF") },
     val:  { trust: $("chTrustV"), comfort: $("chCV"), energy: $("chEV"), susp: $("chSV") }
@@ -1021,6 +1192,15 @@
     var intent = L.intention || null;       /* settle | attend | calibrate */
     put("intent", el.int, intent || "none");
     if (el.int) el.int.className = "ch-intent" + (intent ? " " + intent : " none");
+    /* the agent's OWN thread of thought + how long it has held it. No plan
+       is an honest answer ("no plan"), not an error. */
+    var plan = L.plan || "";
+    if (plan && L.planSince != null && L.ride && L.ride.t != null) {
+      var held = Math.max(0, Math.round(L.ride.t - L.planSince));
+      plan += "  ·  " + held + "s";
+    }
+    put("plan", el.plan, plan || "no plan");
+    if (el.plan) el.plan.className = "ch-plan" + (plan ? " on" : "");
     var spd = ride.speed;
     put("spd", el.spd, (spd == null || isNaN(spd)) ? "— km/h" : Math.round(spd) + " km/h");
     var g = ride.g;

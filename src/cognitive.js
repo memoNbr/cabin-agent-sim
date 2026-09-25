@@ -1077,6 +1077,7 @@
   if (!cogLive || typeof cogLive !== "object") { cogLive = {}; window.__COG_LIVE__ = cogLive; }
   if (!cogLive.mood) cogLive.mood = {};
   if (!cogLive.ride) cogLive.ride = {};
+  if (!cogLive.seat) cogLive.seat = {};
   if (!cogLive.persona || typeof cogLive.persona !== "object") cogLive.persona = {};
   var cogPriors = { rides: 0, trust: null };
   cogLive.priors = cogPriors;
@@ -1086,6 +1087,10 @@
     cogLive.mood.suspicion = V.mood.suspicion;
     cogLive.trust = V.trust.score != null ? V.trust.score : (V.trust.live || 0.5);
     cogLive.intention = V.bdi.intention || null;
+    /* the model's OWN thread of thought: what it is working on right now
+       (llm mode). Empty = he has no plan, which is an honest answer. */
+    cogLive.plan = V.agent && V.agent.plan ? V.agent.plan : "";
+    cogLive.planSince = V.agent && V.agent.planSince != null ? V.agent.planSince : null;
     cogLive.module = V.module || null;
     cogLive.ride.speed = V.speed;
     cogLive.ride.g = V.g;
@@ -1096,6 +1101,14 @@
     cogLive.ride.rain = V.rain;
     cogLive.ride.phase = V.phase;
     cogLive.ride.t = V.t;
+    /* the seat itself (view units: deg, cm, cm offset): cabin.js pulls
+       __COG_LIVE__.seat EVERY frame, so the 3D rig + the seated avatar
+       follow the mind's own moves (chat orders, decide beats) — not just
+       the local sliders. Missing this key is why agent seat moves were
+       invisible in the world while the mood-driven avatar still reacted. */
+    cogLive.seat.rot = V.rot;
+    cogLive.seat.hgt = V.hgt;
+    cogLive.seat.sl = V.sl;
     cogLive.thoughts = V.thoughts.length ? V.thoughts[0].text : "";
     cogLive.speech = V.speech || "";
     cogLive.module = V.module || "";    /* active module: perceive|intend|think|memorize|forget|speak */
