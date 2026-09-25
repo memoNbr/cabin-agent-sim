@@ -63,6 +63,8 @@ def empty_snapshot() -> dict:
             "trust": {"score": None, "live": None},  # live: filled by mind
             "intention": None,  # filled by mind (BDI goal)
             "intentionSince": None,  # sim time the intention was chosen
+            "plan": "",       # the MODEL's own thread of thought (llm mode)
+            "planSince": None,  # sim time it was (re)declared
             "speech": "",
             "thoughts": [],  # filled by mind
             "memory": [],    # associative traces: [{id,label,act,age,rehearsed}]
@@ -130,6 +132,10 @@ def build_snapshot(engine) -> dict:
         snap_agent["trust"]["live"] = round(mind.trust_value(), 4)
         snap_agent["intention"] = mind.bdi["intention"]
         snap_agent["intentionSince"] = mind.bdi["since"]
+        # the model's own thread (llm mode): what it is working on right now,
+        # and how long it has held it — the agent's agenda, in its own words
+        snap_agent["plan"] = getattr(mind, "intent", None) or ""
+        snap_agent["planSince"] = getattr(mind, "intent_since", None)
         snap_agent["thoughts"] = list(mind.thoughts)
         snap_agent["speech"] = mind.speech or st.get("say") or ""
         snap_agent["memory"] = mind.memory.view(mind.t)

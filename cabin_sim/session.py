@@ -89,7 +89,8 @@ class Session:
                 cycle = self.mind.consume_cycle()
                 if cycle:
                     self.note("decide", action=cycle.get("name"),
-                              say=cycle.get("say") or "")
+                              say=cycle.get("say") or "",
+                              plan=cycle.get("intend") or "")
                     say = cycle.get("say") or ""
                     if say:
                         self.agent.last_say = say

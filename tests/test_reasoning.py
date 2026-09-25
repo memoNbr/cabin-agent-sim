@@ -12,7 +12,8 @@ Two contracts are pinned here:
 
 from cabin_sim.cognition import THOUGHTS, Mind
 from cabin_sim.reasoning import (
-    LLMReasoner, clean_line, create_reasoner, extract_json, state_block,
+    LLMReasoner, clean_line, create_reasoner, extract_json, felt_gap,
+    state_block,
 )
 from cabin_sim.schema import check
 from cabin_sim.session import Session
@@ -167,6 +168,69 @@ def test_every_decide_and_chat_message_carries_the_real_seat_envelope(persona):
     assert "ENVELOPE (physical):" in seen[-1]       # the chat lane too
 
 
+# ---- the agent's own thread: felt gap + a plan it carries -----------------
+
+def test_decide_message_carries_the_felt_gap_and_the_models_own_thread(persona):
+    seen = []
+
+    class Spy(FakeProvider):
+        def complete(self, messages):
+            seen.append(messages[1]["content"])
+            return super().complete(messages)
+
+    mind, _ = llm_mind(persona, [DECIDE_OK])
+    mind.reasoner.provider = Spy([DECIDE_OK])      # record what it is sent
+    mind.intent = "get the backrest right"
+    mind.intent_since = mind.t - 40
+    mind.t = 40
+    mind.reasoner.decide(mind)
+    msg = seen[0]
+    assert "HOW THE SEAT SITS FOR YOU:" in msg      # felt, not just fit_gap
+    assert "YOUR OWN THREAD:" in msg
+    assert "get the backrest right" in msg
+    assert "40s" in msg                             # how long it has been held
+    assert '"intend"' in msg                       # and he may rewrite it
+
+
+def test_the_own_thread_is_kept_and_only_the_clock_restarts_on_a_change(persona):
+    plan = ('{"examine": "still off.", "reconsider": "keep at it.", '
+            '"intend": "get the backrest right", "action": null, '
+            '"say": "", "order_done": false}')
+    dropped = plan.replace("get the backrest right", "")
+    mind, _ = llm_mind(persona, [plan, plan, dropped])
+    mind.step(1.0)
+    assert mind.intent == "get the backrest right"
+    first_since = mind.intent_since
+    mind.t += 30
+    mind.reasoner._last_wall = 0.0                    # ...and is due now
+    mind.step(1.0)                                 # same words: clock keeps
+    assert mind.intent == "get the backrest right"
+    assert mind.intent_since == first_since        # still being pursued
+    mind.t += 20                                  # past THROTTLE_S = 12
+    mind.reasoner._last_wall = 0.0
+    mind.step(1.0)                                 # dropped: cleared + restamped
+    assert mind.intent is None
+    assert mind.intent_since is None
+
+
+def test_felt_gap_reports_plain_words_and_how_long_the_seat_has_been_wrong(
+        persona):
+    mind, _ = llm_mind(persona, [DECIDE_OK])
+    seat = mind.cabin.seat
+    seat.rotation_deg = mind.target_rot + 40      # 40° off his liking
+    mind.t = 0
+    note = felt_gap(mind)
+    assert "40" in note and "like to face" in note
+    assert "0s" in note                            # just now
+    mind.t = 55
+    assert "55s" in felt_gap(mind)                 # and it keeps counting
+    # every axis back to his liking → the gap closes and the clock resets
+    seat.rotation_deg = mind.target_rot
+    seat.height_mm = mind.target_hgt_cm * 10
+    seat.slider_mm = mind.target_slider_mm
+    assert "where you like it" in felt_gap(mind)
+
+
 # ---- the decide cycle: examine -> reconsider -> act -----------------------
 
 DECIDE_OK = (
@@ -236,14 +300,14 @@ def test_clamped_move_reports_the_limit_for_the_model_to_examine(persona):
 def test_decide_is_throttled_so_the_gap_stays_quiet(persona):
     mind, provider = llm_mind(persona, [DECIDE_OK])
     mind.step(1.0)
-    mind.step(1.0)                                  # too soon: THROTTLE_S
-    assert provider.calls == 1 and mind.t == 2.0    # quiet, no rule fallback
+    mind.step(1.0)          # too soon for a 2nd call: the MODEL is quiet
+    assert provider.calls == 1 and mind.t == 2.0    # tick still runs (rules)
 
 
 def test_non_json_and_failed_provider_keep_the_ride_running(persona):
     mind, _ = llm_mind(persona, ["I think you should settle the seat."])
-    mind.step(1.0)                                  # prose: no JSON → quiet beat
-    assert mind.cycle is None and mind.thoughts == []
+    mind.step(1.0)                                  # prose: no JSON → no cycle
+    assert mind.cycle is None
     mind, _ = llm_mind(persona, [RuntimeError("groq unreachable")])
     mind.step(1.0)
     assert mind.last_outcome is None and mind.cycle is None

@@ -150,6 +150,55 @@ def _system_prompt(persona, environment=None, persona_guard=True):
     )
 
 
+def felt_gap(mind):
+    """The seat gap in plain words, and how long it has stood.
+
+    The difference between a number the model has to interpret ("fit_gap=0.12")
+    and something a person would actually think about ("turned away from where
+    you like to face, and has been for 40s"). Same facts, felt rather than
+    computed — it invites initiative instead of a rule lookup.
+    """
+    seat = mind.cabin.seat
+    drot = ((seat.rotation_deg - mind.target_rot + 180) % 360) - 180
+    dhgt = seat.height_mm / 10.0 - mind.target_hgt_cm
+    dsl = seat.slider_mm - mind.target_slider_mm
+    bits = []
+    if abs(drot) >= 3:
+        bits.append("turned %s where you like to face, by %.0f°"
+                    % ("away from" if drot > 0 else "short of", abs(drot)))
+    if abs(dhgt) >= 1:
+        bits.append("%s than you like by %.0fcm"
+                    % ("higher" if dhgt > 0 else "lower", abs(dhgt)))
+    if abs(dsl) >= 15:
+        bits.append("%s than you like by %.0fmm"
+                    % ("further back" if dsl > 0 else "too close", abs(dsl)))
+    if not bits:
+        mind._seat_bad_since = None
+        return "the seat sits where you like it"
+    if mind._seat_bad_since is None:
+        mind._seat_bad_since = mind.t
+    return "the seat is %s — and has been like that for %.0fs" % (
+        "; ".join(bits), mind.t - mind._seat_bad_since)
+
+
+def intent_block(mind):
+    """The agent's OWN thread of thought, echoed back to it.
+
+    This is the difference between a reactive policy and an agent: without
+    this, every beat is a fresh reaction to a number. With it, the model can
+    notice it has been holding a plan, whether that plan is working, and
+    change its mind. The words are the model's; Python only keeps the string
+    and the timestamp.
+    """
+    intent = getattr(mind, "intent", None)
+    if not intent:
+        return "you have no plan running right now"
+    held = mind.t - (mind.intent_since if mind.intent_since is not None
+                     else mind.t)
+    return 'YOUR OWN THREAD: "%s" — you have been holding it for %.0fs' % (
+        intent, held)
+
+
 def state_block(mind):
     """One compact line describing what Phill knows right now.
 
@@ -313,6 +362,8 @@ class LLMReasoner:
                             for c in mind.chat[-4:])
         return (
             f"STATE: {state_block(mind)}\n"
+            f"HOW THE SEAT SITS FOR YOU: {felt_gap(mind)}\n"
+            f"{intent_block(mind)}\n"
             f"ENVELOPE (physical): {seat_envelope()}\n"
             f"LAST OUTCOME: {outcome_block(getattr(mind, 'last_outcome', None))}\n"
             f"{order}\n"
@@ -326,9 +377,16 @@ class LLMReasoner:
             "stay still); the cabin only enforces its physical "
             "travel limits, and a clamped or refused outcome is exactly "
             "what you should examine.\n"
+            "You also carry a thread of your own: \"intend\" is the plan you "
+            "are working on right now (max 12 words), or an empty string if "
+            "you have no plan. It is yours alone — keep the same words while "
+            "a plan still serves you (it is then echoed back with how long "
+            "you have held it), pursue it across beats, notice when it "
+            "stops working, and change or drop it when it does.\n"
             "Respond ONLY with JSON:\n"
             '{"examine": "<what the outcome tells you, max 14 words>", '
             '"reconsider": "<what you want now and why, max 14 words>", '
+            '"intend": "<your own plan, max 12 words, or empty>", '
             '"action": {"kind": "seat", "axis": "slider_mm|height_mm|'
             'recline_deg|rotation_deg", "delta": <number>} or '
             '{"kind": "vending", "item": "snack|water|coffee"} or '
@@ -374,6 +432,7 @@ class LLMReasoner:
         return {
             "examine": clean_line(data.get("examine"), MAX_THOUGHT),
             "reconsider": clean_line(data.get("reconsider"), MAX_THOUGHT),
+            "intend": clean_line(data.get("intend"), MAX_THOUGHT),
             "action": action,
             "say": clean_line(data.get("say"), MAX_THOUGHT),
             "order_done": bool(data.get("order_done")),

@@ -363,6 +363,15 @@ class Mind:
         self.last_outcome = None   # what the cabin ACTUALLY did last — the
                                    # OUTCOME line the model examines next
         self.instruction = None    # standing order from the experimenter, or None
+        # The agent's OWN thread of thought across beats (llm mode): the model
+        # declares a private intention in its decide JSON and Python only
+        # stores + echoes it back next beat, so he can pursue something over
+        # time instead of reacting to a number afresh every beat. The model
+        # owns the words; Python owns nothing but the timestamp.
+        self.intent = None         # <the model's own plan, or None>
+        self.intent_since = None   # mind.t when it was last (re)declared
+        self._seat_bad_since = None  # mind.t when the seat last left the
+                                     # persona's liking (felt_gap's "for 40s")
         self.cycle = None          # last cycle {examine, reconsider, say,
                                    # action, name, ok} for the session log
         self._action_result = None # queued {name, ok, detail} for observe()
@@ -742,6 +751,15 @@ class Mind:
             self.think(decision["reconsider"])
         if decision.get("examine"):
             self.think(decision["examine"])
+        # his own thread of thought: the model says what it is working on
+        # right now; Python only keeps the words and restarts the clock when
+        # the plan actually changes (same words = still being pursued).
+        intend = decision.get("intend") or None
+        if intend != self.intent:
+            if intend:
+                self.log_line("dir", f"plan · {intend[:60]}")
+            self.intent = intend
+            self.intent_since = self.t if intend else None
         name, ok = None, False
         action = decision.get("action")
         if (isinstance(action, dict)
@@ -755,6 +773,7 @@ class Mind:
         self.cycle = {"t": self.t,
                       "examine": decision.get("examine"),
                       "reconsider": decision.get("reconsider"),
+                      "intend": self.intent,
                       "say": decision.get("say"),
                       "action": action, "name": name, "ok": ok}
 
