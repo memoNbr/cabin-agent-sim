@@ -30,7 +30,16 @@ from pathlib import Path
 from . import prompts as prompt_files
 from .schema import build_snapshot
 
-WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+_ROOT = Path(__file__).resolve().parent.parent
+# The view. The real cockpit is the Vite app at the project root; `npm run
+# build` bundles it (three.js included) into dist/, which this server can
+# hand out statically — same origin as /api, so the page just works at
+# http://127.0.0.1:8000/. Until a build exists we fall back to the legacy
+# page in web/ rather than serving nothing.
+WEB_DIR = _ROOT / "dist"
+LEGACY_WEB_DIR = _ROOT / "web"
+if not (WEB_DIR / "index.html").exists():
+    WEB_DIR = LEGACY_WEB_DIR
 
 # view axis key -> canonical seat attribute (mm/deg) and conversion
 SEAT_AXES = {"slider_mm": "slider_mm", "height_mm": "height_mm",
@@ -66,6 +75,34 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    CONTENT_TYPES = {
+        ".html": "text/html; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+        ".mjs": "text/javascript; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".svg": "image/svg+xml", ".png": "image/png",
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".webp": "image/webp", ".ico": "image/x-icon",
+        ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg",
+        ".woff2": "font/woff2",
+    }
+
+    def _serve_static(self, rel):
+        """Hand out a file from WEB_DIR (the built sim), never outside it."""
+        root = WEB_DIR.resolve()
+        try:
+            target = (root / rel.lstrip("/")).resolve()
+            target.relative_to(root)          # no path traversal
+        except (ValueError, OSError):
+            self.send_error(404)
+            return
+        if target.is_dir():
+            target = target / "index.html"
+        ctype = self.CONTENT_TYPES.get(target.suffix.lower(),
+                                       "application/octet-stream")
+        self._send(target, ctype)
+
     def _read_json(self):
         try:
             length = int(self.headers.get("Content-Length") or 0)
@@ -82,9 +119,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
-        if path in ("/", "/index.html"):
-            self._send(WEB_DIR / "index.html", "text/html; charset=utf-8")
-        elif path == "/api/state":
+        if not path.startswith("/api/"):
+            # the view itself: the built cockpit from dist/ (or legacy web/)
+            rel = "index.html" if path in ("/", "/index.html") else path
+            self._serve_static(rel)
+            return
+        if path == "/api/state":
             self._json(self.engine.session.state())
         elif path == "/api/snapshot":
             self._json(build_snapshot(self.engine))

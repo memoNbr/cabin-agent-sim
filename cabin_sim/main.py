@@ -134,12 +134,20 @@ def main(argv=None):
         _run_headless(engine)
         return 0
 
-    from .server import serve
+    from .server import LEGACY_WEB_DIR, WEB_DIR, serve
 
     url = f"http://127.0.0.1:{args.port}"
     cap = ("unlimited" if steps >= UNLIMITED_STEPS
            else f"{steps} steps ({steps * args.tick_dt:g} sim-s)")
     session_txt = f"Session: {cap}."   # the ride script itself ends at 600 s
+    if WEB_DIR == LEGACY_WEB_DIR:
+        # no build yet: say so loudly, or the legacy page looks like the sim
+        print(f"NOTE: dist/ has no build - serving the LEGACY page from web/.\n"
+              f"      Run `npm run build` for the real cockpit, or open the\n"
+              f"      Vite dev server (npm run dev -> :5173) for live reload.",
+              file=sys.stderr, flush=True)
+    else:
+        print(f"View: built cockpit (dist/) served from {url}", flush=True)
     print(f"Open {url} in your browser. {session_txt} "
           f"(Ctrl+C to stop)", flush=True)
     try:
