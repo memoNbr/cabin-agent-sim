@@ -315,6 +315,34 @@ def test_non_json_and_failed_provider_keep_the_ride_running(persona):
     assert mind.t == 2.0
 
 
+def test_a_failed_or_throttled_beat_stays_quiet_and_never_moves_the_seat(persona):
+    """The rule, pinned: when the model delivers nothing (rate limit, bad
+    JSON, provider error) the mind sits still. The rules BDI must NOT take
+    over the seat — in llm mode the model IS the reasoner, and a free-tier
+    429 must never turn into invented behaviour. (Speech may still fall
+    back to the phrase bank; the SEAT may not move.)"""
+    mind, _ = llm_mind(persona, [RuntimeError("429 Too Many Requests")])
+    before = dict(mind.cabin.seat.as_dict())
+    for _ in range(10):
+        mind.reasoner._last_wall = 0.0          # past SPEAK_GAP_S: force the try
+        mind.step(1.0)
+    assert mind.cycle is None                    # the model said nothing
+    assert mind.last_outcome is None             # ...so no action was applied
+    assert mind.cabin.seat.as_dict() == before, "rules must not settle the seat"
+    assert mind.self_act == 0, "the rules walker must not run in llm mode"
+
+
+def test_a_bad_json_answer_is_also_a_quiet_beat(persona):
+    """Same rule for the other failure shape: prose instead of JSON."""
+    mind, _ = llm_mind(persona, ["I think you should probably recline a bit."])
+    before = dict(mind.cabin.seat.as_dict())
+    for _ in range(6):
+        mind.reasoner._last_wall = 0.0
+        mind.step(1.0)
+    assert mind.cycle is None
+    assert mind.cabin.seat.as_dict() == before
+
+
 # ---- chat: the model interprets question vs order --------------------------
 
 def test_chat_reply_alone_leaves_no_order_and_moves_nothing(persona):
