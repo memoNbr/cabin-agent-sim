@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Python Mind — BDI cognitive agent (cabin_sim) — technical tutorial</title>
-<meta name="description" content="Section-by-section walkthrough of the Python-authoritative BDI mind: cabin_sim/cognition.py (Mind), data structures, step loop, memory, trust &amp; mood, ride script, schema snapshot, experimenter chat, determinism, reasoning modes, parameters.">
+<meta name="description" content="Section-by-section walkthrough of the Python mind: cabin_sim/cognition.py (Mind), data structures, step loop, memory, trust &amp; mood, ride script, schema snapshot, experimenter chat with physical outcomes, the LLM reasoner (examine/reconsider/act), the live prompt layer (environment + persona), determinism, parameters.">
 <style>
   :root{
     --bg:#08090a; --panel:#0e0f11; --panel2:#131417; --line:#24252a; --line2:#1a1b1f;
@@ -205,20 +205,21 @@
     <div class="sub">The authoritative BDI passenger agent of <code>cabin_sim/</code> — a section-by-section
       walkthrough of <code>cognition.py</code> (<code>Mind</code>): core data structures, the
       perceive → desire → intention → act loop, associative memory, trust &amp; mood dynamics, the
-      120–600&nbsp;s ride script, the <code>schema.py</code> snapshot contract, the experimenter chat,
-      deterministic seeding, LLM reasoning modes, and every tunable parameter. Companion to the
+      120–600&nbsp;s ride script, the <code>schema.py</code> snapshot contract, the experimenter chat
+      with physical outcomes, deterministic seeding, the LLM reasoner (examine → reconsider → act)
+      with its live prompt layer, and every tunable parameter. Companion to the
       <a href="tutorial-cognitive.html">architecture &amp; view walkthrough</a> — that one shows the
       layers; this one opens the mind.</div>
     <div class="chips">
       <span class="chip">mind <b>cabin_sim/cognition.py</b></span>
-      <span class="chip">persona <b>Phill · personas/phill.json</b></span>
+      <span class="chip">persona <b>Phill · personas/phill.py</b></span>
       <span class="chip">memory λ <b>0.004 /s</b></span>
       <span class="chip">ride <b>120s → 600s</b></span>
       <span class="chip">snapshot <b>cabin-agent.v1</b></span>
       <span class="chip">loop <b>step(dt) · engine tick · poll 700ms</b></span>
       <span class="chip">chat <b>chat_send → POST /api/chat</b></span>
       <span class="chip">reasoning <b>rules | llm</b></span>
-      <span class="chip">tests <b>81 pytest · 0 fail</b></span>
+      <span class="chip">tests <b>128 pytest · 0 fail</b></span>
       <span class="chip">companion <b><a href="tutorial-cognitive.html">tutorial-cognitive.html</a></b></span>
     </div>
   </div>
@@ -228,7 +229,7 @@
 
   <div class="bar">
     <div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:#6e7076">
-      11 SECTIONS · COLLAPSIBLE
+      12 SECTIONS · COLLAPSIBLE
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn" id="btnExpand">Expand all</button>
@@ -247,7 +248,8 @@
     <a href="#s8"><span>08</span>Experimenter Chat</a>
     <a href="#s9"><span>09</span>Determinism</a>
     <a href="#s10"><span>10</span>Reasoning Modes</a>
-    <a href="#s11"><span>11</span>Key Parameters</a>
+    <a href="#s11"><span>11</span>Live Prompt Layer</a>
+    <a href="#s12"><span>12</span>Key Parameters</a>
   </nav>
 
   <!-- ================================================================ -->
@@ -291,6 +293,7 @@ cabin_sim.schema and draws what it is told, it no longer reasons.</code></pre>
         <thead><tr><th>Layer</th><th>Owns</th><th class="m">Files</th></tr></thead>
         <tbody>
           <tr><td><b>Core</b> (authoritative)</td><td class="desc">world state, action gate, persona, MDMT questionnaire, <b>BDI / mood / memory / trust / ride / chat</b></td><td class="m">world.py · actions.py · agent.py · provider.py · session.py · questionnaire.py · cognition.py</td></tr>
+          <tr><td><b>Reasoner + prompt layer</b></td><td class="desc">the model's reasoning (<em>examine → reconsider → act</em>, chat interpretation) and the two editable prompt texts that frame it: <b>WORLD</b> (<code>prompts/environment-*.md</code>) and <b>WHO</b> (<code>personas/*.py</code>) — the sim's two buttons open the real source on the page (§10, §11)</td><td class="m">reasoning.py · prompts.py · prompts/ · personas/</td></tr>
           <tr><td><b>Clock + contract</b></td><td class="desc">sim time <code>t</code>, phase machine, seeded rng, canonical snapshot, priors file</td><td class="m">sim.py · schema.py</td></tr>
           <tr><td><b>Transport</b></td><td class="desc">stdlib HTTP: <code>/</code> · <code>/api/state</code> · <code>/api/snapshot</code> · <code>/api/chat</code> · <code>/api/seat</code> · <code>/api/control</code> + ticker thread</td><td class="m">server.py</td></tr>
           <tr><td><b>View</b></td><td class="desc">rendering/interpolation only — draws the snapshot, POSTs input, runs no reasoning</td><td class="m">src/cognitive.js (adapter) · cabin.js · avatar.js · ui.js · main.js · index.html</td></tr>
@@ -310,6 +313,12 @@ cabin_sim.schema and draws what it is told, it no longer reasons.</code></pre>
             feeds back: seat input travels <code>POST /api/seat</code> → clamped by
             <code>world.Seat</code> → <code>mind.note_user_input()</code> (sets
             <code>belief.user_hands</code> for 3&nbsp;s).</li>
+        <li><b>The model reasons; the body stays Python.</b> In <code>llm</code> mode every decide
+            beat is <em>examine → reconsider → act</em> (§10): the model picks the axis, the delta
+            — or to sit still — and Python only whitelists the vocabulary and clamps the travel;
+            the <em>real</em> outcome (as asked / clamped / refused) is fed back into the next
+            beat. In <code>rules</code> mode no model runs at all and behaviour is byte-identical
+            to the port (§09).</li>
         <li><b>Determinism is guaranteed for <code>--provider scripted</code> only</b> — all randomness
             is seeded and snapshot building consumes none (§09).</li>
       </ul>
@@ -388,27 +397,36 @@ cabin_sim.schema and draws what it is told, it no longer reasons.</code></pre>
       </table>
 
       <h3>Persona — Phill</h3>
-      <p>Everything persona-specific lives in <code>personas/phill.json</code> — swap the file to swap
-      the passenger (code defaults keep older personas working):</p>
-      <pre><code>{
-  "name": "Phill",
-  "blurb": "33-year-old entry-level officer from Aachen, married, no kids. …",
-  "traits": ["introvert", "suspicious", "confident", "uninterested in cars"],
-  "talkativeness": 0.55,   "verbosity": "low",
-  "seat":      { "slider_mm": 330, "height_mm": 440, "recline_deg": 95, "rotation_deg": 0 },
-  "tolerance": { "slider_mm": 90,  "height_mm": 20,  "recline_deg": 12, "rotation_deg": 20 },
-  "mood":      { "energy": 0.6, "suspicion": 0.5 },
-  "cognition": { "memory_lambda": 0.004, "memory_cap": 8, "forget_floor": 0.09,
-                 "rehearsal_boost": 0.22, "settle_thresh": 0.22,
-                 "settle_step_mm": 10, "settle_step_deg": 10,
-                 "ride_start": 120, "ride_end": 600 },
-  "vending_interest": "low", "curiosity": 0.1
+      <p>Everything persona-specific lives in <code>personas/phill.py</code> — a plain Python file
+      holding one <code>PERSONA = {…}</code> dict (comments allowed: the loader exec()s the file,
+      so treat persona files as trusted local code; <code>.json</code> still loads for backwards
+      compatibility). Swap the file to swap the passenger — or do it live with the sim's
+      <b>persona prompt</b> button, which hot-applies the new person to the running mind without
+      resetting the ride (§11):</p>
+      <pre><code># personas/phill.py — comments allowed; the loader exec()s this file
+PERSONA = {
+    "name": "Phill",
+    "blurb": "33-year-old entry-level officer from Aachen, married, no kids. …",
+    "self": "You are Phill, a 33-year-old …",          # first-person intro → system prompt
+    "traits": ["introvert", "suspicious", "confident", "uninterested in cars"],
+    "talkativeness": 0.55,   "verbosity": "low",
+    "seat":      { "slider_mm": 330, "height_mm": 440, "recline_deg": 95, "rotation_deg": 0 },
+    "tolerance": { "slider_mm": 90,  "height_mm": 20,  "recline_deg": 12, "rotation_deg": 20 },
+    "mood":      { "energy": 0.6, "suspicion": 0.5 },
+    "cognition": { "memory_lambda": 0.004, "memory_cap": 8, "forget_floor": 0.09,
+                   "rehearsal_boost": 0.22, "settle_thresh": 0.22,
+                   "settle_step_mm": 10, "settle_step_deg": 10,
+                   "ride_start": 120, "ride_end": 600 },
+    "vending_interest": "low", "curiosity": 0.1
 }</code></pre>
       <ul>
         <li><b>seat / tolerance</b> → the BDI's targets and gates: forward (0°), 44&nbsp;cm cushion,
             ±20° / ±2&nbsp;cm comfort zone (§05).</li>
         <li><b>mood</b> → the suspicion/energy set-points the dynamics relax back to.</li>
-        <li><b>cognition</b> → every tunable the mind reads (full table in §11).</li>
+        <li><b>cognition</b> → every tunable the mind reads (full table in §12).</li>
+        <li><b>Two personas ship:</b> <code>phill.py</code> ("just get me there") and
+            <code>nadia.py</code> ("tell me how it works") — switch live from the sim's
+            <b>persona prompt</b> panel (§11).</li>
         <li><b>blurb / talkativeness</b> → voice: the LLM system prompt quotes the blurb verbatim;
             <code>talkativeness</code> scales the chance any line is <em>spoken</em> aloud.</li>
         <li><b>vending_interest / curiosity</b> → read by <code>CognitiveAgent</code> (the scripted
@@ -473,7 +491,9 @@ CHAT_WELLBEING = re.compile(r"(feel|how|you|ok|okay|alright|comfort|fine|doing)"
       trust bands (<code>trustOk · trustMid · trustLow</code>), <code>chat</code> and the endings
       (<code>endGood · endMid · endBad</code>). <code>pick_line()</code> draws one uniformly via
       <code>mind.rng</code>, excluding the previously used line. The chat regexes route experimenter
-      questions in §08; <code>GOAL_CD</code> gates the BDI in §03.</p>
+      questions only in the <em>rules</em> lane (rules mode and the degrade path when the model is
+      unreachable) — in llm mode the model interprets the message itself (§08);
+      <code>GOAL_CD</code> gates the rules BDI in §03.</p>
     </div>
   </details>
 
@@ -1023,8 +1043,11 @@ def build_snapshot(engine) -&gt; dict:
     <summary><span class="no">08</span>Experimenter Chat<span class="caret"></span></summary>
     <div class="body">
 
-      <p>The experimenter's chat line goes from the browser to the mind in one hop — the reply is
-      chosen server-side, from live state:</p>
+      <p>The experimenter's chat line goes from the browser to the mind in one hop. In
+      <b>llm mode</b> the model interprets the message itself — a question gets an answer, an
+      order gets <em>obeyed</em> — and the exchange carries the <b>physical outcome</b> of
+      whatever it did. The rules lane (rules mode, and the degrade path when the model is
+      unreachable) keeps the regex routing shown further down:</p>
 
       <pre><code>def chat_send(self, raw):
     text = str(raw or "").strip()
@@ -1033,15 +1056,48 @@ def build_snapshot(engine) -&gt; dict:
     self.chat.append({"who": "experimenter", "t": self.t, "text": text})
     self.log_line("chat", f"experimenter · {text}")
     self.remember("chat", f"Experimenter: {text}", 0.5, True)   # encoded into memory (§04)
-    reply = self._chat_reply(text)
+    reply, res, outcome = None, None, None
+    if self.reasoner is not None:
+        # llm lane: the MODEL interprets the message — question, small talk, or
+        # an order. An immediate move runs through _perform() (the same
+        # whitelist/clamp bridge as the decide cycle); a longer order stands as
+        # `instruction` until a decide beat reports "order_done": true. No
+        # regex directive table runs on this path.
+        res = self.reasoner.chat_act(self, text)
+        if res:
+            reply = res["reply"]
+            if isinstance(res.get("action"), dict):
+                ok, detail, _ = self._perform(res["action"], source="chat")
+                outcome = detail if ok else f"REFUSED — {detail}"   # "height_mm 380 → 410"
+            if res.get("standing"):
+                self.instruction = text                     # the order STANDS (§10)
+                self.remember("order", f"Standing order: {text}", 0.6, True)
+                if outcome is None:
+                    outcome = "order accepted — first move on the next think beat"
+    if reply is None:
+        # rules mode — and the degrade path when the model is unreachable:
+        # orders by regex, then phrase-bank conversation
+        reply = self._directive(text) or self._chat_reply(text)
+        if self.reasoner is not None:
+            # that fallback line may SOUND compliant while nothing moves —
+            # say so, so a rate-limited no-op can never pass for success
+            outcome = ("the model did not answer this time (rate limit or "
+                       "network) — the line above is a fallback, no seat "
+                       "move was made")
     self.chat.append({"who": "phill", "t": self.t, "text": reply})
+    if outcome:
+        self.chat.append({"who": "cabin", "t": self.t, "text": outcome})
     del self.chat[: max(0, len(self.chat) - 40)]                # history capped at 40
     self.speak(reply)                                           # → speech in next snapshot
-    return {"ok": True, "reply": reply, "state": self.chat_state()}</code></pre>
+    result = {"ok": True, "reply": reply, "state": self.chat_state()}
+    if self.reasoner is not None:      # llm lane: always report honestly;
+        result["outcome"] = outcome    # the rules payload keeps its old shape
+    return result</code></pre>
 
-      <h3>Routing — <code>_chat_reply()</code>, never a fixed script</h3>
-      <p>It first calls <code>perceive_fit()</code> — answers come from the <em>current</em> seat,
-      even between ticks — then routes by regex:</p>
+      <h3>The rules lane — <code>_directive()</code> / <code>_chat_reply()</code>, regex routing</h3>
+      <p>This is the <em>rules</em> lane — rules mode in full, and llm mode's degrade path when the
+      model is unreachable. It first calls <code>perceive_fit()</code> — answers come from the
+      <em>current</em> seat, even between ticks — then routes by regex:</p>
       <table>
         <thead><tr><th class="m">Route</th><th class="m">Pattern</th><th>Reply comes from</th><th>Side effect</th></tr></thead>
         <tbody>
@@ -1056,10 +1112,32 @@ def build_snapshot(engine) -&gt; dict:
         </tbody>
       </table>
 
-      <div class="note"><b>The rule path always runs first — its side effects are authoritative in
-      every mode:</b> the settle-cooldown clear and the <code>rng</code> draws happen in Python; only
-      then may <code>reasoner.chat(self, text, rule)</code> <em>reword</em> the answer (§10),
-      <code>None</code> meaning "keep the rule reply".</div>
+      <div class="note"><b>Two lanes, one safety bridge:</b> in <b>rules</b> mode the regex route
+      runs first and its side effects (the settle-cooldown clear, the <code>rng</code> draws) are
+      authoritative. In <b>llm</b> mode no regex table runs at all — <code>chat_act()</code>
+      decides what the message <em>is</em> (§10): an immediate move goes through
+      <code>_perform()</code> right away (the same whitelist + clamps as every other action), and
+      a multi-move order is kept as <code>mind.instruction</code> across decide beats until the
+      model reports <code>order_done</code>.</div>
+
+      <h3>The outcome line — the chat shows what physically happened</h3>
+      <p>An order is not "done" because Phill <em>said</em> it is. Every llm-lane exchange appends
+      the machine's own line (<code>who: "cabin"</code>, printed right after Phill's reply) and
+      sets the payload key <code>outcome</code>:</p>
+      <table>
+        <thead><tr><th class="m">Situation</th><th>Outcome line</th></tr></thead>
+        <tbody>
+          <tr><td class="m">action applied</td><td class="desc"><code>height_mm 380 → 410</code> — the <em>real</em> delta in the canonical <code>{axis} {before:g} → {after:g}</code> format; a move stopped at a travel limit shows the limit, not the request</td></tr>
+          <tr><td class="m">refused (not a legal move)</td><td class="desc"><code>REFUSED — …</code>, nothing moved</td></tr>
+          <tr><td class="m">standing order, no move in this reply</td><td class="desc"><code>order accepted — first move on the next think beat</code></td></tr>
+          <tr><td class="m">standing order after the step cap</td><td class="desc"><code>order received — the session ENDED at its step cap; restart the ride to carry it out</code> — never promises a beat that can no longer happen</td></tr>
+          <tr><td class="m">model unreachable (degrade)</td><td class="desc"><code>the model did not answer this time (rate limit or network) — the line above is a fallback, no seat move was made</code> — a compliant-sounding fallback can never pass for success in the panel</td></tr>
+        </tbody>
+      </table>
+      <p>The order itself lives in <code>mind.instruction</code>: every decide prompt carries it
+      (<code>STANDING ORDER …</code>, §10) until the model answers <code>"order_done": true</code>,
+      which logs <code>order done · …</code> and clears it. In rules mode the payload has <b>no</b>
+      <code>outcome</code> key at all — the old shape is untouched.</p>
 
       <p>The reply payload also carries a state digest for the caller:</p>
       <pre><code>chat_state() → { t, phase, done, mood, trust, belief,
@@ -1130,7 +1208,9 @@ window.__EXPERIMENTER_CHAT__ = {
       <div class="warn"><b>Which chat UI talks to Python?</b> All three paths — the 💬 panel's
       form (async <code>fetch</code>), the console hook, and any direct
       <code>POST /api/chat</code> — reach the mind, so every reply is computed from live
-      state (Groq via the reasoner, rules when rate-limited); if the server is down the
+      state by the model lane, and the machine's <code>outcome</code> line says honestly what
+      physically happened (a real move, a refusal, a not-yet-moved order, or a fallback where
+      <em>no seat move was made</em>); if the server is down the
       panel shows <code>(no reply — Python mind not reachable)</code> rather than a fake
       echo, and <code>history()</code> always shows what the mind actually recorded. Every
       message that reaches the mind is also encoded into memory (salience 0.5, important),
@@ -1193,14 +1273,14 @@ self.t   = 0.0                     # sim clock: tick counts, never wall time</co
           <tr><td class="m">test_determinism.py</td><td class="desc">same seed → identical session log; different seed → different trajectory; engine run → reproducible snapshot sequence; snapshot is pure and repeatable</td></tr>
           <tr><td class="m">test_cognition.py</td><td class="desc">same seed → same mind, different seed → differs; events fire once even with big ticks; worked fit/comfort/trust examples; decay/FIFO/cooldown semantics</td></tr>
           <tr><td class="m">test_schema.py</td><td class="desc">snapshot conforms after a full run (bounds, mood, trust landing); template stays neutral; <code>check()</code> reports violations</td></tr>
-          <tr><td class="m">test_reasoning.py</td><td class="desc">rules mode leaves the mind untouched; illegal/garbled/failed LLM answers fall back to the rule answer for that tick</td></tr>
+          <tr><td class="m">test_reasoning.py</td><td class="desc">rules mode leaves the mind untouched; the decide loop feeds the <b>real</b> outcome back (as asked / clamped / refused); throttled or failed beats stay quiet; chat orders move the seat <em>now</em>, stand until the model reports <code>order_done</code>, and every degrade path says honestly that no move was made</td></tr>
         </tbody>
       </table>
 
       <div class="note"><b>Reproduce a run:</b>
       <code>python -m cabin_sim.main --headless --steps 40 --seed 1</code> prints the same JSON log
       lines and the same summary on every machine; the browser path replays the same snapshots
-      through <code>/api/snapshot</code>. <code>python -m pytest tests -q</code> → <b>81 passed</b>.</div>
+      through <code>/api/snapshot</code>. <code>python -m pytest tests -q</code> → <b>128 passed</b>.</div>
     </div>
   </details>
 
@@ -1209,26 +1289,35 @@ self.t   = 0.0                     # sim clock: tick counts, never wall time</co
     <summary><span class="no">10</span>Reasoning Modes<span class="caret"></span></summary>
     <div class="body">
 
-      <p><code>cabin_sim/reasoning.py</code> plugs an LLM into the mind without ever letting it own
-      the state. The separation is stated in its docstring — <b>who decides vs. what is decided</b>:</p>
+      <p><code>cabin_sim/reasoning.py</code> — <b>the model IS the reasoner</b>; Python is the body
+      it lives in. The split is stated in the module docstring:</p>
 
-      <pre><code>cabin_sim.cognition      owns state, dynamics and legality
-                         (cooldowns, preconditions, clamps, memory decay,
-                          mood relax — Python)
-cabin_sim.reasoning.py   owns WORDING and CHOICE among legal options
-                         (an LLM behind provider.complete(), or rules/None)</code></pre>
+      <pre><code>cabin_sim.cognition      owns state and the felt dynamics
+                         (mood relax, memory decay, fit perception,
+                          the ride script — Python)
+cabin_sim.reasoning.py   owns the reasoning itself (this file, an LLM
+                         behind provider.complete()): each decide beat the
+                         model EXAMINES the real outcome of its last action,
+                         RECONSIDERS from its persona, and picks the next
+                         action with its own values — which axis, how far,
+                         or to do nothing at all. actions.apply_llm_action()
+                         then only checks the vocabulary and lets the world
+                         clamp, and that real outcome (clamped, refused or
+                         as asked) is fed back into the next beat.</code></pre>
 
       <table>
         <thead><tr><th class="m">Mode</th><th>Behaviour</th></tr></thead>
         <tbody>
           <tr><td class="m">rules (default)</td><td class="desc"><code>create_reasoner()</code> returns <code>None</code>: the mind keeps its deterministic desire-argmax and phrase banks — byte-identical to the pre-LLM port, which is what pytest exercises.</td></tr>
-          <tr><td class="m">llm</td><td class="desc">Each decision step the model is handed <b>only the legal goals</b> (cooldowns/preconditions already applied in Python) and picks one plus a one-line thought; chat replies are written from the live state. Anything it returns is validated — an illegal intention, bad JSON, an empty line or a network error silently falls back to the rule answer <em>for that tick</em>.</td></tr>
+          <tr><td class="m">llm</td><td class="desc">Each decide beat runs the closed loop: state + envelope + <b>the real outcome of the last action</b> in, <code>{examine, reconsider, action, say, order_done}</code> out. The model chooses every value — axis and delta, or to sit still (<code>"action": null</code>); Python validates only the <em>shape</em>, then <code>actions.apply_llm_action()</code> enforces the vocabulary whitelist and the world's travel clamps, and the <b>real</b> result lands in <code>mind.last_outcome</code> for the next beat to examine. Chat is interpreted by the model too (§08). A throttled beat, bad JSON or a dead network means the beat stays <b>quiet</b> — no rule fallback, no invented behaviour, the ride never breaks.</td></tr>
         </tbody>
       </table>
 
       <h3>Mode selection</h3>
-      <pre><code>def create_reasoner(provider, mode="auto", persona=None):
-    """Never raises: an unusable 'llm' request degrades to rules with a warning,
+      <pre><code>def create_reasoner(provider, mode="auto", persona=None, chat_provider=None,
+                    environment=None):
+    """Build the reasoner for this session (None = rules mode).
+    Never raises: an unusable 'llm' request degrades to rules with a warning,
     so a missing key or stopped Ollama can never take the ride down."""
     mode = (mode or "auto").lower()
     backend = getattr(provider, "name", "scripted")
@@ -1239,73 +1328,169 @@ cabin_sim.reasoning.py   owns WORDING and CHOICE among legal options
             print("reasoning: 'llm' needs a real provider (groq/ollama) — "
                   "using rule-based reasoning.", file=sys.stderr)
         else:
-            return LLMReasoner(provider, persona)
+            return LLMReasoner(provider, persona,
+                               chat_provider=chat_provider,
+                               environment=environment)
     return None</code></pre>
       <ul>
         <li><b>CLI:</b> <code>--reasoning auto|rules|llm</code> (env <code>REASONING</code>);
             <code>main.py</code> prints <code>Reasoning: rules</code> /
-            <code>Reasoning: llm:groq</code>, and the snapshot publishes the same string in
-            <code>agent.reasoning</code>.</li>
+            <code>Reasoning: llm:groq   chat: gpt-oss-120b</code>, and the snapshot publishes the
+            same string in <code>agent.reasoning</code>.</li>
         <li><b>Providers:</b> <code>scripted</code> (deterministic stand-in, no key),
             <code>ollama</code> (fully local via <code>OLLAMA_BASE_URL</code>, default model
             <code>llama3.2</code> — any model via <code>OLLAMA_MODEL</code>), <code>groq</code> (free
-            cloud tier, default <code>allam-2-7b</code> via <code>GROQ_MODEL</code>, temperature 0.7,
-            max 240 tokens). <code>create_provider()</code> honours <code>--provider</code> then
-            <code>.env</code>, and unknown config falls back to scripted with a warning.</li>
+            cloud tier, code default <code>allam-2-7b</code> via <code>GROQ_MODEL</code>,
+            temperature 0.7, max 240 tokens; the running setup overrides it in <code>.env</code> —
+            <code>GROQ_MODEL=openai/gpt-oss-20b</code> ticks,
+            <code>CHAT_MODEL=gpt-oss-120b</code> chats). <code>create_provider()</code> honours
+            <code>--provider</code> then <code>.env</code>, and unknown config falls back to
+            scripted with a warning.</li>
+        <li><b>Hybrid chat backend:</b> <code>--chat-model</code> / env <code>CHAT_MODEL</code>
+            selects a SECOND model used <em>only</em> for experimenter replies — the fast model
+            ticks, the bigger model chats (§08); unset = the same model does everything.</li>
+        <li><b>Live switching:</b> <code>set_environment()</code> / <code>set_persona()</code>
+            rebuild the system prompt on the running reasoner — the buttons of the live prompt
+            layer (§11).</li>
       </ul>
 
-      <h3>The one allowed call per step</h3>
-      <p>Legality is decided in Python (§03); the model sees the legal set with its desire scores
-      and answers in JSON:</p>
+      <h3>The decide beat — examine → reconsider → act</h3>
+      <p>One closed loop, at most one call per <code>THROTTLE_S</code> sim-seconds. Every message
+      carries the authoritative state, the seat's <b>physical travel envelope</b> and the
+      <b>real outcome</b> of the previous move; the model answers with its whole reasoning trace
+      plus ONE action:</p>
       <pre><code>msg = (
     f"STATE: {state_block(mind)}\n"
-    f"LEGAL GOALS — you may pick exactly ONE: {legal}\n"
-    "Choose the goal worth pursuing right now, given your body, mood "
-    "and memories. Respond with JSON:\n"
-    '{"intention": "&lt;one legal goal&gt;", '
-    '"thought": "&lt;your inner monologue line, max 14 words&gt;"}'
+    f"ENVELOPE (physical): {seat_envelope()}\n"
+    f"LAST OUTCOME: {outcome_block(getattr(mind, 'last_outcome', None))}\n"
+    f"{order}\n"                      # STANDING ORDER … or "act purely as yourself"
+    f"RECENT CHAT: {recent or 'none'}\n"
+    "Examine what your last action actually did (as intended, clamped at a "
+    "travel limit, or refused?), then reconsider what you want now as this "
+    "person, and choose ONE next move — or none (\\"action\\": null) … "
+    "Respond ONLY with JSON:\n"
+    '{"examine": "&lt;what the outcome tells you, max 14 words&gt;", '
+    '"reconsider": "&lt;what you want now and why, max 14 words&gt;", '
+    '"action": {"kind": "seat", "axis": "slider_mm|height_mm|'
+    'recline_deg|rotation_deg", "delta": &lt;number&gt;} or '
+    '{"kind": "vending", "item": "snack|water|coffee"} or '
+    '{"kind": "table", "folded": true|false} or null, '
+    '"say": "&lt;one short line you say out loud, or empty&gt;", '
+    '"order_done": &lt;true only if a standing order is fulfilled&gt;}'
 )</code></pre>
       <ul>
         <li><b><code>state_block()</code></b> is one compact STATE line built from the authoritative
             mind only — <em>the same facts the snapshot publishes, so the model can never contradict
             observable state</em> (seat, prefs, fit gap, user hands, mood, live trust, ride, top-3
             memories with activations, last said).</li>
-        <li><b>The system prompt</b> anchors the persona: Phill's blurb verbatim, "dry, practical,
-            British understatement; short first-person lines", <em>never invent numbers</em>, never
-            break character, answer with the requested JSON only.</li>
-        <li><b>Validation &amp; containment:</b> the caller re-checks
-            <code>choice ∈ offered</code> (else the rule argmax stands); <code>extract_json</code>
-            tolerates fences/prose; <code>clean_line</code> strips and truncates to
-            <code>MAX_THOUGHT = 160</code> / <code>MAX_REPLY = 240</code> chars; deliberation is
-            throttled — an unchanged legal set within <code>THROTTLE_S = 12.0</code> sim-seconds is
-            covered by rules; one retry after <code>RETRY_BACKOFF = 1.5</code> wall-seconds; any
-            exception → stderr note + rules for that tick. <b>≤1 model call per decision step</b>
-            (intention and thought come back together); the chat call happens only when the
-            experimenter actually sends a line.</li>
-        <li><b>What the model never touches:</b> cooldowns, preconditions, clamps, memory decay,
-            rehearsal, mood relaxation, salience, the ride script, and — in chat — the rule path's
-            side effects (the settle-cooldown clear runs <em>before</em> the model is asked,
-            §08).</li>
+        <li><b><code>outcome_block()</code></b> is the feedback half:
+            <code>done: height_mm 380 → 410 | seat now 45° / 410mm / slide 350mm</code> — or
+            <code>REFUSED: …</code> — so the next call examines the <em>real</em> world, not the
+            model's intention; before the first action it reads "nothing yet — you have just sat
+            down".</li>
+        <li><b>The system prompt</b> anchors the persona (the <code>self</code> intro, traits, the
+            voice — "dry, practical, British understatement; short first-person lines") plus the
+            <b>ENVIRONMENT</b> world text from <code>prompts/</code> (§11), with the RULES:
+            <em>never invent numbers</em>, never break character, answer with the requested JSON
+            only.</li>
+        <li><b>Validation &amp; containment:</b> <code>extract_json</code> tolerates fences/prose;
+            <code>clean_line</code> strips and truncates to <code>MAX_THOUGHT = 160</code> /
+            <code>MAX_REPLY = 240</code> chars; the action is checked for <em>SHAPE</em> only — the
+            physical referee is <code>actions.apply_llm_action()</code> (whitelist + world clamps),
+            whose real result comes back as <code>mind.last_outcome</code>. Rates:
+            <code>THROTTLE_S = 12.0</code> sim-seconds between decide calls (sized to the Groq
+            free tier — zero 429 churn), <code>SPEAK_GAP_S = 30.0</code> wall-seconds shared by
+            <b>every</b> lane (decide, speak and chat all stamp it, so they can never crowd the
+            free tier at once), one retry after <code>RETRY_BACKOFF = 4.0</code> wall-seconds
+            (measured: 1.5 s lands inside the same 429 window, 4 s crosses its edge). Chat itself
+            is not throttled — the experimenter is waiting for the answer.</li>
+        <li><b>What the model never touches:</b> mood relaxation, memory decay / rehearsal /
+            salience, the ride script, the seat's travel clamps and the action vocabulary — and a
+            throttled or failed beat is a <b>quiet beat</b>: no rule fallback, no invented
+            behaviour, the person simply sits still until the next allowed call.</li>
       </ul>
 
-      <div class="note"><b>Inner monologue:</b> the returned thought lands in
-      <code>mind._pending_thought</code> and <code>think()</code> lets it override this tick's
-      phrase-bank line — while the memory side effects of <code>think()</code> (rehearse,
+      <div class="note"><b>Inner monologue:</b> <code>examine</code> and <code>reconsider</code>
+      land in the thoughts ring through <code>think()</code> (newest on top: what the outcome
+      meant, then what he wants now), <code>say</code> becomes speech in the next snapshot, and the
+      whole beat is recorded as <code>mind.cycle</code> / popped by <code>consume_cycle()</code>
+      into the session log — while the memory side effects of <code>think()</code> (rehearse,
       rotation-flush) have already happened Python-side and stay authoritative.</div>
 
       <div class="warn"><b>Ride never breaks:</b> missing key, stopped Ollama, rate limit, garbled
-      JSON — every failure mode degrades to the deterministic rule answer for that tick and logs a
-      one-line warning. The mode is observable at any time via
+      JSON — a failed <em>decide</em> is a quiet beat (the mind sits still until the next allowed
+      call; no rule fallback, no invented behaviour); a failed <em>chat</em> still answers from the
+      rules lane but adds the honest outcome line "no seat move was made" (§08); a failed cycle
+      never crashes a tick. The mode is observable at any time via
       <code>snapshot.agent.reasoning</code>.</div>
     </div>
   </details>
 
   <!-- ================================================================ -->
   <details class="sec" id="s11">
-    <summary><span class="no">11</span>Key Parameters<span class="caret"></span></summary>
+    <summary><span class="no">11</span>Live Prompt Layer<span class="caret"></span></summary>
     <div class="body">
 
-      <h3>Persona (personas/phill.json)</h3>
+      <p>Two editable text layers frame every model call, and the sim exposes exactly
+      <b>two buttons</b> that open the real source <em>on the same page</em> — edit it in the
+      panel, press apply, and the running reasoner picks it up without restarting the ride:</p>
+
+      <table>
+        <thead><tr><th class="m">Button</th><th>Opens (the actual file)</th><th>Effect on apply</th></tr></thead>
+        <tbody>
+          <tr><td class="m">environment prompt</td><td class="desc">the ACTIVE <code>prompts/environment-*.md</code> — <b>THE WORLD</b> the model is told (the file's first line is the panel title: <code>WORLD — a fully autonomous weekend ride</code>)</td><td class="desc"><code>save()</code> writes the file; <code>reasoner.set_environment()</code> rebuilds the system prompt — the very next call sees the new world</td></tr>
+          <tr><td class="m">persona prompt</td><td class="desc">the ACTIVE <code>personas/*.py</code> — <b>WHO</b> the model is, the <code>PERSONA = {…}</code> dict, comments and all</td><td class="desc"><code>save()</code> writes the file and <code>apply_persona()</code> hot-applies the person to the <em>running</em> mind — seat targets, tolerances, talkativeness, prompt layer — without resetting the ride</td></tr>
+        </tbody>
+      </table>
+
+      <pre><code># cabin_sim/prompts.py — the loader behind both buttons
+PROMPTS_DIR  = ROOT / "prompts"      # environment-*.md   (the world)
+PERSONAS_DIR = ROOT / "personas"     # *.py (PERSONA = {...}) | *.json legacy
+
+seat_envelope()            # "rot 0..359° · height 380..460mm · …" generated
+                           #   from world.Seat — folded into EVERY decide and
+                           #   chat message (§10)
+default_environment()      # (path, text) — the world in every system prompt
+load_persona(path)         # PERSONA dict — .py via exec(), .json parsed
+list_environments() / list_personas()   # the panel's file dropdowns
+status(session)            # GET /api/prompt: active name/path, content EXACTLY
+                           #   as on disk, title / who / blurb, both choices
+save(session, kind, text)  # apply  → write file + hot-apply
+select(session, kind, name)# dropdown → switch the active file + hot-apply
+cycle(session, kind)       # legacy one click: disk edit if any, else next file</code></pre>
+
+      <h3>Transport — <code>GET / POST /api/prompt</code></h3>
+      <pre><code>GET  /api/prompt                    → prompt_files.status(session)
+                                       # under the session lock — the ticker
+                                       # may be deliberating on the same mind
+POST /api/prompt {"kind", "text"}    → save()     # the panel's apply button
+POST /api/prompt {"kind", "file"}    → select()   # the panel's dropdown
+POST /api/prompt {"kind"}            → cycle()    # the legacy single click
+# an unusable persona file answers 400 {"error": …} — never a dead ticker</code></pre>
+
+      <p>The view side is three small functions in <code>src/cognitive.js</code>:
+      <code>openPrompt(kind)</code> fetches the status and paints the panel (file dropdown,
+      the source in a textarea, the path as a note), <code>applyPromptFile()</code> posts the
+      edited text, <code>switchPromptFile(name)</code> posts the chosen file — plus the
+      titles <code>"environment prompt — the WORLD the model is told"</code> /
+      <code>"persona prompt — WHO the model is"</code>.</p>
+
+      <div class="note"><b>What moves and what never does:</b> only the prompt layer and
+      persona-derived preferences move — <code>actions.apply_llm_action()</code>, the world's
+      travel clamps and the rules/scripted path are exactly as before (§01, §10), and a missing or
+      broken file degrades (builtin text / an error payload) instead of taking the run down.
+      Ships with two worlds (<code>environment-1-weekend-ride.md</code>,
+      <code>environment-2-lounge.md</code>) and two people (<code>phill.py</code>,
+      <code>nadia.py</code>) — every one of them editable live.</div>
+    </div>
+  </details>
+
+  <!-- ================================================================ -->
+  <details class="sec" id="s12">
+    <summary><span class="no">12</span>Key Parameters<span class="caret"></span></summary>
+    <div class="body">
+
+      <h3>Persona (personas/phill.py)</h3>
       <table>
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
         <tbody>
@@ -1392,10 +1577,13 @@ cabin_sim.reasoning.py   owns WORDING and CHOICE among legal options
         <thead><tr><th class="m">Parameter</th><th class="num">Value</th><th>Meaning</th></tr></thead>
         <tbody>
           <tr><td class="m">--reasoning</td><td class="num">auto · rules · llm</td><td class="desc">auto = LLM when the provider is groq/ollama; rules = deterministic (tests); llm = force</td></tr>
-          <tr><td class="m">deliberation throttle</td><td class="num">12 s</td><td class="desc">min sim-seconds between model calls with an unchanged legal set — sized to the Groq free tier (~6K TPM), no 429 churn</td></tr>
-          <tr><td class="m">retry backoff</td><td class="num">1.5 s × 1</td><td class="desc">one retry on rate limits/errors, then rules fallback for that tick</td></tr>
+          <tr><td class="m">decide throttle</td><td class="num">12 s sim</td><td class="desc">min sim-seconds between <code>decide()</code> calls — sized to the Groq free tier (~6K TPM), no 429 churn</td></tr>
+          <tr><td class="m">shared speak/chat gap</td><td class="num">30 s wall</td><td class="desc"><code>SPEAK_GAP_S</code> — every non-priority lane (decide, speak, chat) stamps it, so they can never crowd the free tier at once; speech skips to the phrase bank instead of stalling</td></tr>
+          <tr><td class="m">retry backoff</td><td class="num">4.0 s × 1</td><td class="desc">one retry on rate limits/errors (measured: 1.5 s lands inside the same 429 window, 4 s crosses its edge), then a quiet decide beat / the honest chat degrade</td></tr>
           <tr><td class="m">MAX_THOUGHT / MAX_REPLY</td><td class="num">160 / 240 chars</td><td class="desc">validated truncation of model-generated text</td></tr>
-          <tr><td class="m">backends</td><td class="num">scripted · ollama (llama3.2) · groq (allam-2-7b)</td><td class="desc"><code>create_provider()</code>: --provider → .env → scripted fallback; groq at temperature 0.7, max 240 tokens</td></tr>
+          <tr><td class="m">backends</td><td class="num">scripted · ollama (llama3.2) · groq (allam-2-7b)</td><td class="desc"><code>create_provider()</code>: --provider → .env → scripted fallback; groq at temperature 0.7, max 240 tokens; the running setup overrides the models in <code>.env</code> (ticks <code>openai/gpt-oss-20b</code>, chat <code>gpt-oss-120b</code>)</td></tr>
+          <tr><td class="m">--chat-model / CHAT_MODEL</td><td class="num">hybrid</td><td class="desc">second backend used <em>only</em> for experimenter replies — fast model ticks, big model chats; unset = the tick model chats too</td></tr>
+          <tr><td class="m">prompt layer</td><td class="num">2 + 2 files</td><td class="desc"><code>prompts/environment-*.md</code> (world) and <code>personas/*.py</code> (people), live-swappable from the two buttons (§11)</td></tr>
         </tbody>
       </table>
 
@@ -1405,18 +1593,23 @@ cabin_sim.reasoning.py   owns WORDING and CHOICE among legal options
         <tbody>
           <tr><td class="m">--seed</td><td class="num">1</td><td class="desc">flows into <code>Session(seed=)</code> → <code>Mind.rng</code> and <code>SimEngine(seed=)</code> (§09)</td></tr>
           <tr><td class="m">--tick-dt</td><td class="num">2.0 s / step</td><td class="desc">sim seconds per decision step — 300 steps cover the 600 s ride script</td></tr>
-          <tr><td class="m">--steps / --interval / --duration</td><td class="num">300 · 1.2 s · 300 s</td><td class="desc">decision cap · wall-seconds between steps (ticker) · browser session length</td></tr>
+          <tr><td class="m">--steps (default)</td><td class="num">headless 300 · browser ∞</td><td class="desc">an explicit &gt;0 always wins; otherwise headless runs the full 600 s ride (300 steps) and the browser session is <b>unlimited</b> — it must never silently freeze mid-conversation; the banner prints <code>Session: unlimited.</code></td></tr>
+          <tr><td class="m">--interval / --duration</td><td class="num">1.2 s · inert</td><td class="desc">wall-seconds between steps (ticker); <code>--duration</code> is kept for compatibility only — session length is governed by <code>--steps</code></td></tr>
+          <tr><td class="m">--chat-model</td><td class="num">.env CHAT_MODEL</td><td class="desc">model used <em>only</em> for experimenter chat replies (hybrid, §10)</td></tr>
           <tr><td class="m">--ride-start / --port / --priors</td><td class="num">120 · 8000 · opt-in</td><td class="desc">engine phase threshold · HTTP port · priors JSON path (no file I/O without it)</td></tr>
           <tr><td class="m">view poll interval</td><td class="num">700 ms</td><td class="desc"><code>cognitive.js</code> <code>pollMs</code> (speed buttons remap it: 1600/sp ms)</td></tr>
           <tr><td class="m">schema version</td><td class="num">1 · cabin-agent.v1</td><td class="desc">the snapshot contract (<code>check()</code>-validated)</td></tr>
         </tbody>
       </table>
 
-      <div class="warn"><b>Verification:</b> <code>python -m pytest tests -q</code> → <b>78
+      <div class="warn"><b>Verification:</b> <code>python -m pytest tests -q</code> → <b>128
       passed</b> (rate tables, fit/comfort/trust worked examples, memory decay/floor/FIFO, BDI
       cooldowns &amp; preconditions, event once-only firing, mood impulses, chat routing, snapshot
-      determinism per seed, schema conformance, priors round-trip — plus 20 reasoning tests: mode
-      selection, legal-set validation, JSON/error fallbacks, chat side effects, snapshot mode).
+      determinism per seed, schema conformance, priors round-trip — plus the reasoning suite:
+      mode selection, system-prompt / environment / persona swapping, the seat envelope in every
+      message, the closed decide loop with real outcomes (as asked / clamped / refused), quiet
+      throttle beats, chat orders obeyed-now-standing-until-<code>order_done</code>, honest
+      outcome / degrade / ENDED lines, hybrid chat routing, snapshot mode).
       <code>npm run build</code> → exit 0 (this tutorial is a standalone file at the project root —
       opened directly in a browser, not part of the Vite bundle).</div>
     </div>
@@ -1424,7 +1617,7 @@ cabin_sim.reasoning.py   owns WORDING and CHOICE among legal options
 
   <footer class="kiosk">
     cabin-agent-sim · the python mind · companion to <a href="tutorial-cognitive.html">tutorial-cognitive.html</a><br>
-    mind: cabin_sim/cognition.py · reasoning: cabin_sim/reasoning.py · clock: sim.py · contract: schema.py · transport: server.py · persona: personas/phill.json · legacy view mind: src/cognitive.legacy.js<br>
+    mind: cabin_sim/cognition.py · reasoning: cabin_sim/reasoning.py · prompt layer: cabin_sim/prompts.py · clock: sim.py · contract: schema.py · transport: server.py · persona: personas/phill.py · worlds: prompts/environment-*.md · legacy view mind: src/cognitive.legacy.js<br>
     python -m pytest tests -q · python -m cabin_sim.main --server --provider scripted | ollama | groq · python -m cabin_sim.main --headless --steps 40 --seed 1 · npm run dev · npm run build
   </footer>
 </div>
