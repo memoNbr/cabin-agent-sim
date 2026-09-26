@@ -41,6 +41,9 @@ LEGACY_WEB_DIR = _ROOT / "web"
 if not (WEB_DIR / "index.html").exists():
     WEB_DIR = LEGACY_WEB_DIR
 
+# last view diagnostic posted by the page (scene state at boot)
+VIEWDIAG = {}
+
 # view axis key -> canonical seat attribute (mm/deg) and conversion
 SEAT_AXES = {"slider_mm": "slider_mm", "height_mm": "height_mm",
              "recline_deg": "recline_deg", "rotation_deg": "rotation_deg"}
@@ -124,6 +127,9 @@ class Handler(BaseHTTPRequestHandler):
             rel = "index.html" if path in ("/", "/index.html") else path
             self._serve_static(rel)
             return
+        if path == "/api/viewdiag":
+            self._json(VIEWDIAG or {"note": "no diagnostic posted yet"})
+            return
         if path == "/api/state":
             self._json(self.engine.session.state())
         elif path == "/api/snapshot":
@@ -145,6 +151,15 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         data = self._read_json()
 
+        if path == "/api/viewdiag":
+            # the view reports its own scene state (is the loop alive? is
+            # the rig finite? is the camera inside?) so "the seat and the
+            # avatar are invisible" can be answered with numbers
+            global VIEWDIAG
+            VIEWDIAG = data or {}
+            VIEWDIAG["_at"] = time.time()
+            self._json({"ok": True})
+            return
         if path == "/api/chat":
             if data.get("clear"):
                 engine = self.engine

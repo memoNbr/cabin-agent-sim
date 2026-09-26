@@ -1077,7 +1077,12 @@
   if (!cogLive || typeof cogLive !== "object") { cogLive = {}; window.__COG_LIVE__ = cogLive; }
   if (!cogLive.mood) cogLive.mood = {};
   if (!cogLive.ride) cogLive.ride = {};
-  if (!cogLive.seat) cogLive.seat = {};
+  /* NOTE: deliberately NO `cogLive.seat = {}` placeholder here. The view
+     reads window.__COG_LIVE__.seat and treats a missing key as "no data
+     yet" — an EMPTY object is truthy, so it sailed past that check and
+     `+undefined` wrote NaN into the seat rig, which killed the seat AND
+     its child avatar for the whole session. publishCog() creates the
+     object with all three finite values in one synchronous block. */
   if (!cogLive.persona || typeof cogLive.persona !== "object") cogLive.persona = {};
   var cogPriors = { rides: 0, trust: null };
   cogLive.priors = cogPriors;

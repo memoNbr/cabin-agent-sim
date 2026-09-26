@@ -166,6 +166,43 @@ function boot() {
     cabinApi.seatRig = seatMount;
     cabinApi.agentMount = seatMount;
 
+    /* Live view diagnostics: main.js posts this to /api/viewdiag a few
+       seconds after boot so "the seat and avatar are invisible" can be
+       answered with numbers (is the loop alive? is the rig finite? is the
+       camera outside? is the seat toggled off?) instead of guesses. */
+    cabinApi.viewDiag = function () {
+      function v3(v) {
+        if (!v) return null;
+        var a = [v.x, v.y, v.z].map(function (n) {
+          return (typeof n === "number" && isFinite(n)) ? +n.toFixed(3) : "NaN";
+        });
+        return a;
+      }
+      return {
+        frames: window.__CABIN_FRAMES__ || 0,
+        seatSysOn: !!seatSysOn,
+        seatParts: seatParts.length,
+        seatVisible: seatParts.map(function (m) { return !!m.visible; }),
+        seatCtl: { hgt: seatCtl.hgt, rot: seatCtl.rot, lat: seatCtl.lat,
+                    lng: seatCtl.lng },
+        seatGoal: { hgt: seatGoal.hgt, rot: seatGoal.rot },
+        seatPos: v3(seatMount.position),
+        seatRotY: isFinite(seatMount.rotation.y)
+          ? +seatMount.rotation.y.toFixed(3) : "NaN",
+        avatarPhase: avPhase,
+        avatarInScene: !!avRoot,
+        avatarVisible: avRoot ? !!avRoot.visible : false,
+        avatarParent: avRoot && avRoot.parent ? avRoot.parent.name || "?" : "none",
+        avatarPos: v3(avRoot ? avRoot.position : null),
+        mode: state.mode,
+        camPos: v3(camera.position),
+        camTarget: v3(controls.target),
+        photoOn: !!(photoEl && photoEl.classList.contains("on")),
+        interiorChildren: interior.children.length,
+        renderer: renderer.getContext() ? "webgl-ok" : "no-context"
+      };
+    };
+
     /* -- material helpers -------------------------------------------------- */
     function mat(color, rough) {
       return new THREE.MeshStandardMaterial({
@@ -1089,7 +1126,13 @@ function boot() {
       var v = parseFloat(simSpeedEl.value);
       state.simSpeed = v > 0 ? v : 1;
     });
-    if (simSeatEl) simSeatEl.addEventListener("click", focusSeat);
+    if (simSeatEl) simSeatEl.addEventListener("click", function () {
+      /* "seat" means SHOW ME THE SEAT: if the seat system was toggled off
+         the camera would fly in to an empty frame and the button would look
+         dead - so bring the seat back with it. */
+      if (!seatSysOn) setSeatSystem(true);
+      focusSeat();
+    });
 
     /* ---- adjustable seat: on/off + height / rotation / lateral / longi-
        tudinal. Sliders write cabinApi.seatMount position (x = lateral rail,
@@ -1125,6 +1168,13 @@ function boot() {
       var s = C && C.seat;
       if (!s) return;
       var h = +s.hgt, r = +s.rot, l = +s.sl;
+      /* A half-published or non-numeric sample must never reach the rig.
+         One NaN here is unrecoverable: every downstream test compares with
+         < or === against NaN, which is always false, so the rig (and the
+         avatar parented to it) would stay invisible for the whole session.
+         The empty-object case is fixed at the source in cognitive.js; this
+         keeps the boundary honest. */
+      if (!isFinite(h) || !isFinite(r) || !isFinite(l)) return;
       if (h === seatGoal.hgt && r === seatGoal.rot && l === seatGoal.lng) return;
       seatGoal.hgt = h; seatGoal.rot = r; seatGoal.lng = l;  /* rig glides (glideSeat) */
       if (seatHgtEl) seatHgtEl.value = h;
@@ -1158,6 +1208,16 @@ function boot() {
        20°, never 340°. The seated avatar, the stretching pedestal and the
        numeric readouts all ride updateSeat(), so they follow the glide. */
     function glideSeat(dt) {
+      /* re-anchor first: a pose that went non-finite (a bad sample from an
+         older build) can never satisfy the "close enough" test below, so it
+         would propagate NaN forever. With a sound goal, adopt it at once. */
+      if (!isFinite(seatCtl.hgt) || !isFinite(seatCtl.rot)
+          || !isFinite(seatCtl.lat) || !isFinite(seatCtl.lng)) {
+        seatCtl.hgt = seatGoal.hgt; seatCtl.rot = seatGoal.rot;
+        seatCtl.lat = seatGoal.lat; seatCtl.lng = seatGoal.lng;
+        updateSeat();
+        return;
+      }
       var k = 1 - Math.exp(-dt / SEAT_TAU);
       var dRot = ((seatGoal.rot - seatCtl.rot) % 360 + 540) % 360 - 180;
       var dh = seatGoal.hgt - seatCtl.hgt;
@@ -1373,6 +1433,9 @@ function boot() {
       renderer.render(scene, camera);
       state.camPos = camera.position.toArray();
       state.target = controls.target.toArray();
+      /* frame COMPLETE: the counter sits at the end on purpose — a throw
+         anywhere above skips it, so main.js can see a dead loop */
+      window.__CABIN_FRAMES__ = (window.__CABIN_FRAMES__ || 0) + 1;
       if (!ticked) { ticked = true; console.log("animate tick"); }
     }
     requestAnimationFrame(animate);
