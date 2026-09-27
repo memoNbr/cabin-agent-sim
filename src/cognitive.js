@@ -1077,12 +1077,15 @@
   if (!cogLive || typeof cogLive !== "object") { cogLive = {}; window.__COG_LIVE__ = cogLive; }
   if (!cogLive.mood) cogLive.mood = {};
   if (!cogLive.ride) cogLive.ride = {};
-  /* NOTE: deliberately NO `cogLive.seat = {}` placeholder here. The view
-     reads window.__COG_LIVE__.seat and treats a missing key as "no data
-     yet" — an EMPTY object is truthy, so it sailed past that check and
-     `+undefined` wrote NaN into the seat rig, which killed the seat AND
-     its child avatar for the whole session. publishCog() creates the
-     object with all three finite values in one synchronous block. */
+  /* The seat object must EXIST here, because the publisher further down assigns
+     into it unconditionally (cogLive.seat.rot = ...). It must NOT be `{}`:
+     an empty object is truthy, so the view's "no data yet" check sailed past it
+     and `+undefined` wrote NaN into the seat rig, killing the seat AND its
+     child avatar for the whole session. So: create it with the same finite
+     defaults the view uses for its own local seat, never empty, never absent. */
+  if (!cogLive.seat || typeof cogLive.seat !== "object") {
+    cogLive.seat = { rot: 90, hgt: 38, sl: 3 };
+  }
   if (!cogLive.persona || typeof cogLive.persona !== "object") cogLive.persona = {};
   var cogPriors = { rides: 0, trust: null };
   cogLive.priors = cogPriors;
