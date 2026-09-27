@@ -66,6 +66,13 @@ class SimEngine:
     def phase(self) -> str:
         if self.done:
             return "done"
+        # The ride is a FIXED, scripted window (setup -> ride -> done). Only the
+        # Mind knew where it ended, so the engine - which is what the snapshot
+        # and therefore the view read - reported "ride" forever, and the view's
+        # RIDE chip never left that state.
+        ride_end = getattr(self.mind, "ride_end", None)
+        if ride_end is not None and self.t >= ride_end:
+            return "done"
         if self.ride_start is not None and self.t >= self.ride_start:
             return "ride"
         return "setup"

@@ -67,9 +67,21 @@ class Session:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
+    def ride_complete(self) -> bool:
+        """True once the scripted ride window has passed.
+
+        This is an END, not a timeout. The MDMT questionnaire is the only trust
+        measure the experiment has, so finish() must run when the ride ends or
+        the run produces no outcome at all. Nothing used to stop the session
+        here: with the server's unlimited max_steps it ticked forever, the
+        questionnaire never fired, and done never became true.
+        """
+        return self.mind.t >= self.mind.ride_end
+
     def _run(self):
         deadline = time.monotonic() + self.duration if self.duration > 0 else None
         while (self.step < self.max_steps and not self.done and
+               not self.ride_complete() and
                (deadline is None or time.monotonic() < deadline)):
             self.step_once()
             if self.step_interval:

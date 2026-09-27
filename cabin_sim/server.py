@@ -307,6 +307,14 @@ def serve(engine, port=8000, interval=1.2):
             eng = httpd.engine
             if eng.running and not eng.done:
                 eng.tick(1)
+                # The end of the scripted ride is an END, not a timeout: finish
+                # the session so the MDMT questionnaire is administered exactly
+                # once and the run reports done. Done outside the session lock
+                # on purpose - finish() takes it, and tick() may hold it for
+                # the length of a model call.
+                sess = getattr(eng, "session", None)
+                if sess is not None and not eng.done and sess.ride_complete():
+                    sess.finish()
             time.sleep(interval)
 
     thread = threading.Thread(target=ticker, daemon=True)
