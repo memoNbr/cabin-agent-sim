@@ -45,14 +45,37 @@ window.addEventListener("unhandledrejection", function (ev) {
    window.__CABIN_FRAMES__ — watch THAT (a separate rAF chain here would
    keep ticking even when cabin.js is dead, proving nothing). */
 (function () {
+  /* Two things look exactly like a frozen canvas and are not:
+
+     1. a backgrounded tab — rAF is throttled to a stop by design;
+     2. an automated headless capture, where the clock is virtual: timers
+        fast-forward while rAF only advances on real compositor frames, so
+        "three seconds with no frame" elapses in milliseconds.
+
+     Both would paint a red "the canvas is frozen" banner over a cockpit
+     that is working perfectly, which is worse than no watchdog at all. So
+     measure once whether this page's clock is honest, and only judge the
+     loop when it is. */
+  var realClock = true;
+  (function probe() {
+    var t0 = performance.now();
+    setTimeout(function () {
+      /* asked for 1000ms, got back in under 400ms => the clock is virtual */
+      if (performance.now() - t0 < 400) realClock = false;
+    }, 1000);
+  })();
+
   var lastCount = -1, lastChange = performance.now();
   (function watch() {
     var n = window.__CABIN_FRAMES__ || 0;
     if (n !== lastCount) { lastCount = n; lastChange = performance.now(); }
-    else if (performance.now() - lastChange > 3000 && n > 0) {
+    else if (realClock && document.visibilityState === "visible" &&
+             performance.now() - lastChange > 3000 && n > 0) {
       showViewError("render loop stopped for " +
         Math.round((performance.now() - lastChange) / 1000) + "s",
         "cabin.js stopped calling requestAnimationFrame — the canvas is frozen");
+    } else if (n === lastCount) {
+      lastChange = performance.now();   /* hidden or virtual clock: forgive */
     }
     setTimeout(watch, 1000);
   })();

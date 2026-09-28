@@ -37,10 +37,8 @@ var photoEl = document.getElementById("scenePhoto");
 /* ---- simulation control bar (bottom-center kiosk strip) ---------------- */
 var simToggleEl = document.getElementById("simToggle");
 var simClockEl = document.getElementById("simClock");
-var simJumpEl = document.getElementById("simJump");
-var simGoEl = document.getElementById("simGo");
 var simSpeedEl = document.getElementById("simSpeed");
-var simSeatEl = document.getElementById("simSeat");
+var simCabinEl = document.getElementById("simCabin");
 var avatarBtn = document.getElementById("simAvatar");
 
 /* ---- adjustable seat controls (on/off toggle + 4 sliders, sim bar) ----- */
@@ -62,7 +60,7 @@ var state = (window.__CABIN3D__ = {
   error: null,
   webgl: false,
   revision: THREE.REVISION,
-  mode: "interior",
+  mode: "exterior",        /* Item 1: open on the whole-vehicle shot */
   roof: true,
   photo: false,
   simRunning: true,
@@ -105,14 +103,6 @@ function fmtTime(sec) {
   var r = s % 60;
   return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
 }
-function parseTime(str) {
-  str = String(str === null || str === undefined ? "" : str).trim();
-  if (!str) return null;
-  var m = /^(\d{1,4}):([0-5]?\d)$/.exec(str);
-  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  if (/^\d{1,5}$/.test(str)) return parseInt(str, 10);
-  return null;
-}
 function mod68(v) {
   var m = v % 68;
   return m < 0 ? m + 68 : m;
@@ -146,7 +136,11 @@ function boot() {
         target: new THREE.Vector3(0, 0.72, 0)
       }
     };
-    camera.position.copy(HOME.interior.pos);
+    /* Item 1: the session OPENS on the establishing shot — the whole
+       vehicle, so you know what you are looking at before you go in. The
+       walk-out / [C] keys and the seat button still take you inside. */
+    var ESTABLISH = "exterior";
+    camera.position.copy(HOME[ESTABLISH].pos);
 
     /* Seat mount point for the avatar — a bare Object3D, no rig; it also
        carries the adjustable seat meshes (see below), so slider changes land
@@ -956,7 +950,13 @@ function boot() {
     controls.minDistance = 0.25;
     controls.maxDistance = 22;
     controls.maxPolarAngle = Math.PI * 0.52;
-    controls.target.copy(HOME.interior.target);
+    /* The session OPENS on the establishing shot, so the controls must aim
+       at the establishing target too. This used to be set to the interior
+       target while the camera sat at the exterior position — a half-applied
+       framing that put the vehicle slightly off-centre and meant something
+       other than an explicit view control was choosing where the camera
+       looked. The interior target is re-applied by setMode("interior"). */
+    controls.target.copy(HOME[ESTABLISH].target);
     controls.update();
     cabinApi.controls = controls;
     cabinApi.renderer = renderer;
@@ -974,12 +974,15 @@ function boot() {
       camera.position.y = Math.min(BOUND.yHi, Math.max(BOUND.yLo, camera.position.y));
       camera.position.z = Math.min(BOUND.zHi, Math.max(BOUND.zLo, camera.position.z));
     }
-    function setMode(m) {
+    function setMode(m, keepPose) {
       if (m !== "interior" && m !== "exterior") return;
       if (camAnim) endCamAnim();   /* C pressed mid-flight: land, solidify shell */
       state.mode = m;
-      camera.position.copy(HOME[m].pos);
-      controls.target.copy(HOME[m].target);
+      /* keepPose: the caller already placed the camera (reset view) */
+      if (!keepPose) {
+        camera.position.copy(HOME[m].pos);
+        controls.target.copy(HOME[m].target);
+      }
       controls.update();
       if (camBtn) camBtn.className = "btn" + (m === "exterior" ? " on" : "");
     }
@@ -1017,9 +1020,11 @@ function boot() {
     }
     function resetView() {
       if (camAnim) endCamAnim();
-      camera.position.copy(HOME[state.mode].pos);
-      controls.target.copy(HOME[state.mode].target);
-      if (state.mode === "interior") clampCam();
+      /* "reset view" is reproducible: it always returns to the SAME
+         establishing shot the session opened on, whatever you were in. */
+      camera.position.copy(HOME[ESTABLISH].pos);
+      controls.target.copy(HOME[ESTABLISH].target);
+      setMode(ESTABLISH, true);
       controls.update();
     }
 
@@ -1126,12 +1131,14 @@ function boot() {
       var v = parseFloat(simSpeedEl.value);
       state.simSpeed = v > 0 ? v : 1;
     });
-    if (simSeatEl) simSeatEl.addEventListener("click", function () {
-      /* "seat" means SHOW ME THE SEAT: if the seat system was toggled off
-         the camera would fly in to an empty frame and the button would look
-         dead - so bring the seat back with it. */
+    if (simCabinEl) simCabinEl.addEventListener("click", function () {
+      /* "cabin" means SHOW ME THE CABIN: the wide establishing shot — the
+         whole vehicle on the road, the same framing the session opens on.
+         It is a view control and changes nothing about the seat or the ride.
+         If the seat system was toggled off, the shot would be an empty
+         frame, so bring the seat back with it. */
       if (!seatSysOn) setSeatSystem(true);
-      focusSeat();
+      resetView();
     });
 
     /* ---- adjustable seat: on/off + height / rotation / lateral / longi-
@@ -1198,10 +1205,18 @@ function boot() {
       seatMount.rotation.y = THREE.MathUtils.degToRad(seatCtl.rot);
       pedestal.scale.y = 0.14 + seatMount.position.y;
       pedestal.position.y = (0.38 - seatMount.position.y) / 2;
-      if (seatHgtV) seatHgtV.textContent = String(seatCtl.hgt);
-      if (seatRotV) seatRotV.textContent = seatCtl.rot + "\u00b0";
-      if (seatLatV) seatLatV.textContent = String(seatCtl.lat);
-      if (seatLngV) seatLngV.textContent = (seatCtl.lng > 0 ? "+" : "") + seatCtl.lng;
+      /* The rig value is CONTINUOUS on purpose — glideSeat eases it toward
+         the goal so the seat moves smoothly rather than snapping, which means
+         mid-glide it is a long float (78.0106327243011). That is correct for
+         the animation and unreadable as a caption, so round ONLY what the
+         captain reads; the underlying value stays smooth for the glide. */
+      if (seatHgtV) seatHgtV.textContent = String(Math.round(seatCtl.hgt));
+      if (seatRotV) seatRotV.textContent = Math.round(seatCtl.rot) + "\u00b0";
+      if (seatLatV) seatLatV.textContent = String(Math.round(seatCtl.lat));
+      if (seatLngV) {
+        var lngR = Math.round(seatCtl.lng);
+        seatLngV.textContent = (lngR > 0 ? "+" : "") + lngR;
+      }
     }
     /* ease the rig toward the goal: exponential approach (frame-rate
        independent), rotation along the SHORTEST arc so 350° -> 10° spins
@@ -1261,26 +1276,33 @@ function boot() {
       for (var i = 0; i < seatParts.length; i++) seatParts[i].visible = seatSysOn;
       if (seatSysEl) seatSysEl.classList.toggle("gone", !seatSysOn);
       if (seatVisEl) {
-        seatVisEl.textContent = seatSysOn ? "seat on" : "seat off";
+        /* same wording as the markup, so the button does not change its
+           vocabulary the first time it is pressed */
+        seatVisEl.textContent = seatSysOn ? "seat visible" : "seat hidden";
         seatVisEl.className = "kbtn" + (seatSysOn ? " on" : "");
       }
     }
     if (seatVisEl) seatVisEl.addEventListener("click", function () {
+      /* Showing or hiding the seat must NOT move the camera. This used to call
+         focusSeat() on re-enable, so toggling the seat inside the Parameters
+         panel silently flew the view into the cabin — the captain's exact
+         complaint: "I don't want my camera view to change when I toggle in and
+         out the seat." Camera framing now changes ONLY from an explicit view
+         control: the cabin button, reset view, walk-out, [C], or a click on
+         the seat in the 3D scene. */
       setSeatSystem(!seatSysOn);
-      if (seatSysOn) focusSeat();
     });
     updateSeat();
-    var jumpGo = function () {
-      var t = parseTime(simJumpEl && simJumpEl.value);
-      if (t === null) return;
-      state.simTime = t;
-      paintClock(true);
-      if (simJumpEl) simJumpEl.value = "";
-    };
-    if (simGoEl) simGoEl.addEventListener("click", jumpGo);
-    if (simJumpEl) simJumpEl.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); jumpGo(); }
-    });
+    /* The old "go" button and its mm:ss field are GONE, deliberately.
+
+       They were never a play/resume control — that is the primary toggle's
+       job, and its own label switches stop<->start. "go" was a jump-to-time
+       control, and it never worked: it assigned state.simTime, which is the
+       VIEW's decorative animation clock (it drives the road dashes and the
+       centre-line posts), not the ride. So typing a time moved the mm:ss
+       readout and the road scroll and nothing else — which is exactly why
+       it read as broken. Deleting the field with it avoids leaving an input
+       that no longer does anything. */
 
     /* clicking the seat in 3D — tap (not orbit-drag) raycasts the scene; the
        shell blocks clicks from outside, the nearest seat part selects */

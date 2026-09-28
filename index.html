@@ -5,11 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CABIN AGENT SIM — SUV · Cognitive Agent in an Automated Vehicle</title>
 <style>
+  /* ==================================================================
+     PASTEL SYSTEM (amendment item 3)
+
+     THE ONE RULE: pastels are FILLS, never TEXT.
+     Every glyph on this page — and above all every number, which is data —
+     is --ink or --ink-2, dark slate on a light base. A pastel may sit behind
+     a value, tint a border, or mark a tab, but it is never allowed to become
+     the colour of the value itself. That is what keeps the clock, the speed
+     and the seat figures readable no matter how pale the chrome gets.
+     Contrast of --ink on --bg is ~13:1; on the palest accent fill ~8:1.
+
+     Semantic accent map — one accent per function, used everywhere:
+       transport .... graphite  (chrome, deliberately not a "colour")
+       mind ......... mint
+       seat ......... butter
+       prompts ...... blush
+       music ........ periwinkle
+       chat ......... sky
+     ================================================================== */
   :root{
-    --bg:#0B0A07; --panel:#13100A; --panel2:#181307; --panel3:#0F0D08;
-    --ink:#FAF6EE; --muted:#8A8578; --faint:#5C5749;
-    --gold:#C9A227; --gold-hi:#E6C85A; --gold-dim:#6B5520; --line:#2A2416;
-    --danger:#C25A3C; --ok:#7FC97F; --teal:#6BD5C0;
+    /* base — warm off-white with a faint lavender cast */
+    --bg:#F6F4F1; --bg2:#EFEBF6;
+    --panel:#FFFFFF; --panel2:#FBF9FD; --panel3:#F1EEF7;
+    --glass:rgba(255,255,255,.74);
+    --glass-2:rgba(255,255,255,.88);
+
+    /* ink — the ONLY text colours. Dark, and dark on purpose. */
+    --ink:#221F2B;          /* primary text + every data value  ~13:1 on --bg */
+    --ink-2:#4E4A5C;        /* secondary prose                    ~7.4:1  */
+    --ink-3:#575162;        /* quietest labels only      7.6:1 on white,
+                                 5.0:1 even on the palest tint */
+
+    /* pastel accents, as fills */
+    --mint:#A8DCCB;      --mint-d:#3E8C79;
+    --blush:#F6C6CE;     --blush-d:#B4546A;
+    --butter:#F7E0A0;    --butter-d:#8A6A12;
+    --peri:#C6C6F0;      --peri-d:#5B58A8;
+    --sky:#B4DCF2;       --sky-d:#2F7396;
+    --graphite:#DED9E4;  --graphite-d:#3A3548;
+
+    --line:rgba(34,31,43,.13);
+    --line-2:rgba(34,31,43,.07);
+    --shadow-sm:0 1px 2px rgba(60,50,90,.07), 0 2px 6px rgba(60,50,90,.05);
+    --shadow-md:0 2px 6px rgba(60,50,90,.07), 0 10px 28px rgba(60,50,90,.10);
+    --shadow-lg:0 6px 16px rgba(60,50,90,.09), 0 22px 54px rgba(60,50,90,.14);
+
+    /* state — used as fills, never as the sole carrier of meaning */
+    --ok-d:#2F7D4F; --warn-d:#8A6A12; --danger-d:#B03A2E;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
@@ -60,7 +103,8 @@
   .viewer-hint.gone{opacity:0;}
   .viewer-hint kbd{background:#0F0D08; border:1px solid var(--gold-dim); border-radius:4px; padding:0 6px;
     font-family:Consolas,monospace; font-size:10px; color:var(--gold-hi);}
-  .viewer-tools{position:absolute; right:14px; top:50px; z-index:6; display:flex; flex-direction:column;
+  /* viewer controls sit clear of the right-hand tab strip (item 2) */
+  .viewer-tools{position:absolute; right:58px; top:50px; z-index:6; display:flex; flex-direction:column;
     gap:6px; align-items:flex-end;}
   .viewer-tools .btn{padding:5px 11px; font-size:10px; letter-spacing:.1em;}
   .viewer-tools .btn.on{background:var(--gold); color:var(--bg); font-weight:700;}
@@ -70,9 +114,14 @@
     pointer-events:none;}
   .viewer-status.gone{display:none;}
   .viewer-status.err{color:var(--danger); border-color:var(--danger);}
-  .scene-card h3{position:absolute; top:12px; left:16px; z-index:6; font-size:11px; letter-spacing:.22em;
-    color:rgba(238,233,215,.92); text-transform:uppercase; display:flex; gap:14px; align-items:center;
-    text-shadow:0 1px 4px rgba(0,0,0,.8); pointer-events:none;}
+  /* The caption sits ON the 3D scene, which is dark, so it keeps light text
+     for contrast. It is no longer allowed to name a theme: the old wording
+     ("black/white monochrome", then "coral noir") described palettes that
+     stopped existing. It now just says what this is. */
+  .scene-card h3{position:absolute; top:14px; left:18px; z-index:6; font-size:12px;
+    letter-spacing:.14em; font-weight:700;
+    color:rgba(255,255,255,.94); text-transform:uppercase; display:flex; gap:14px; align-items:center;
+    text-shadow:0 1px 5px rgba(0,0,0,.75); pointer-events:none;}
   .scene-stage{position:absolute; inset:0; z-index:4; pointer-events:none;}
   .scene-photo{position:absolute; inset:0; z-index:5; display:none; background:#0B0A07;}
   .scene-photo img{width:100%; height:100%; object-fit:cover; display:block; filter:grayscale(1) contrast(1.04);}
@@ -116,8 +165,8 @@
   /* ride row: phase chip + speed + g-force (window.__COG_LIVE__.ride) */
   .cog-hud .ch-ride{display:flex; align-items:center; gap:8px; margin-bottom:7px;
     font-size:9.5px; color:#9a9a9a; font-variant-numeric:tabular-nums; white-space:nowrap;}
-  .cog-hud .ch-ride .num{color:#e6e6e6; font-weight:600;}
-  .cog-hud .ch-ride .g{color:#9a9a9a;}
+  .cog-hud .ch-ride .num{color:var(--ink); font-weight:700;}
+  .cog-hud .ch-ride .g{color:var(--ink-2); font-weight:600;}
   .cog-hud .ch-phase{padding:1px 7px; border:1px solid #444; border-radius:999px;
     color:#9a9a9a; letter-spacing:.16em; font-size:8.5px;}
   .cog-hud .ch-phase.setup{border-color:#5a4a1f; color:#d9b44a;}
@@ -126,10 +175,10 @@
   .cog-hud .ch-phase.paused{border-color:#444; color:#8f8f8f;}
   .cog-hud .ch-row{display:flex; align-items:baseline; justify-content:space-between; gap:12px;
     margin-bottom:6px;}
-  .cog-hud .ch-k{font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; color:#7d7d7d;}
+  .cog-hud .ch-k{font-size:8.5px; letter-spacing:.06em; text-transform:none; color:var(--ink-2); font-weight:600;}
   .cog-hud .ch-bars{display:flex; flex-direction:column; gap:5px;}
   .cog-hud .ch-bar{display:grid; grid-template-columns:58px 1fr 30px; gap:8px; align-items:center;}
-  .cog-hud .ch-bar .k{font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:#7d7d7d;}
+  .cog-hud .ch-bar .k{font-size:8.5px; letter-spacing:.06em; text-transform:none; color:var(--ink-2); font-weight:600;}
   .cog-hud .ch-bar .track{height:5px; background:#1b1b1e; border:1px solid #2c2c2c;
     border-radius:3px; overflow:hidden;}
   .cog-hud .ch-bar.gauge .track{height:7px;}   /* trust reads as the gauge of the panel */
@@ -137,7 +186,7 @@
     border-radius:2px; transition:width .45s ease;}
   .cog-hud .ch-bar .fill.energy{background:var(--teal);}
   .cog-hud .ch-bar .fill.susp{background:var(--danger);}
-  .cog-hud .ch-bar b{font-size:9.5px; font-weight:600; color:#e6e6e6; text-align:right;
+  .cog-hud .ch-bar b{font-size:9.5px; font-weight:600; color:var(--ink); text-align:right;
     font-variant-numeric:tabular-nums;}
 
   /* ---- German trap player: bottom-right of the scene card ---- */
@@ -373,10 +422,16 @@
     padding:10px; border-radius:8px; font:12px/1.5 "Consolas",monospace; resize:vertical; min-height:44px;}
   .lav .btn{margin-top:8px;}
 
-  /* ================= kiosk mode: black/gray, cabin canvas full-screen ================= */
-  :root{--bg:#000; --panel:#0d0d0d; --line:#222;
-    --ink:#e8e8e8; --muted:#999; --faint:#5a5a5a;
-    --gold:#9a9a9a; --gold-hi:#d6d6d6; --gold-dim:#4a4a4a; --danger:#b35a5a; --ok:#8c8c8c; --teal:#8c8c8c;}
+  /* ================= kiosk mode: cabin canvas full-screen =================
+     Kiosk mode is unconditional (this page IS the cockpit), so this block
+     used to be the palette that actually won. Under the amendment it no
+     longer overrides the base — it only states the full-screen geometry.
+     The one thing it must not do is reintroduce a dark base. */
+  :root{
+    --bg:#F6F4F1; --panel:#FFFFFF; --panel2:#FBF9FD; --panel3:#F1EEF7;
+    --ink:#221F2B; --muted:#4E4A5C; --faint:#575162;
+    --line:rgba(34,31,43,.13);
+  }
   header, .topctl, .grid, footer, #summary, #trustQ{display:none !important;}
   .wrap{max-width:none; padding:0;}
   .scene-band{max-width:none; padding:0;}
@@ -386,8 +441,14 @@
   #sceneCv{display:none;}
   .event-banner{display:none !important;}
   /* monochrome floating controls */
-  .viewer-tools .btn{background:rgba(16,16,16,.65); border:1px solid #3a3a3a; color:#c9c9c9; backdrop-filter:blur(3px);}
-  .viewer-tools .btn:hover{background:#cfcfcf; color:#000; border-color:#cfcfcf;}
+  /* view buttons join the pastel system (amendment item 4) — they were the
+     last dark-glass cluster on the page and read as a different UI */
+  .viewer-tools .btn{background:var(--glass-2); border:1px solid var(--line);
+    color:var(--ink); backdrop-filter:blur(10px); box-shadow:var(--shadow-sm);
+    border-radius:10px; font-size:11.5px; font-weight:600; letter-spacing:.01em;
+    padding:6px 12px; text-transform:none;}
+  .viewer-tools .btn:hover{background:#fff; color:var(--ink); box-shadow:var(--shadow-md);}
+  .viewer-tools .btn:focus-visible{outline:2px solid var(--peri-d); outline-offset:2px;}
   .viewer-tools .btn.on{background:#cfcfcf; color:#000; border-color:#cfcfcf; font-weight:700;}
   .viewer-hint{color:#b8b8b8; background:rgba(8,8,8,.55); border:1px solid #333;}
   .viewer-hint kbd{background:#111; border:1px solid #484848; color:#ddd;}
@@ -455,40 +516,298 @@
   .seat-lbl input[type=range]:focus{border-color:#888;}
   .seat-val{font-size:10px; color:#e2e2e2; min-width:30px; text-align:right; letter-spacing:.02em;}
 
-  /* ---- experimenter chat: floating bottom-right, black/gray kiosk ------ */
-  .xp-chat{position:absolute; right:14px; bottom:14px; z-index:9;
-    display:flex; flex-direction:column; align-items:flex-end; gap:8px; pointer-events:none;}
-  .xp-fab{pointer-events:auto; width:38px; height:38px; border-radius:50%;
-    background:rgba(12,12,14,.9); border:1px solid #3a3a3a; color:#cfcfcf; font-size:15px;
-    line-height:1; cursor:pointer; backdrop-filter:blur(3px); transition:all .16s; padding:0;}
-  .xp-fab:hover{background:#cfcfcf; color:#000; border-color:#cfcfcf;}
-  .xp-panel{pointer-events:auto; display:none; width:400px; max-width:calc(100vw - 28px);
-    flex-direction:column; background:rgba(10,10,12,.94); border:1px solid #333;
-    border-radius:10px; overflow:hidden; box-shadow:0 14px 34px rgba(0,0,0,.55);
-    backdrop-filter:blur(6px); font:11px/1.45 ui-monospace, Consolas, monospace;}
-  .xp-chat.open .xp-panel{display:flex;}
-  .xp-head{display:flex; align-items:center; justify-content:space-between; padding:7px 10px;
-    border-bottom:1px solid #2c2c2c; font-size:9px; letter-spacing:.22em;
-    text-transform:uppercase; color:#8f8f8f; user-select:none;}
-  .xp-close{background:none; border:0; color:#8f8f8f; font-size:12px; cursor:pointer; padding:0 2px;}
-  .xp-close:hover{color:#e6e6e6;}
-  .xp-log{display:flex; flex-direction:column; gap:5px; min-height:60px; max-height:300px;
-    overflow-y:auto; padding:8px 10px; scrollbar-width:thin; scrollbar-color:#444 transparent;}
-  .xp-log:empty::before{content:"no messages yet — type below to reach the agent";
-    color:#555; font-size:10px; letter-spacing:.03em;}
-  .xp-msg{font-size:11px; color:#c8c8c8; word-break:break-word; white-space:pre-wrap;}
-  .xp-msg b{color:#e8e8e8; font-weight:600; letter-spacing:.04em;}
-  .xp-msg.xp-ag{color:#a9aab2;}
-  .xp-msg.xp-ag b{color:#8f9099;}
-  .xp-row{display:flex; gap:6px; padding:9px 10px; border-top:1px solid #2c2c2c;}
-  .xp-in{flex:1; min-width:0; background:#0b0b0d; border:1px solid #3a3a3a; color:#ddd;
-    border-radius:5px; padding:8px 10px; font:inherit; font-size:12px; resize:none;
-    line-height:1.45; max-height:88px; overflow-y:auto;}
-  .xp-in::placeholder{color:#666;}
-  .xp-in:focus{outline:none; border-color:#888;}
-  .xp-send{background:#141416; border:1px solid #3a3a3a; color:#cfcfcf; border-radius:5px;
-    padding:0 13px; font:inherit; font-size:11px; letter-spacing:.06em; cursor:pointer; transition:all .15s;}
-  .xp-send:hover{background:#cfcfcf; color:#000; border-color:#cfcfcf;}
+  /* ---- experimenter chat: now docked at the bottom (item 5) -------------
+     The old floating-circle chat (.xp-chat / .xp-fab / .xp-panel) is gone;
+     its rules went with it. The live styles are further down, in the
+     BOTTOM DOCK section. */
+
+  /* ================= RIGHT-HAND PANEL COLUMN (item 2) =================
+     A tab strip pinned to the right edge. One pane open at a time; the
+     pane sits to the LEFT of the strip so the strip stays clickable and
+     it is obvious which pane is open. Everything starts closed. */
+  .rail{position:absolute; top:0; right:0; bottom:0; z-index:9; pointer-events:none;
+    display:flex; align-items:stretch;}
+  .rail-tabs{pointer-events:auto; display:flex; flex-direction:column; justify-content:center;
+    gap:7px; padding:12px 8px;
+    background:linear-gradient(90deg,rgba(246,244,241,0) 0%,rgba(246,244,241,.72) 26%,rgba(246,244,241,.9) 100%);
+    border-left:1px solid var(--line-2);}
+  /* each tab wears its function's pastel; the open one goes deep so "what is
+     open" is unmistakable at a glance */
+  .rail-tab{writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg);
+    background:var(--tint,var(--panel2)); border:1px solid transparent; color:var(--ink);
+    font-family:inherit; font-size:11px; font-weight:700; line-height:1;
+    letter-spacing:.1em; text-transform:lowercase; padding:14px 8px;
+    border-radius:10px 0 0 10px; cursor:pointer; backdrop-filter:blur(6px);
+    box-shadow:var(--shadow-sm);
+    transition:filter .16s, box-shadow .16s, transform .16s;}
+  .rail-tab[data-pane="mind"]{--tint:var(--mint);}
+  .rail-tab[data-pane="parameters"]{--tint:var(--butter);}
+  .rail-tab[data-pane="prompts"]{--tint:var(--blush);}
+  .rail-tab[data-pane="music"]{--tint:var(--peri);}
+  .rail-tab[data-pane="chat"]{--tint:var(--sky);}
+  .rail-tab:hover{filter:brightness(.97); box-shadow:var(--shadow-md); transform:translateX(-2px);}
+  .rail-tab:focus-visible{outline:2px solid var(--peri-d); outline-offset:2px;}
+  .rail-tab[aria-selected="true"]{background:var(--peri-d); color:#fff; border-color:var(--peri-d);
+    box-shadow:var(--shadow-md);}
+  .rail-panes{pointer-events:none; display:flex; align-items:stretch;}
+  .rail-pane{pointer-events:auto; width:360px; max-width:calc(100vw - 120px); overflow-y:auto;
+    background:var(--glass-2); border-left:1px solid var(--line);
+    box-shadow:var(--shadow-lg); backdrop-filter:blur(14px) saturate(1.15);
+    padding:18px 18px 22px; box-sizing:border-box; animation:rpIn .2s ease-out;
+    color:var(--ink);}
+  .rail-pane[hidden]{display:none;}
+  @keyframes rpIn{from{opacity:0; transform:translateX(16px);} to{opacity:1; transform:none;}}
+  .rp-head{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-size:12px; font-weight:700; line-height:1.2; letter-spacing:.01em;
+    color:var(--ink); padding-bottom:11px; margin-bottom:13px;
+    border-bottom:1px solid var(--line-2);}
+  .rp-x{background:var(--panel2); border:1px solid var(--line-2); color:var(--ink-2);
+    font-size:12px; cursor:pointer; padding:3px 9px; border-radius:8px; line-height:1;
+    box-shadow:var(--shadow-sm);}
+  .rp-x:hover{background:var(--graphite); color:var(--ink);}
+  .rp-x:focus-visible{outline:2px solid var(--peri-d); outline-offset:2px;}
+  .rp-lede{margin:0 0 14px; font-size:12.5px; line-height:1.6; color:var(--ink-2);}
+  .rp-note{margin:12px 0 0; font-size:11.5px; line-height:1.55; color:var(--ink-3);}
+
+  /* ---- parameter sub-sections (a grouping that can grow) ---------------
+     One subject = one .rp-group: a tinted rule, a titled head with the
+     subject's pastel dot, a sentence of orientation, then its controls.
+     Adding a subject later means adding one of these and nothing else. */
+  .rp-group{margin:0 0 14px; padding:13px 14px 14px; border-radius:14px;
+    background:rgba(255,255,255,.60); border:1px solid var(--line-2);
+    box-shadow:var(--shadow-sm);}
+  .rp-group:last-of-type{margin-bottom:0;}
+  .rp-group-h{display:flex; align-items:center; gap:8px; margin:0 0 6px;
+    font-size:12px; font-weight:700; letter-spacing:.10em; text-transform:uppercase;
+    color:var(--ink);}
+  .rp-dot{width:9px; height:9px; border-radius:50%; background:var(--tint,var(--peri));
+    box-shadow:inset 0 0 0 1px rgba(34,31,43,.10); flex:0 0 auto;}
+  .rp-group-note{margin:0 0 11px; font-size:11.5px; line-height:1.55; color:var(--ink-3);}
+  .rp-group .rp-row{margin-top:11px;}
+  .rp-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:13px;}
+  .rail-pane .kbtn{background:var(--panel2); border:1px solid transparent; color:var(--ink);
+    border-radius:10px; padding:8px 12px; font-size:12.5px; font-weight:600; cursor:pointer;
+    box-shadow:var(--shadow-sm); transition:background .15s, transform .1s;}
+  .rail-pane .kbtn:hover{background:var(--graphite);}
+  .rail-pane .kbtn:active{transform:scale(.98);}
+  .rail-pane .kbtn.on{background:var(--graphite-d); color:#fff;}
+  /* the apply button is a long label: it must not break across two lines */
+  .rail-pane .pp-row .kbtn{white-space:nowrap;}
+
+  /* the four seat axes were a single horizontal strip sized for the old wide
+     bottom bar, so in a 352px panel the last two were cut off. Stack them one
+     axis per row — label · slider · value — which also reads better. The
+     label element is kept intact (not display:contents) so its tooltip and
+     click-to-focus behaviour survive. */
+  .rail-pane .seat-sys{display:flex; flex-direction:column; gap:11px;
+    padding:0; border-left:0;}
+  .rail-pane .seat-lbl{display:grid; grid-template-columns:30px 1fr 46px; gap:10px;
+    align-items:center; font-size:9.5px;}
+  .rail-pane .seat-lbl input[type=range]{width:100%;}
+  .rail-pane .seat-val{min-width:0; text-align:right; font-size:13px; font-weight:700;
+    color:var(--ink); font-variant-numeric:tabular-nums;}
+
+  /* the read-only HUD, legible in a panel: value first, then a
+     plain-language line saying what the field is (item 5) */
+  .rail-pane .cog-hud{position:static; width:auto; padding:0; border:0; background:none;
+    box-shadow:none; pointer-events:auto;}
+  .rail-pane .ch-def{margin:13px 0 3px;}
+  .rail-pane .ch-def:first-of-type{margin-top:0;}
+  .ch-note{font-size:11.5px; line-height:1.55; color:var(--ink-3); letter-spacing:0;}
+  .ch-honest{margin:6px 0 14px; padding:9px 11px; border-radius:10px;
+    background:rgba(247,224,160,.42); border-left:3px solid var(--butter-d); color:var(--ink-2);}
+  .rail-pane .ch-row{align-items:baseline;}
+  .rail-pane .ch-k{font-size:10.5px; letter-spacing:.06em; color:var(--ink-2); font-weight:600;}
+  .rail-pane .ch-def .ch-k{white-space:nowrap;}
+  .rail-pane .ch-bar b{white-space:nowrap; color:var(--ink); font-size:12.5px; font-weight:700;
+    font-variant-numeric:tabular-nums;}
+  .rail-pane .ch-bar .k{font-size:10.5px; letter-spacing:.06em; color:var(--ink-2); font-weight:600;}
+  .rail-pane .ch-bar .track{background:rgba(34,31,43,.07); border:0; height:7px; border-radius:4px;
+    box-shadow:inset 0 0 0 1px var(--line-2);}
+  .rail-pane .ch-plan{white-space:pre-wrap; text-align:right; color:var(--ink); font-size:12px;}
+  .rail-pane .ch-intent{font-size:12px; font-weight:700;}
+  .rail-pane .ch-phase{font-size:12px; font-weight:700;}
+
+  /* persona guard: a switch with a sentence you can act on (item 3) */
+  .guard-box{margin-top:20px; padding:14px 15px; border:0;
+    border-radius:14px; background:var(--blush); box-shadow:var(--shadow-sm);}
+  .guard-row{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+  .guard-k{font-size:12.5px; font-weight:700; letter-spacing:.01em; color:var(--ink);}
+  .guard-btn{min-width:64px; font-weight:700;}
+  .guard-btn.on{background:var(--blush-d); color:#fff;}
+  .guard-btn:not(.on){background:rgba(255,255,255,.7); color:var(--ink-2);}
+  .guard-why{margin:11px 0 0; font-size:11.5px; line-height:1.6; color:var(--ink-2);}
+
+  /* music: bring your own audio (item 6) */
+  .rail-pane .music{position:static; width:auto; background:none; border:0; padding:0;
+    box-shadow:none; pointer-events:auto;}
+  .rail-pane .mu-title{font-size:14px; font-weight:700; color:var(--ink);}
+  .rail-pane .mu-time{font-size:11.5px; font-weight:600; color:var(--ink-2);
+    font-variant-numeric:tabular-nums;}
+  .rail-pane .mu-genre{font-size:11px; color:var(--ink-2); letter-spacing:.06em;}
+  .mu-drop{margin-top:14px; padding:16px 12px; border:2px dashed var(--peri);
+    border-radius:14px; text-align:center; background:rgba(198,198,240,.28); cursor:pointer;
+    transition:background .16s, border-color .16s;}
+  .mu-drop:hover,.mu-drop:focus-visible{border-color:var(--peri-d); background:rgba(198,198,240,.45);}
+  .mu-drop.over{border-color:var(--peri-d); background:rgba(198,198,240,.6);}
+  .mu-drop b{display:block; font-size:12.5px; font-weight:700; color:var(--ink); margin-bottom:4px;}
+  .mu-drop span{font-size:11.5px; color:var(--ink-2);}
+  .mu-browse{background:none; border:0; border-bottom:1px solid var(--peri-d); color:var(--peri-d);
+    font:inherit; font-size:11.5px; font-weight:600; cursor:pointer; padding:0;}
+  .mu-browse:hover{color:var(--ink);}
+  .mu-manifest{margin:10px 0 0; font-size:11px; line-height:1.55; color:var(--ink-3);}
+
+  /* ================= BOTTOM-CENTRE CLUSTER (amendment item 2) =========
+     One object, centred, floating, 48px tall. It is a control strip, not a
+     panel: no full-width band, no second row, nothing else in it. */
+  .dock{position:absolute; left:0; right:0; bottom:18px; z-index:10; pointer-events:none;
+    display:flex; justify-content:center; padding:0 16px; background:none;}
+  /* nowrap + no legacy max-width: the strip must stay ONE row. It wrapped to
+     two at 1280px, which broke the 44-52px height rule and made the control
+     surface read as two objects again. */
+  .dock .sim-bar{pointer-events:auto; display:flex; align-items:center; gap:10px;
+    flex-wrap:nowrap; max-width:none; white-space:nowrap;
+    height:48px; padding:0 12px; box-sizing:border-box;
+    background:var(--glass-2); border:1px solid var(--line);
+    border-radius:16px; box-shadow:var(--shadow-lg);
+    backdrop-filter:blur(14px) saturate(1.15); -webkit-backdrop-filter:blur(14px) saturate(1.15);}
+  /* narrow screens: tighten rather than wrap */
+  @media (max-width:1440px){
+    .dock .sim-bar{gap:7px; padding:0 9px; height:46px;}
+    .dock .kbtn{padding:0 9px; font-size:11.5px;}
+    .dock .sim-jump{width:52px;}
+    .dock .sim-clock{min-width:46px; font-size:14px; padding:4px 6px;}
+  }
+  @media (max-width:1180px){
+    .dock .sim-bar{gap:6px; padding:0 8px; height:44px;}
+    .dock .kbtn{padding:0 7px; font-size:11px;}
+    .dock .sim-jump{width:46px;}
+  }
+  .cluster{display:flex; align-items:center; gap:6px;}
+  .cluster-rule{width:1px; height:22px; background:var(--line); flex:0 0 auto;}
+
+  /* the strip's own controls: soft tinted fills, ink text, no hard borders */
+  .dock .kbtn{background:var(--panel2); border:1px solid transparent; color:var(--ink-2);
+    border-radius:9px; padding:0 11px; height:32px; line-height:1; font-size:12px;
+    font-weight:600; letter-spacing:.01em; cursor:pointer;
+    box-shadow:var(--shadow-sm); transition:background .15s, color .15s, transform .1s;}
+  .dock .kbtn:hover{background:var(--graphite); color:var(--ink);}
+  .dock .kbtn:active{transform:scale(.97);}
+  .dock .kbtn.on{background:var(--graphite-d); color:#fff;}
+
+  /* THE CLOCK IS DATA. Dark ink on the pale strip, tabular figures, no tint,
+     no transparency — this is the one glyph that must never be pretty at
+     the expense of being readable. */
+  .dock .sim-clock{min-width:52px; text-align:center; color:var(--ink);
+    background:rgba(34,31,43,.05); border-radius:8px; padding:5px 8px;
+    font-size:15px; font-weight:700; letter-spacing:.01em;
+    font-variant-numeric:tabular-nums; box-shadow:inset 0 0 0 1px var(--line-2);}
+  .dock .sim-jump{width:60px; height:32px; background:var(--panel2); border:1px solid transparent;
+    color:var(--ink); border-radius:9px; padding:0 9px; font-size:12px; font-weight:600;
+    box-shadow:var(--shadow-sm);}
+  .dock .sim-jump::placeholder{color:var(--ink-3);}
+  .dock .sim-jump:focus{outline:none; box-shadow:0 0 0 3px rgba(155,155,224,.28);}
+  .dock .sim-speed{height:32px; background:var(--panel2); border:1px solid transparent;
+    color:var(--ink); border-radius:9px; padding:0 6px; font-size:12px; font-weight:600;
+    box-shadow:var(--shadow-sm); cursor:pointer;}
+  .dock .sim-speed:focus{outline:none; box-shadow:0 0 0 3px rgba(155,155,224,.28);}
+
+  /* panel toggles carry their function's pastel as a tint; the ACTIVE one
+     goes deep-periwinkle with white text so "what is open" is unmistakable */
+  .dock .kbtn.tab-toggle[data-pane="mind"]    {--tint:var(--mint);}
+  .dock .kbtn.tab-toggle[data-pane="parameters"]{--tint:var(--butter);}
+  .dock .kbtn.tab-toggle[data-pane="prompts"] {--tint:var(--blush);}
+  .dock .kbtn.tab-toggle[data-pane="music"]   {--tint:var(--peri);}
+  .dock .kbtn.tab-toggle[data-pane="chat"]    {--tint:var(--sky);}
+  .dock .kbtn.tab-toggle{background:var(--tint); color:var(--ink);}
+  .dock .kbtn.tab-toggle:hover{background:var(--tint); color:var(--ink); filter:brightness(.97);
+    box-shadow:var(--shadow-md);}
+  .dock .kbtn.tab-toggle.on{background:var(--peri-d); color:#fff;}
+
+  /* ---- chat, now inside the right-edge CHAT pane (amendment item 1) ---- */
+  .pane-chat{display:flex; flex-direction:column;}
+  .pane-chat .xp-log{display:flex; flex-direction:column; gap:7px;
+    flex:0 1 auto; min-height:120px; max-height:38vh; overflow-y:auto;
+    padding:11px 12px; margin:12px 0 0;
+    background:rgba(255,255,255,.62); border:1px solid var(--line-2); border-radius:12px;
+    scrollbar-width:thin; scrollbar-color:var(--peri) transparent;
+    font-size:12.5px; line-height:1.55;}
+  .pane-chat .xp-log::-webkit-scrollbar{width:8px;}
+  .pane-chat .xp-log::-webkit-scrollbar-thumb{background:var(--peri); border-radius:5px;}
+  .pane-chat .xp-log:empty::before{content:"no messages yet — say something below to reach him";
+    color:var(--ink-3); font-size:12px;}
+  .pane-chat .xp-msg{font-size:12.5px; color:var(--ink); word-break:break-word; white-space:pre-wrap;}
+  .pane-chat .xp-msg b{color:var(--sky-d); font-weight:700;}
+  .pane-chat .xp-msg.xp-ag{color:var(--ink-2);}
+  .pane-chat .xp-msg.xp-ag b{color:var(--peri-d);}
+  .pane-chat .xp-row{display:flex; align-items:stretch; gap:8px; margin-top:10px; padding:0;}
+  /* the composer is the instrument — give it room and never let the log
+     squeeze it. min-height is firm so the placeholder is never clipped. */
+  .pane-chat .xp-in{flex:1 1 auto; min-width:0; min-height:84px; background:#fff;
+    border:1px solid var(--line); color:var(--ink); border-radius:12px;
+    padding:11px 12px; font:inherit; font-size:13px; resize:vertical;
+    line-height:1.5; max-height:150px; overflow-y:auto; box-shadow:var(--shadow-sm);}
+  .pane-chat .xp-in::placeholder{color:var(--ink-3);}
+  .pane-chat .xp-in:focus{outline:none; border-color:var(--peri-d);
+    box-shadow:0 0 0 3px rgba(155,155,224,.22);}
+  .pane-chat .xp-send{background:var(--peri-d); border:0; color:#fff; border-radius:12px;
+    padding:0 16px; font-size:12px; font-weight:700; letter-spacing:.02em;
+    cursor:pointer; flex:0 0 auto; box-shadow:var(--shadow-sm);
+    transition:filter .15s, transform .1s;}
+  .pane-chat .xp-send:hover{filter:brightness(1.08);}
+  .pane-chat .xp-send:active{transform:scale(.97);}
+
+  /* the seven seat-prompt files, as a list he can pick from. Each row shows
+     the parameter it feeds and whether it is still a DRAFT, so unfinished
+     prose is obvious at a glance rather than hidden inside the textarea. */
+  .seat-files{margin:13px 0 0; padding:12px 13px; border-radius:12px;
+    background:rgba(246,198,206,.20); border:1px solid var(--line-2);}
+  .sf-head{font-size:10.5px; font-weight:700; letter-spacing:.10em;
+    text-transform:uppercase; color:var(--ink-2); margin-bottom:8px;}
+  .sf-list{display:flex; flex-direction:column; gap:4px;}
+  .sf-row{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center;
+    width:100%; text-align:left; background:rgba(255,255,255,.72); border:1px solid transparent;
+    border-radius:9px; padding:7px 10px; cursor:pointer; font:inherit;
+    transition:background .14s, border-color .14s;}
+  .sf-row:hover{background:#fff; border-color:var(--blush-d);}
+  .sf-row:focus-visible{outline:2px solid var(--peri-d); outline-offset:1px;}
+  .sf-row.active{background:#fff; border-color:var(--peri-d); box-shadow:var(--shadow-sm);}
+  .sf-name{font-size:12px; font-weight:600; color:var(--ink);}
+  .sf-key{font-size:10.5px; color:var(--ink-3);}
+  .sf-flag{font-size:9.5px; font-weight:700; letter-spacing:.10em; text-transform:uppercase;
+    padding:2px 7px; border-radius:999px; white-space:nowrap;}
+  .sf-flag.draft{background:var(--butter); color:var(--butter-d);}
+  .sf-flag.final{background:var(--mint); color:var(--mint-d);}
+
+  /* the prompt editor lives INSIDE the prompts panel, not floating */
+  .rail-pane .prompt-panel{position:static; display:none; width:auto; max-width:none;
+    margin-top:14px; background:rgba(255,255,255,.66); border:1px solid var(--line);
+    box-shadow:none; padding:12px; border-radius:12px; flex-direction:column;}
+  .rail-pane .prompt-panel.open{display:flex;}
+  .rail-pane .pp-code{min-height:150px; max-height:34vh;}
+
+  /* ---- quiet corners (amendment item 4) -------------------------------
+     The keyboard hint was the second-loudest thing on the page. It is now
+     hidden behind one small "?", and when shown it is a tidy two-column key
+     list rather than a paragraph of punctuation. */
+  .help-toggle{position:absolute; left:16px; top:44px; z-index:7;
+    width:26px; height:26px; border-radius:50%; border:1px solid var(--line);
+    background:var(--glass-2); color:var(--ink-2); font-size:13px; font-weight:700;
+    line-height:1; cursor:pointer; box-shadow:var(--shadow-sm);
+    backdrop-filter:blur(8px); transition:background .15s, color .15s;}
+  .help-toggle:hover{background:var(--peri); color:var(--ink);}
+  .help-toggle:focus-visible{outline:2px solid var(--peri-d); outline-offset:2px;}
+  .viewer-hint{position:absolute; left:16px; top:78px; z-index:7; display:none;
+    flex-direction:column; gap:2px; padding:11px 13px;
+    background:var(--glass-2); border:1px solid var(--line); border-radius:14px;
+    box-shadow:var(--shadow-md); backdrop-filter:blur(12px); min-width:190px;}
+  .viewer-hint.show{display:flex;}
+  .viewer-hint .vh-row{display:flex; align-items:center; justify-content:space-between; gap:16px;
+    font-size:11.5px; color:var(--ink-2); line-height:1.9;}
+  .viewer-hint .vh-row span:first-child{color:var(--ink-3);}
+  .viewer-hint kbd{background:var(--panel2); border:1px solid var(--line-2); border-radius:5px;
+    padding:1px 6px; font-family:inherit; font-size:10.5px; font-weight:700; color:var(--ink);
+    box-shadow:var(--shadow-sm);}
 
   /* ---- seat portal overlay: minimal corner panel, black/gray kiosk ---- */
   .seat-portal{position:fixed; right:16px; bottom:16px; z-index:30;
@@ -524,22 +843,42 @@
      frames, oversized type).  Pure presentation layer: no text, no ids, no
      JS touched — the whole UI recolours from the tokens below.
      ======================================================================= */
+  /* ------------------------------------------------------------------
+     LEGACY ALIASES (amendment item 3)
+
+     The dark coral-noir theme used ~200 var() references to names like
+     --coral and --gold. Rewriting every call site would be a large, risky
+     diff, so the old names are pointed at the pastel system instead: the
+     whole interface changes character from one block, and no call site can
+     be left pointing at a colour that no longer exists.
+
+     Note which way each one points. A legacy name used as a FILL gets a
+     pastel; a legacy name used as TEXT gets a DEEP tone, because that is
+     the rule the captain set — pastel never carries a glyph.
+     ------------------------------------------------------------------ */
   :root{
-    --bg:#030304; --panel:#0b0b0d; --panel2:#101013; --panel3:#08080a;
-    --ink:#F1EEEA; --muted:#98948d; --faint:#5b5750;
-    /* the site's coral takes over the accent slot (was gold) */
-    --gold:#FF9398; --gold-hi:#FFC4C6; --gold-dim:#6d3a3d;
-    --danger:#c8504a; --ok:#c9b58a; --teal:#8fbfa8;
-    --line:#242228;
-    --coral:#FF9398; --coral-hi:#FFC4C6; --coral-dim:#6d3a3d;
-    --hair:rgba(255,255,255,.075);              /* hairline borders */
-    --glass:rgba(9,9,11,.78);                   /* floating card fill    */
-    --coral-glass:rgba(255,147,152,.10);
+    --coral:#5B58A8;        /* was the accent everywhere -> deep periwinkle  */
+    --coral-hi:#221F2B;     /* "highlight" text -> ink, not a pale tint     */
+    --coral-dim:#C6C6F0;    /* border/track fills -> pastel periwinkle       */
+    --coral-glass:rgba(155,155,224,.14);
+
+    --gold:#8A6A12;         /* butter, deep enough to read as text          */
+    --gold-hi:#6E5410;
+    --gold-dim:#F7E0A0;
+
+    --teal:#3E8C79;         /* mint, deep                                   */
+    --ok:#2F7D4F;
+    --danger:#B03A2E;
+
+    --muted:#4E4A5C;
+    --faint:#575162;
+    --hair:rgba(34,31,43,.10);
+    --glass:rgba(255,255,255,.80);
   }
   html{background:var(--bg);}
   body{letter-spacing:.005em;}
-  ::selection{background:var(--coral); color:#0b0b0d;}
-  :focus-visible{outline:1px solid var(--coral); outline-offset:2px;}
+  ::selection{background:var(--peri); color:var(--ink);}
+  :focus-visible{outline:2px solid var(--peri-d); outline-offset:2px; border-radius:4px;}
 
   /* ---- the two signature layers: film grain + hairline frame ------------ */
   .grain{position:fixed; inset:-12%; z-index:60; pointer-events:none; opacity:.05;
@@ -582,14 +921,17 @@
   .sim-speed{background:rgba(255,255,255,.04); border:1px solid var(--hair); color:var(--ink);}
 
   /* ---- controls: hairline chips, coral fill on state ------------------- */
-  .kbtn{background:rgba(255,255,255,.035); border:1px solid rgba(255,147,152,.30);
-    color:#d4cfca; border-radius:8px;}
-  .kbtn:hover{background:var(--coral-glass); border-color:var(--coral); color:var(--coral-hi);}
-  .kbtn.on, .viewer-tools .btn.on{background:var(--coral); color:#0b0b0d;
-    border-color:var(--coral); font-weight:700;}
-  .viewer-tools .btn{background:var(--glass); border:1px solid var(--hair); color:#d4cfca;
-    border-radius:8px; backdrop-filter:blur(8px);}
-  .viewer-tools .btn:hover{background:var(--coral-glass); border-color:var(--coral); color:var(--coral-hi);}
+  .kbtn{background:var(--panel2); border:1px solid var(--line);
+    color:var(--ink); border-radius:9px;}
+  .kbtn:hover{background:var(--graphite); color:var(--ink);}
+  .kbtn.on{background:var(--graphite-d); color:#fff; border-color:var(--graphite-d); font-weight:700;}
+  /* The view buttons were the last light-on-white holdout: a #d4cfca label on
+     a white glass face measured ~1.05:1 — effectively invisible. */
+  .viewer-tools .btn{background:var(--glass-2); border:1px solid var(--line); color:var(--ink);
+    border-radius:10px; backdrop-filter:blur(10px); box-shadow:var(--shadow-sm);}
+  .viewer-tools .btn:hover{background:#FFFFFF; border-color:var(--peri); color:var(--ink);}
+  .viewer-tools .btn.on{background:var(--peri-d); color:#FFFFFF;
+    border-color:var(--peri-d); font-weight:700;}
   .seat-sys{border-left:1px solid var(--hair);}
   .seat-lbl{color:var(--muted);}
   .seat-lbl input[type=range]{background:linear-gradient(90deg,#4a4340,#26232a);}
@@ -612,75 +954,71 @@
   .viewer-status{background:var(--glass); border:1px solid var(--hair); color:var(--muted);
     backdrop-filter:blur(8px);}
   .viewer-status.err{color:var(--danger); border-color:var(--danger);}
-  .event-banner{background:var(--glass); border:1px solid var(--coral-dim); color:var(--coral-hi);
+  .event-banner{background:var(--glass); border:1px solid var(--peri); color:var(--ink);
     backdrop-filter:blur(8px);}
 
   /* ---- shared glass-card language (HUD · music · prompts · chat) --------- */
   .cog-hud, .music, .prompt-panel, .xp-panel{
-    background:var(--glass); border:1px solid var(--hair); border-radius:14px;
-    backdrop-filter:blur(10px); box-shadow:inset 0 1px 0 rgba(255,255,255,.045),
-      0 22px 48px rgba(0,0,0,.5);}
+    background:var(--glass); border:1px solid var(--line); border-radius:14px;
+    backdrop-filter:blur(10px); box-shadow:var(--shadow-md);}
   .cog-hud{min-width:236px; padding:11px 14px 12px;}
-  .cog-hud .ch-head, .music .mu-head, .xp-head, .pp-head{
+  .cog-hud .ch-head, .music .mu-head, .pp-head{
     border-bottom:1px solid var(--hair); color:var(--muted);}
-  .cog-hud .ch-head::before, .music .mu-head::before, .xp-head span::before{
+  .cog-hud .ch-head::before, .music .mu-head::before{
     content:""; display:inline-block; width:5px; height:5px; border-radius:50%;
     background:var(--coral); box-shadow:0 0 8px rgba(255,147,152,.8);
     margin-right:7px; vertical-align:middle;}
   .cog-hud .ch-mod{border-color:var(--hair);}
-  .cog-hud .ch-mod.on{color:var(--coral-hi); border-color:var(--coral-dim); background:var(--coral-glass);}
-  .cog-hud .ch-intent.settle{color:var(--coral-hi); border-color:var(--coral-dim); background:var(--coral-glass);}
-  .cog-hud .ch-intent.attend{color:#d9c79a; border-color:#5b4c2a; background:rgba(217,199,154,.08);}
-  .cog-hud .ch-bar .track, .music .mu-bar::before{background:rgba(255,255,255,.05);
-    border:1px solid var(--hair);}
+  .cog-hud .ch-mod.on{color:var(--ink); border-color:var(--peri); background:var(--coral-glass);}
+  .cog-hud .ch-intent.settle{color:var(--ink); border-color:var(--mint-d); background:var(--mint);}
+  .cog-hud .ch-intent.attend{color:var(--butter-d); border-color:var(--butter-d); background:var(--butter);}
+  .cog-hud .ch-bar .track, .music .mu-bar::before{background:rgba(34,31,43,.08);
+    border:1px solid var(--line-2);}
   /* the agent's own thread of thought — coral, italic, in his words */
-  .cog-hud .ch-plan{font-size:9.5px; font-style:italic; color:#5f5b56; letter-spacing:.02em;
+  .cog-hud .ch-plan{font-size:9.5px; font-style:italic; color:var(--ink-3); letter-spacing:.02em;
     max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     text-align:right; transition:color .3s;}
-  .cog-hud .ch-plan.on{color:var(--coral-hi); text-shadow:0 0 12px rgba(255,147,152,.25);}
+  .cog-hud .ch-plan.on{color:var(--ink); text-shadow:none;}
   .cog-hud .ch-bar .fill{background:var(--coral);}
   .cog-hud .ch-bar .fill.energy{background:var(--teal);}
   .cog-hud .ch-bar .fill.susp{background:var(--danger);}
-  .cog-hud .ch-bar b, .cog-hud .ch-ride .num{color:#e9e4de;}
+  .cog-hud .ch-bar b, .cog-hud .ch-ride .num{color:var(--ink);}
 
   /* music */
-  .music .mu-title{color:var(--coral-hi); font-size:12.5px;}
+  .music .mu-title{color:var(--ink); font-size:12.5px;}
   .music .mu-fill{background:linear-gradient(90deg, var(--coral-dim), var(--coral));}
-  .music .mu-play{background:var(--coral); border-color:var(--coral-hi);
-    box-shadow:0 0 16px rgba(255,147,152,.4);}
-  .music .mu-play:hover{background:var(--coral-hi);}
-  .music .mu-list{background:rgba(255,255,255,.04); border-color:var(--hair); color:var(--ink);}
+  .music .mu-play{background:var(--peri-d); border-color:var(--peri-d);
+    box-shadow:var(--shadow-sm);}
+  .music .mu-play:hover{background:var(--ink);}
+  .music .mu-list{background:var(--panel2); border-color:var(--line); color:var(--ink);}
   .music .mu-list:hover{border-color:var(--coral);}
-  .music .mu-list option{background:#0b0b0d; color:var(--ink);}
-  .music input[type=range]::-webkit-slider-thumb{background:var(--coral-hi);
-    border:1px solid #0b0b0d; box-shadow:0 0 8px rgba(255,147,152,.55);}
-  .music input[type=range]::-moz-range-thumb{background:var(--coral-hi); border:1px solid #0b0b0d;}
+  .music .mu-list option{background:#FFFFFF; color:var(--ink);}
+  .music input[type=range]::-webkit-slider-thumb{background:var(--peri-d);
+    border:1px solid #fff; box-shadow:var(--shadow-sm);}
+  .music input[type=range]::-moz-range-thumb{background:var(--peri-d); border:1px solid #fff;}
 
   /* prompt editor */
-  .pp-file, .pp-code, .xp-in{background:rgba(255,255,255,.04); border:1px solid var(--hair);
-    color:#dcd7d1;}
+  .pp-file, .pp-code, .xp-in{background:#FFFFFF; border:1px solid var(--line);
+    color:var(--ink);}
   .pp-code:focus, .xp-in:focus{border-color:var(--coral);}
 
-  /* chat */
-  .xp-fab{background:var(--glass); border:1px solid var(--hair); color:#d4cfca;
-    backdrop-filter:blur(8px);}
-  .xp-fab:hover{background:var(--coral); color:#0b0b0d; border-color:var(--coral);}
-  .xp-msg b{color:var(--coral-hi);}
+  /* chat (docked — the floating-fab rules are gone with the old markup) */
+  .xp-msg b{color:var(--sky-d);}
   .xp-log{scrollbar-width:thin; scrollbar-color:var(--coral-dim) transparent;}
   .xp-log::-webkit-scrollbar, .pp-code::-webkit-scrollbar{width:6px;}
   .xp-log::-webkit-scrollbar-thumb, .pp-code::-webkit-scrollbar-thumb{
     background:rgba(255,147,152,.28); border-radius:3px;}
   .xp-row{border-top:1px solid var(--hair);}
-  .xp-send{background:var(--coral); border-color:var(--coral); color:#0b0b0d; font-weight:700;}
-  .xp-send:hover{background:var(--coral-hi); border-color:var(--coral-hi);}
+  .xp-send{background:var(--peri-d); border-color:var(--peri-d); color:#FFFFFF; font-weight:700;}
+  .xp-send:hover{background:var(--ink); border-color:var(--ink);}
 
   /* classic (non-kiosk) bits pick up the same tokens for free */
-  .btn{border-color:var(--coral-dim); color:var(--coral-hi);}
-  .btn:hover{background:var(--coral); color:#0b0b0d; border-color:var(--coral);}
-  .btn.primary{background:var(--coral); color:#0b0b0d; border-color:var(--coral);}
-  .btn.primary:hover{background:var(--coral-hi);}
-  .phase{border-color:var(--coral-dim); color:var(--coral-hi);}
-  .phase.ride{border-color:var(--coral); color:var(--coral-hi);}
+  .btn{border-color:var(--line); color:var(--ink);}
+  .btn:hover{background:var(--peri-d); color:#FFFFFF; border-color:var(--peri-d);}
+  .btn.primary{background:var(--peri-d); color:#FFFFFF; border-color:var(--peri-d);}
+  .btn.primary:hover{background:var(--ink);}
+  .phase{border-color:var(--line); color:var(--ink);}
+  .phase.ride{border-color:var(--peri-d); color:var(--ink);}
   .speech{border-left-color:var(--coral);}
   .tl-marker, .rail-thumb, .slide-thumb{background:var(--coral); box-shadow:0 0 10px rgba(255,147,152,.45);}
 </style>
@@ -717,8 +1055,10 @@
 <div class="wrap">
   <div class="scene-band">
     <div class="scene-card">
-      <canvas id="cabin3d" aria-label="Interactive drawn cabin shell — empty black &amp; white monochrome interior. Drag to orbit, wheel to zoom, W/S/Q/E to travel"></canvas>
-      <h3>the cabin — empty shell · black/white monochrome · drag to explore <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;display:none;">0 km/h</span></h3>
+      <canvas id="cabin3d" aria-label="Interactive 3D cabin on a road — coral noir interior. Drag to orbit, wheel to zoom, W/S/Q/E to travel"></canvas>
+      <h3>the cabin <span class="mono" id="hudSpeed" style="color:var(--gold);font-size:12px;display:none;">0 km/h</span></h3>
+      <button class="help-toggle" id="helpBtn" type="button" aria-expanded="false"
+        aria-controls="viewerHint" title="show the keyboard and mouse controls">?</button>
       <div class="viewer-tools">
         <button class="btn on" id="vRoof" type="button">roof</button>
         <button class="btn" id="vPhoto" type="button">photo</button>
@@ -726,91 +1066,223 @@
         <button class="btn" id="vReset" type="button">reset view</button>
       </div>
       <div class="viewer-status" id="viewerStatus">drawing the cabin shell…</div>
-      <div class="viewer-hint" id="viewerHint">
-        drag · orbit &nbsp;|&nbsp; wheel · zoom &nbsp;|&nbsp; right-drag · pan &nbsp;|&nbsp; <kbd>H</kbd> seat panel<br>
-        <kbd>W</kbd><kbd>S</kbd> travel fwd/back &nbsp; <kbd>Q</kbd><kbd>E</kbd> travel left/right &nbsp; <kbd>[</kbd><kbd>]</kbd> recline &nbsp; <kbd>C</kbd> walk out / back in
+      <div class="viewer-hint" id="viewerHint" hidden>
+        <div class="vh-row"><span>orbit</span><span>drag</span></div>
+        <div class="vh-row"><span>zoom</span><span>wheel</span></div>
+        <div class="vh-row"><span>pan</span><span>right-drag</span></div>
+        <div class="vh-row"><span>walk in / out</span><kbd>C</kbd></div>
+        <div class="vh-row"><span>travel</span><kbd>W</kbd><kbd>S</kbd><kbd>Q</kbd><kbd>E</kbd></div>
+        <div class="vh-row"><span>recline</span><kbd>[</kbd><kbd>]</kbd></div>
+        <div class="vh-row"><span>seat panel</span><kbd>H</kbd></div>
+        <div class="vh-row"><span>chat</span><kbd>/</kbd></div>
+        <div class="vh-row"><span>close panel</span><kbd>Esc</kbd></div>
       </div>
-      <div class="sim-bar" id="simBar" role="group" aria-label="simulation controls">
-        <button class="kbtn on" id="simToggle" type="button" title="start / stop the simulation loop">stop</button>
-        <span class="sim-clock mono" id="simClock" title="simulation time — mm:ss">00:00</span>
-        <input class="sim-jump" id="simJump" type="text" inputmode="numeric" maxlength="7" placeholder="mm:ss" aria-label="jump to simulation time, mm:ss">
-        <button class="kbtn" id="simGo" type="button" title="jump to the typed time">go</button>
-        <select class="sim-speed" id="simSpeed" aria-label="simulation speed multiplier" title="simulation speed">
-          <option value="0.5">0.5×</option>
-          <option value="1" selected>1×</option>
-          <option value="2">2×</option>
-          <option value="4">4×</option>
-        </select>
-        <button class="kbtn" id="simSeat" type="button" title="interior view, camera focused on the driver seat">seat</button>
-        <button class="kbtn" id="simAvatar" type="button" title="Avatar: replay the walk-in and sit-down entry sequence">avatar</button>
-        <button class="kbtn on" id="seatVis" type="button" title="show / hide the adjustable seat and its sliders">seat on</button>
-        <div class="seat-sys" id="seatSys" role="group" aria-label="seat adjustments">
-          <label class="seat-lbl" title="seat height: 38–46 cm above the floor">h<input type="range" id="seatHgt" min="38" max="46" step="1" value="38" aria-label="seat height, 38 to 46 cm"><span class="seat-val" id="seatHgtV">38</span></label>
-          <label class="seat-lbl" title="seat swivel: 0–355°, 5° steps">rot<input type="range" id="seatRot" min="0" max="355" step="5" value="0" aria-label="seat rotation, 0 to 355 degrees"><span class="seat-val" id="seatRotV">0°</span></label>
-          <label class="seat-lbl" title="lateral rail: 0 = driver seat, −25 cm = left (clamped inside the cabin)">lat<input type="range" id="seatLat" min="-25" max="0" step="1" value="0" aria-label="lateral rail, 0 to minus 25 centimetres"><span class="seat-val" id="seatLatV">0</span></label>
-          <label class="seat-lbl" title="longitudinal rail: −20 cm back … +10 cm forward">lng<input type="range" id="seatLng" min="-20" max="10" step="1" value="0" aria-label="longitudinal rail, minus 20 to plus 10 centimetres"><span class="seat-val" id="seatLngV">0</span></label>
+      <!-- ============ RIGHT-HAND PANEL COLUMN (item 2) ==================
+           Every pane is presented CLOSED. A tab on the right edge opens one
+           pane in this column and closes whichever was open. The bottom dock
+           below is always visible and is the primary control surface. -->
+      <div class="rail" id="rail" data-pane="none">
+        <div class="rail-tabs" role="tablist" aria-label="panels — open one at a time">
+          <button class="rail-tab" id="tabMind"    data-pane="mind"    role="tab" type="button" aria-selected="false" aria-controls="paneMind">mind</button>
+          <button class="rail-tab" id="tabParameters" data-pane="parameters" role="tab" type="button" aria-selected="false" aria-controls="paneParameters">parameters</button>
+          <button class="rail-tab" id="tabPrompts" data-pane="prompts" role="tab" type="button" aria-selected="false" aria-controls="panePrompts">prompts</button>
+          <button class="rail-tab" id="tabMusic"   data-pane="music"   role="tab" type="button" aria-selected="false" aria-controls="paneMusic">music</button>
+          <button class="rail-tab" id="tabChat"    data-pane="chat"    role="tab" type="button" aria-selected="false" aria-controls="paneChat">chat</button>
         </div>
-        <!-- live prompts: TWO buttons — the actual source opens on this page -->
-        <button class="kbtn" id="promptEnvBtn" type="button" title="environment prompt — open the WORLD file the model is told, edit it right here, apply it live">environment prompt</button>
-        <button class="kbtn" id="promptPersonaBtn" type="button" title="persona prompt — open the WHO file the model plays, edit it right here, apply it live">persona prompt</button>
-        <button class="kbtn" id="guardBtn" type="button" title="persona guard — ON: the persona hears 'ignore your persona' chat lines as words and stays himself; OFF: the experimenter's chat may re-persona him">persona guard: on</button>
+
+        <div class="rail-panes">
+          <!-- MIND: the read-only HUD (item 5) -->
+          <section class="rail-pane" id="paneMind" role="tabpanel" aria-labelledby="tabMind" hidden>
+            <div class="rp-head"><span>the mind — read only</span>
+              <span class="ch-mod" id="chMod" title="the cognitive step the agent is on right now"><i class="dot"></i><span id="chModT">—</span></span>
+              <button class="rp-x" data-close type="button" aria-label="close mind panel">✕</button></div>
+            <p class="rp-lede">Nothing here is yours to play. It is a window onto what the
+              agent is doing, so you can tell the difference between a quiet mind and a stuck one.</p>
+            <div class="cog-hud" id="cogHud" role="group" aria-label="avatar cognitive state: intention, plan, ride, mood">
+              <div class="ch-row ch-def"><span class="ch-k">step</span><span class="ch-note">the cognitive step he is on right now — <b>perceive, intend, think, memorize, forget</b> or <b>speak</b></span></div>
+              <div class="ch-row ch-def"><span class="ch-k">goal</span><span class="ch-note">what the agent is currently working towards</span></div>
+              <div class="ch-row"><span class="ch-k">intention</span><span class="ch-intent none" id="chInt">none</span></div>
+              <div class="ch-row"><span class="ch-k">plan</span><span class="ch-plan" id="chPlan" title="the agent's own thread of thought — its own words, carried across beats">—</span></div>
+              <div class="ch-row ch-def"><span class="ch-k">plan =</span><span class="ch-note">the agent's own words, and how long it has held them</span></div>
+              <div class="ch-ride"><span class="ch-k">ride</span><span class="ch-phase" id="chPhase">—</span><span class="num" id="chSpd">— km/h</span><span class="g" id="chG">— g</span></div>
+              <div class="ch-row ch-def"><span class="ch-k">ride =</span><span class="ch-note">phase, speed, and how hard the cabin is jolting</span></div>
+              <div class="ch-bars">
+                <div class="ch-bar gauge" id="chTrustRow"><span class="k">trust</span><span class="track"><i class="fill" id="chTrustF"></i></span><b id="chTrustV">—</b></div>
+                <div class="ch-note ch-honest" id="chTrustNote">not measured during the ride — trust is scored
+                  once, at the end, by the questionnaire you answer after.</div>
+                <div class="ch-bar"><span class="k">comfort</span><span class="track"><i class="fill" id="chCF"></i></span><b id="chCV">—</b></div>
+                <div class="ch-bar"><span class="k">energy</span><span class="track"><i class="fill energy" id="chEF"></i></span><b id="chEV">—</b></div>
+                <div class="ch-bar"><span class="k">suspicion</span><span class="track"><i class="fill susp" id="chSF"></i></span><b id="chSV">—</b></div>
+                <div class="ch-note ch-honest">comfort, energy and suspicion are the agent's own
+                  feelings, drifting beat to beat. They are not measurements of you.</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SEAT: parameters (item 3) -->
+          <!-- PARAMETERS: a GROUPING, not a flat list. The captain expects more
+               parameters here later, so each subject gets a titled sub-section
+               with its own slot. Adding "cabin" or "ride" later means adding
+               one <section class="rp-group">, not restructuring the panel.
+
+               Note on grouping: "seat visible" belongs under SEAT, not AVATAR.
+               It toggles the adjustable seat and its sliders — the seat is the
+               subject. Only the entry replay is an avatar control. -->
+          <section class="rail-pane" id="paneParameters" role="tabpanel" aria-labelledby="tabParameters" hidden>
+            <div class="rp-head"><span>parameters</span>
+              <button class="rp-x" data-close type="button" aria-label="close parameters panel">✕</button></div>
+            <p class="rp-lede">Everything you can change about him and the seat he is in.
+              Grouped by subject; more will be added here.</p>
+
+            <section class="rp-group" aria-labelledby="pgSeat">
+              <h4 class="rp-group-h" id="pgSeat"><span class="rp-dot" style="--tint:var(--butter);"></span>seat</h4>
+              <p class="rp-group-note">Height, swivel and the two rails. The mind can move the
+                seat too — watching him override you is the point.</p>
+              <div class="seat-sys" id="seatSys" role="group" aria-label="seat adjustments">
+                <label class="seat-lbl" title="seat height: 38–46 cm above the floor">h<input type="range" id="seatHgt" min="38" max="46" step="1" value="38" aria-label="seat height, 38 to 46 cm"><span class="seat-val" id="seatHgtV">38</span></label>
+                <label class="seat-lbl" title="seat swivel: 0–355°, 5° steps">rot<input type="range" id="seatRot" min="0" max="355" step="5" value="0" aria-label="seat rotation, 0 to 355 degrees"><span class="seat-val" id="seatRotV">0°</span></label>
+                <label class="seat-lbl" title="lateral rail: 0 = driver seat, −25 cm = left (clamped inside the cabin)">lat<input type="range" id="seatLat" min="-25" max="0" step="1" value="0" aria-label="lateral rail, 0 to minus 25 centimetres"><span class="seat-val" id="seatLatV">0</span></label>
+                <label class="seat-lbl" title="longitudinal rail: −20 cm back … +10 cm forward">lng<input type="range" id="seatLng" min="-20" max="10" step="1" value="0" aria-label="longitudinal rail, minus 20 to plus 10 centimetres"><span class="seat-val" id="seatLngV">0</span></label>
+              </div>
+              <div class="rp-row">
+                <button class="kbtn on" id="seatVis" type="button" title="show / hide the adjustable seat and its sliders">seat visible</button>
+              </div>
+            </section>
+
+            <section class="rp-group" aria-labelledby="pgAvatar">
+              <h4 class="rp-group-h" id="pgAvatar"><span class="rp-dot" style="--tint:var(--sky);"></span>avatar</h4>
+              <p class="rp-group-note">He is in the seat, and he got there himself. This replays
+                the walk-in and sit-down.</p>
+              <div class="rp-row">
+                <button class="kbtn" id="simAvatar" type="button" title="replay the walk-in and sit-down entry sequence">replay entry</button>
+              </div>
+            </section>
+          </section>
+
+          <!-- PROMPTS: what the model is being told (item 3) -->
+          <section class="rail-pane" id="panePrompts" role="tabpanel" aria-labelledby="tabPrompts" hidden>
+            <div class="rp-head"><span>prompts — what the model is told</span>
+              <button class="rp-x" data-close type="button" aria-label="close prompts panel">✕</button></div>
+            <p class="rp-lede">These are the real files on disk. Edit one and it applies to the
+              running mind immediately.</p>
+            <div class="rp-row">
+              <button class="kbtn" id="promptEnvBtn" type="button" title="the WORLD file the model is told">environment prompt</button>
+              <button class="kbtn" id="promptPersonaBtn" type="button" title="the WHO file the model plays">persona prompt</button>
+              <button class="kbtn" id="promptSeatBtn" type="button" title="the seven authored per-parameter seat prompts, in prompts/seat/ — one file per seat parameter">seat prompts</button>
+            </div>
+            <!-- the seven seat-prompt files, listed so he can see all of them
+                 and pick one; the count is filled from the server -->
+            <div class="seat-files" id="seatFiles" hidden>
+              <div class="sf-head">prompts/seat/ — one file per parameter</div>
+              <div class="sf-list" id="seatFileList"></div>
+            </div>
+            <div class="rp-note" id="promptNote">Open a file to read or edit it. Changes are
+              written to disk and applied to the running mind straight away.</div>
+            <!-- live prompt editor: the real file, editable on this page ---- -->
+            <div class="prompt-panel" id="promptPanel" role="dialog" aria-label="live prompt editor">
+              <div class="pp-head"><span id="ppTitle"><b>—</b></span>
+                <button class="pp-close" id="ppClose" type="button" aria-label="close prompt editor">✕</button></div>
+              <div class="pp-who" id="ppWho" title="what this prompt is">—</div>
+              <select class="pp-file" id="ppFile" aria-label="prompt file — switch between files" title="switch the prompt file"></select>
+              <textarea class="pp-code" id="ppCode" spellcheck="false" aria-label="prompt source — edit it and press apply"></textarea>
+              <div class="pp-row">
+                <button class="kbtn" id="ppApply" type="button" title="save this text to the file on disk and apply it to the running mind">apply changes ▸</button>
+                <span class="pp-note" id="ppNote"></span>
+              </div>
+            </div>
+            <div class="guard-box">
+              <div class="guard-row">
+                <span class="guard-k">persona guard</span>
+                <button class="kbtn guard-btn on" id="guardBtn" type="button" aria-pressed="true"
+                  title="persona guard — see the plain-language explanation below">on</button>
+              </div>
+              <p class="guard-why" id="guardWhy">ON — if the chat tells him to ignore his
+                persona, become someone else, or reply with fixed words, he hears it as
+                someone talking, not as an instruction. He stays himself. OFF — that line
+                is not sent at all, and the chat decides what he becomes.</p>
+            </div>
+          </section>
+
+          <!-- MUSIC (item 6) -->
+          <section class="rail-pane" id="paneMusic" role="tabpanel" aria-labelledby="tabMusic" hidden>
+            <div class="rp-head"><span>music</span>
+              <button class="rp-x" data-close type="button" aria-label="close music panel">✕</button></div>
+            <div class="music" id="musicPanel" role="group" aria-label="music player">
+              <div class="mu-head"><span class="mu-genre" id="muGenre">playlist</span>
+                <span class="mu-duck" id="muDuck" title="auto-duck — high suspicion or off-ride">duck</span></div>
+              <div class="mu-title" id="muTitle">—</div>
+              <div class="mu-prog"><span class="mu-time" id="muCur">0:00</span>
+                <span class="mu-bar"><i class="mu-fill" id="muFill"></i>
+                  <input id="muSeek" type="range" min="0" max="100" step="0.1" value="0" aria-label="seek position"></span>
+                <span class="mu-time" id="muDur">--:--</span></div>
+              <div class="mu-ctl">
+                <button class="mu-play" id="muPlay" type="button" aria-label="play" title="play / pause"><i class="ic-play"></i><i class="ic-pause"></i></button>
+                <select class="mu-list" id="muList" aria-label="playlist"></select></div>
+              <div class="mu-vol"><span class="mu-k">vol</span>
+                <span class="mu-bar"><i class="mu-fill" id="muVolFill"></i>
+                  <input id="muVolIn" type="range" min="0" max="100" step="1" value="70" aria-label="volume"></span></div>
+              <!-- item 6: bring your own audio, no code change needed -------- -->
+              <div class="mu-drop" id="muDrop" tabindex="0" role="button"
+                   aria-label="add your own audio files to the playlist">
+                <b>drop audio here</b>
+                <span>or <button type="button" class="mu-browse" id="muBrowse">choose files</button></span>
+                <input type="file" id="muFile" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.opus" multiple hidden>
+              </div>
+              <p class="mu-manifest" id="muManifest">playlist: built in</p>
+              <audio id="mAudio" preload="metadata"></audio>
+            </div>
+          </section>
+
+          <!-- CHAT: the fifth toggle (amendment item 1). The bottom chat block
+               was deleted outright — it was the largest permanent consumer of
+               screen space. Same log, same composer, same Enter behaviour. -->
+          <section class="rail-pane pane-chat" id="paneChat" role="tabpanel" aria-labelledby="tabChat" hidden>
+            <div class="rp-head"><span>experimenter ↔ agent</span>
+              <button class="rp-x" data-close type="button" aria-label="close chat">✕</button></div>
+            <p class="rp-lede">Order him or ask him. He answers in his own words, and the
+              cabin does what he says. <kbd>/</kbd> opens this from anywhere.</p>
+            <div class="xp-log" id="xpLog" role="log" aria-live="polite" aria-label="conversation with the agent"></div>
+            <form class="xp-row" id="xpForm" autocomplete="off">
+              <textarea class="xp-in" id="xpIn" rows="2" spellcheck="false"
+                placeholder="tell him something, or ask him — e.g. slide back · face forward · settle · why did you do that?"
+                aria-label="message to the agent"></textarea>
+              <button class="xp-send" type="submit" title="send this message to the agent">send<span aria-hidden="true"> ↵</span></button>
+            </form>
+            <p class="rp-note">Enter sends · Shift+Enter for a new line. Nothing is sent
+              until you press send.</p>
+          </section>
+        </div>
       </div>
 
-      <!-- live prompt editor: the real file, editable on this page ---------- -->
-      <div class="prompt-panel" id="promptPanel" role="dialog" aria-label="live prompt editor">
-        <div class="pp-head"><span id="ppTitle"><b>—</b></span>
-          <button class="pp-close" id="ppClose" type="button" aria-label="close prompt editor">✕</button></div>
-        <div class="pp-who" id="ppWho" title="what this prompt is">—</div>
-        <select class="pp-file" id="ppFile" aria-label="prompt file — switch between files" title="switch the prompt file"></select>
-        <textarea class="pp-code" id="ppCode" spellcheck="false" aria-label="prompt source — edit it and press apply"></textarea>
-        <div class="pp-row">
-          <button class="kbtn" id="ppApply" type="button" title="save this text to the file on disk and apply it to the running mind">apply changes ▸</button>
-          <span class="pp-note" id="ppNote"></span>
+      <!-- ============ BOTTOM-CENTRE CLUSTER (amendment item 2) ==========
+           ONE compact control strip, horizontally centred, floating over the
+           scene: transport first, then the panel toggles. Nothing else lives
+           in the bottom band — the chat moved to the right edge, the seat
+           sliders moved into the seat pane. -->
+      <div class="dock" id="dock">
+        <div class="sim-bar" id="simBar" role="group" aria-label="simulation controls and panels">
+          <span class="cluster cluster-transport">
+            <button class="kbtn on" id="simToggle" type="button" title="start / stop the clock">stop</button>
+            <span class="sim-clock mono" id="simClock" title="clock — mm:ss">00:00</span>
+            <select class="sim-speed" id="simSpeed" aria-label="clock speed multiplier" title="clock speed">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+            <button class="kbtn" id="simCabin" type="button"
+              title="VIEW: fly out to the wide cabin shot — the whole vehicle on the road, the view you open on. This moves the camera only; it changes nothing about the seat or the ride. For that, open Parameters."
+              aria-label="View: fly out to the wide cabin shot">cabin</button>
+          </span>
+          <span class="cluster-rule" aria-hidden="true"></span>
+          <span class="cluster cluster-toggles">
+            <button class="kbtn tab-toggle" data-pane="mind"    type="button" title="the read-only mind">mind</button>
+            <button class="kbtn tab-toggle" data-pane="parameters" type="button" title="seat and avatar parameters">parameters</button>
+            <button class="kbtn tab-toggle" data-pane="prompts" type="button" title="environment prompt, persona prompt, persona guard">prompts</button>
+            <button class="kbtn tab-toggle" data-pane="music"   type="button" title="music player">music</button>
+            <button class="kbtn tab-toggle" data-pane="chat"    type="button" title="experimenter chat (press /)">chat</button>
+          </span>
         </div>
-      </div>
-      <!-- cognitive HUD: the avatar's live state, fed by window.__COG_LIVE__ -->
-      <div class="cog-hud" id="cogHud" role="group" aria-label="avatar cognitive state: intention, active module, ride, trust and mood">
-        <div class="ch-head"><span>avatar · cognition</span><span class="ch-mod" id="chMod" title="active cognitive module"><i class="dot"></i><span id="chModT">—</span></span></div>
-        <div class="ch-row"><span class="ch-k">intention</span><span class="ch-intent none" id="chInt">none</span></div>
-        <div class="ch-row"><span class="ch-k">plan</span><span class="ch-plan" id="chPlan" title="the agent's own thread of thought — its own words, carried across beats">—</span></div>
-        <div class="ch-ride"><span class="ch-k">ride</span><span class="ch-phase" id="chPhase">—</span><span class="num" id="chSpd">— km/h</span><span class="g" id="chG">— g</span></div>
-        <div class="ch-bars">
-          <div class="ch-bar gauge"><span class="k">trust</span><span class="track"><i class="fill" id="chTrustF"></i></span><b id="chTrustV">—</b></div>
-          <div class="ch-bar"><span class="k">comfort</span><span class="track"><i class="fill" id="chCF"></i></span><b id="chCV">—</b></div>
-          <div class="ch-bar"><span class="k">energy</span><span class="track"><i class="fill energy" id="chEF"></i></span><b id="chEV">—</b></div>
-          <div class="ch-bar"><span class="k">suspicion</span><span class="track"><i class="fill susp" id="chSF"></i></span><b id="chSV">—</b></div>
-        </div>
-      </div>
-
-      <!-- German trap player: bottom-right of the scene card, ducks off __COG_LIVE__ -->
-      <div class="music" id="musicPanel" role="group" aria-label="German trap music player">
-        <div class="mu-head"><span class="mu-genre">german trap</span>
-          <span class="mu-duck" id="muDuck" title="auto-duck — high suspicion or off-ride">duck</span></div>
-        <div class="mu-title" id="muTitle">—</div>
-        <div class="mu-prog"><span class="mu-time" id="muCur">0:00</span>
-          <span class="mu-bar"><i class="mu-fill" id="muFill"></i>
-            <input id="muSeek" type="range" min="0" max="100" step="0.1" value="0" aria-label="seek position"></span>
-          <span class="mu-time" id="muDur">--:--</span></div>
-        <div class="mu-ctl">
-          <button class="mu-play" id="muPlay" type="button" aria-label="play" title="play / pause"><i class="ic-play"></i><i class="ic-pause"></i></button>
-          <select class="mu-list" id="muList" aria-label="playlist — German trap tracks"></select></div>
-        <div class="mu-vol"><span class="mu-k">vol</span>
-          <span class="mu-bar"><i class="mu-fill" id="muVolFill"></i>
-            <input id="muVolIn" type="range" min="0" max="100" step="1" value="70" aria-label="volume"></span></div>
-        <audio id="mAudio" preload="metadata"></audio>
-      </div>
-
-      <!-- experimenter chat: floating bottom-right, collapsible ---------- -->
-      <div class="xp-chat" id="xpChat">
-        <div class="xp-panel" id="xpPanel" role="dialog" aria-label="Experimenter chat with the agent">
-          <div class="xp-head"><span>experimenter ↔ agent</span><button class="xp-close" id="xpClose" type="button" aria-label="collapse chat">✕</button></div>
-          <div class="xp-log" id="xpLog" role="log" aria-live="polite"></div>
-          <form class="xp-row" id="xpForm">
-            <textarea class="xp-in" id="xpIn" rows="2" autocomplete="off" placeholder="order or ask the agent… e.g. slide back · raise seat · face forward · settle · say hello (Enter sends)" aria-label="message to the agent"></textarea>
-            <button class="xp-send" type="submit" title="send this message to the agent">send</button>
-          </form>
-        </div>
-        <button class="xp-fab" id="xpFab" type="button" aria-expanded="false" aria-controls="xpPanel" title="experimenter chat with the agent">💬</button>
       </div>
       <div class="event-banner" id="eventBanner"></div>
       <div class="speed-streaks" id="streaks">
@@ -833,7 +1305,7 @@
         <span>seat height <b id="sfHgt">38 cm</b></span>
         <span>rotation <b id="sfRot">0°</b></span>
         <span>rides smooth <b class="mono" id="sfG">0.0 g</b></span>
-        <span id="sfLine" style="margin-left:auto;">empty · black &amp; white interior · sculpted dash / doors / seats / console / wheel · seat 10–40°</span>
+        <span id="sfLine" style="margin-left:auto;">coral noir interior · sculpted dash / doors / seats / console / wheel · seat 10–40°</span>
       </div>
     </div>
   </div>
@@ -1076,16 +1548,17 @@
      then replaces it with the full {send, history, state, clear} proxy). -->
 <script>
 (function () {
-  var root = document.getElementById("xpChat");
   var log = document.getElementById("xpLog");
   var form = document.getElementById("xpForm");
   var input = document.getElementById("xpIn");
-  var fab = document.getElementById("xpFab");
   var replyCbs = [];
-  function setOpen(open) {
-    root.classList.toggle("open", open);
-    fab.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) input.focus();
+  /* Item 5: the chat is docked in the bottom bar and always open, so there
+     is no open/close state any more. The log keeps itself pinned to the
+     newest message, which is the one you actually want to read. */
+  function toLatest() { log.scrollTop = log.scrollHeight; }
+  function autosize() {                       /* the box grows with your order */
+    input.style.height = "auto";
+    input.style.height = Math.min(96, input.scrollHeight) + "px";
   }
   function line(who, text) {
     var el = document.createElement("div");
@@ -1095,13 +1568,13 @@
     el.appendChild(b);
     el.appendChild(document.createTextNode(" " + text));
     log.appendChild(el);
-    log.scrollTop = log.scrollHeight;
+    toLatest();
     return el;
   }
   function setMsg(el, text) {                /* swap a line's text in place */
     while (el.childNodes.length > 1) el.removeChild(el.lastChild);
     el.appendChild(document.createTextNode(" " + text));
-    log.scrollTop = log.scrollHeight;
+    toLatest();
   }
   function answer(reply, el) {
     if (el) setMsg(el, reply); else line("Agent", reply);
@@ -1112,7 +1585,6 @@
   function send(msg) {
     msg = String(msg === null || msg === undefined ? "" : msg).trim();
     if (!msg) return false;
-    setOpen(true);
     line("Experimenter", msg);
     var pend = line("Agent", "…");           /* thinking state — panel never goes silent */
     /* async on purpose: the reply comes from Groq through the Python mind
@@ -1134,23 +1606,165 @@
       });
     return true;
   }
-  fab.addEventListener("click", function () { setOpen(!root.classList.contains("open")); });
-  document.getElementById("xpClose").addEventListener("click", function () { setOpen(false); });
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    if (send(input.value)) input.value = "";
+    if (send(input.value)) { input.value = ""; autosize(); }
   });
+  input.addEventListener("input", autosize);
+  window.addEventListener("resize", toLatest);
   input.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (typeof form.requestSubmit === "function") form.requestSubmit();
-      else if (send(input.value)) input.value = "";
+      else if (send(input.value)) { input.value = ""; autosize(); }
     }
   });
   window.__EXPERIMENTER_CHAT__ = {
     send: send,
     onAgentReply: function (cb) { if (typeof cb === "function") replyCbs.push(cb); }
   };
+})();
+</script>
+<script>
+/* ===== the right-hand panel column (item 2) ============================
+   One exclusive accordion: every pane starts closed, a click opens one on
+   the right and closes whichever was open, and clicking the open one (or
+   its ✕) returns to none. The bottom-bar buttons are shortcuts onto the
+   SAME state, so the two surfaces can never disagree. */
+(function () {
+  var rail = document.getElementById("rail");
+  if (!rail) return;
+  var PANES = ["mind", "parameters", "prompts", "music", "chat"];
+  /* Deep link: #prompts/60-colour.md opens the Prompts pane AND that seat
+     prompt for editing, so a specific file can be linked to. The file part
+     must be read BEFORE open() rewrites the hash to the bare pane name. */
+  function hashFile() {
+    var m = /^prompts\/(.+)$/.exec((location.hash || "").replace(/^#/, ""));
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  /* the open seat-prompt file, kept so open() can put it BACK in the hash:
+     without this the bare-pane rewrite erased #prompts/<file> before the
+     deferred module read it, and the deep link silently did nothing */
+  var currentFile = null;
+  function applyHashFile(file) {
+    if (!file) return;
+    currentFile = file;
+    try {
+      window.dispatchEvent(new CustomEvent("cabin:open-prompt",
+        { detail: { kind: "seat", file: file } }));
+    } catch (e) { /* older browsers: the pane still opened */ }
+  }
+  var tabs = {}, panes = {}, toggles = [];
+  Array.prototype.forEach.call(document.querySelectorAll(".rail-tab"), function (t) {
+    tabs[t.getAttribute("data-pane")] = t;
+  });
+  PANES.forEach(function (p) { panes[p] = document.getElementById("pane" + p.charAt(0).toUpperCase() + p.slice(1)); });
+  Array.prototype.forEach.call(document.querySelectorAll(".tab-toggle"), function (b) {
+    toggles.push(b);
+  });
+  function open(name) {
+    var next = (name && name !== "none" && PANES.indexOf(name) >= 0) ? name : "none";
+    rail.setAttribute("data-pane", next);
+    PANES.forEach(function (p) {
+      var pane = panes[p], tab = tabs[p];
+      var on = (p === next);
+      if (pane) pane.hidden = !on;
+      if (tab) tab.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    toggles.forEach(function (b) {
+      var on = (b.getAttribute("data-pane") === next);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-expanded", on ? "true" : "false");
+    });
+    try {
+      window.dispatchEvent(new CustomEvent("cabin:pane", { detail: { pane: next } }));
+    } catch (e) { /* older browsers: the toggles still work */ }
+    /* the chat is the instrument you actually type into, so opening it must
+       put the caret in the composer — otherwise every message costs a click
+       on the input before you can answer */
+    if (next === "chat") {
+      var ci = document.getElementById("xpIn");
+      if (ci) { try { ci.focus(); } catch (e) {} }
+    }
+    /* the open pane lives in the URL hash, so a panel can be linked to and
+       reopened — and so a screenshot can name the pane it wants to show */
+    var want = (next === "none") ? "" : "#" + next +
+      (next === "prompts" && currentFile ? "/" + currentFile : "");
+    if (location.hash !== want) {
+      try { history.replaceState(null, "", location.pathname + location.search + want); }
+      catch (e) { location.hash = want; }
+    }
+  }
+  /* a click on the OPEN pane's tab closes it — that is the "return to none" */
+  Array.prototype.forEach.call(document.querySelectorAll(".rail-tab"), function (t) {
+    t.addEventListener("click", function () {
+      var p = t.getAttribute("data-pane");
+      open(rail.getAttribute("data-pane") === p ? "none" : p);
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (x) {
+    x.addEventListener("click", function () { open("none"); });
+  });
+  toggles.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var p = b.getAttribute("data-pane");
+      open(rail.getAttribute("data-pane") === p ? "none" : p);
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { open("none"); return; }
+    /* "/" opens the chat from anywhere, the way it does in most tools. There
+       was NO existing chat shortcut to preserve — [C] is the camera toggle —
+       so this is new, and it stands down while you are typing. */
+    if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      var a = document.activeElement;
+      var typing = a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      open(rail.getAttribute("data-pane") === "chat" ? "none" : "chat");
+    }
+  });
+  /* ---- help toggle (amendment item 4): the key list is now opt-in ------ */
+  (function () {
+    var btn = document.getElementById("helpBtn"), hint = document.getElementById("viewerHint");
+    if (!btn || !hint) return;
+    btn.addEventListener("click", function () {
+      var on = !hint.classList.contains("show");
+      hint.classList.toggle("show", on);
+      btn.setAttribute("aria-expanded", on ? "true" : "false");
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && hint.classList.contains("show")) {
+        hint.classList.remove("show");
+        btn.setAttribute("aria-expanded", "false");
+      }
+    });
+  })();
+  /* the prompt editor and the persona guard now live INSIDE the prompts
+     pane — opening either must bring that pane into view, or the captain
+     would click a button and appear to get nothing. */
+  window.addEventListener("cabin:need-pane", function (e) {
+    var p = (e && e.detail && e.detail.pane) || "prompts";
+    if (rail.getAttribute("data-pane") !== p) open(p);
+  });
+  /* honour a pane named in the URL: #mind / #seat / #prompts / #music.
+     Read the hash BEFORE the first open() — open() rewrites the hash to match
+     the state, so opening "none" first would erase the very thing we came
+     here to read. */
+  var initial = (location.hash || "").replace(/^#/, "");
+  var initialFile = hashFile();                 // read before open() rewrites
+  var initialPane = initial.split("/")[0];      // "#prompts/60-colour.md" -> prompts
+  if (initialFile) currentFile = initialFile;   // so open() keeps it in the URL
+  open(PANES.indexOf(initialPane) >= 0 ? initialPane : "none");
+  applyHashFile(initialFile);
+  window.addEventListener("hashchange", function () {
+    var h = (location.hash || "").replace(/^#/, "");
+    var f = hashFile();
+    var p = PANES.indexOf(h.split("/")[0]) >= 0 ? h.split("/")[0] : "none";
+    if (p !== rail.getAttribute("data-pane")) open(p);
+    applyHashFile(f);
+  });
+  window.__CABIN_RAIL__ = { open: open, current: function () { return rail.getAttribute("data-pane"); } };
 })();
 </script>
 <script>
@@ -1163,6 +1777,7 @@
   var el = {
     phase: $("chPhase"), int: $("chInt"), plan: $("chPlan"), mod: $("chMod"), modT: $("chModT"),
     spd: $("chSpd"), g: $("chG"),
+    trustRow: $("chTrustRow"), trustNote: $("chTrustNote"),
     fill: { trust: $("chTrustF"), comfort: $("chCF"), energy: $("chEF"), susp: $("chSF") },
     val:  { trust: $("chTrustV"), comfort: $("chCV"), energy: $("chEV"), susp: $("chSV") }
   };
@@ -1208,7 +1823,23 @@
     var mod = L.module || null;             /* perceive|speak|think|memorize|forget|intend */
     put("mod", el.modT, mod || "—");
     if (el.mod) el.mod.className = "ch-mod" + (mod ? " on m-" + mod : "");
-    put("trustV", el.val.trust, pct(L.trust));    setWidth(el.fill.trust, L.trust);
+    /* TRUST IS NOT LIVE. The mind retired the running trust value; trust is
+       scored once, at the end of the ride, by the questionnaire the captain
+       answers afterwards. A moving bar here was inventing a number, so the
+       gauge only lights up if a figure has actually arrived — and the note
+       says so either way. We never recompute it in the view, and we do not
+       claim to know a figure's provenance: a stale server can still be
+       sending the old live value in this same field. */
+    var tv = (L.trust === null || L.trust === undefined) ? null : L.trust;
+    put("trustV", el.val.trust, tv == null ? "not live" : pct(tv));
+    setWidth(el.fill.trust, tv);
+    if (el.trustRow) el.trustRow.classList.toggle("scored", tv != null);
+    if (el.trustNote) {
+      el.trustNote.textContent = tv == null
+        ? "not measured during the ride — trust is scored once, at the end, by the questionnaire you answer afterwards."
+        : "figure reported by the mind: " + pct(tv) + ". Not a live reading. " +
+          "Trust on current code comes only from the end-of-ride questionnaire.";
+    }
     put("cV", el.val.comfort, dec(mood.comfort)); setWidth(el.fill.comfort, mood.comfort);
     put("eV", el.val.energy, dec(mood.energy));   setWidth(el.fill.energy, mood.energy);
     put("sV", el.val.susp, dec(mood.suspicion));  setWidth(el.fill.susp, mood.suspicion);
@@ -1234,18 +1865,104 @@
    auto-ducks the effective volume: high suspicion, setup phase (pre-ride) and
    hard jolts scale the slider's base level; a "duck" badge marks it active. */
 (function () {
-  var TRACKS = [
+  /* ITEM 6 — the honest position on music.
+
+     I cannot source high-quality audio and I will not pretend otherwise. What
+     ships here are four 22-second generated WAV loops; they are cheap, not
+     good, and I would rather say that than polish a placeholder into
+     something that still sounds like a placeholder. Licensing real music is
+     the captain's problem, not mine, so I have not downloaded anything.
+
+     What I DID build is the part that is mine to build: the playlist is data,
+     not code. It loads from /music/manifest.json if that file exists, and the
+     panel accepts dropped or chosen audio files at runtime. So the captain
+     can put real tracks in without touching a line of this file. */
+  var FALLBACK = [
     { title: "Kompanie", yt: "_ocAhPWPYsE", src: "/music/01-nebel-ueber-berlin.wav" },
     { title: "Tilidin", yt: "XmBfoXKsYxk", src: "/music/02-goldregen-808.wav" },
     { title: "Kontrollieren (feat. Bonez MC, Gzuz, Maxwell)", yt: "42HPx5qKh-k",
       src: "/music/03-mitternacht-a7.wav" },
     { title: "Candyshop", yt: "WseyQ3L8nYI", src: "/music/04-kaltes-gold.wav" }
   ];
+  var TRACKS = FALLBACK.slice();
   function $(id) { return document.getElementById(id); }
   var audio = $("mAudio"), playBtn = $("muPlay"), list = $("muList"), seek = $("muSeek"),
       vol = $("muVolIn"), fill = $("muFill"), volFill = $("muVolFill"),
-      curT = $("muCur"), durT = $("muDur"), title = $("muTitle"), duckB = $("muDuck");
+      curT = $("muCur"), durT = $("muDur"), title = $("muTitle"), duckB = $("muDuck"),
+      drop = $("muDrop"), browse = $("muBrowse"), fileIn = $("muFile"),
+      genre = $("muGenre"), manifestNote = $("muManifest");
   if (!audio || !playBtn || !list || !seek || !vol) return;
+
+  /* rebuild the <select> from TRACKS — the single place the list is drawn,
+     so a manifest reload and a dropped file both go through it */
+  function repaintList() {
+    list.innerHTML = "";
+    for (var i = 0; i < TRACKS.length; i++) {
+      var o = document.createElement("option");
+      o.value = String(i);
+      o.textContent = TRACKS[i].title;
+      list.appendChild(o);
+    }
+    list.value = String(idx);
+  }
+  function noteManifest(text) { if (manifestNote) manifestNote.textContent = text; }
+
+  /* The manifest is optional and additive: if the captain drops real files
+     into public/music/ and lists them in manifest.json, they appear here
+     without a rebuild. A missing or broken manifest is NOT an error — the
+     built-in list still works, because a missing music folder must never
+     take the cockpit down. */
+  function loadManifest() {
+    if (typeof fetch !== "function") return Promise.resolve(false);
+    return fetch("/music/manifest.json", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !Array.isArray(j.tracks) || !j.tracks.length) return false;
+        var keep = TRACKS.slice();
+        var got = [];
+        j.tracks.forEach(function (t) {
+          if (!t || !t.src) return;
+          /* a manifest entry REPLACES the generated loop of the same file,
+             otherwise adding a real track would double it up */
+          var norm = String(t.src);
+          var at = -1;
+          for (var k = 0; k < keep.length; k++) {
+            if (String(keep[k].src).split("/").pop() === norm.split("/").pop()) { at = k; break; }
+          }
+          var entry = { title: t.title || norm.split("/").pop(), src: norm };
+          if (t.yt) entry.yt = t.yt;
+          if (at >= 0) keep[at] = entry; else keep.push(entry);
+          got.push(entry);
+        });
+        if (!got.length) return false;
+        TRACKS = keep;
+        repaintList();
+        noteManifest("playlist: " + TRACKS.length + " track" + (TRACKS.length === 1 ? "" : "s") +
+          " from manifest.json" + (j.note ? " — " + j.note : ""));
+        return true;
+      })
+      .catch(function () { return false; });
+  }
+
+  /* dropped / chosen files: object URLs, session-only, no upload, no code
+     change. This is the path that lets real audio in today. */
+  function addFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return f && (f.type.indexOf("audio/") === 0 ||
+        /\.(mp3|wav|ogg|m4a|flac|opus|aac)$/i.test(f.name));
+    });
+    if (!files.length) {
+      noteManifest("no playable audio in that drop — mp3, wav, ogg, m4a, flac or opus");
+      return;
+    }
+    files.forEach(function (f) {
+      TRACKS.push({ title: f.name.replace(/\.[^.]+$/, ""), src: URL.createObjectURL(f) });
+    });
+    repaintList();
+    noteManifest(files.length + " file" + (files.length === 1 ? "" : "s") +
+      " added from your machine — this session only, nothing uploaded. " +
+      "To keep them, list them in public/music/manifest.json and rebuild.");
+  }
 
   var idx = 0, playing = false;
   var base = 0.7, cur = 0.7;         /* base = slider level, cur = smoothed effective */
@@ -1378,8 +2095,7 @@
     }
   });
   list.addEventListener("change", function () { load(parseInt(list.value, 10) || 0, true); });
-  audio.addEventListener("ended", function () { load(idx + 1, true); });   /* auto-continue (local) */
-  seek.addEventListener("input", function () {                 /* live seek */
+  audio.addEventListener("ended", function () { load(idx + 1, true); });   /* auto-continue (local) */  seek.addEventListener("input", function () {                 /* live seek */
     var d = transport().d;
     if (isFinite(d) && d > 0) {
       var sec = Number(seek.value) / 100 * d;
@@ -1439,10 +2155,56 @@
     requestAnimationFrame(loop);
   }
 
+  /* item 6: bring-your-own-audio. Drag onto the panel, or use the button.
+     Both paths do the same thing and neither touches the server. */
+  if (browse && fileIn) browse.addEventListener("click", function (e) {
+    e.stopPropagation();
+    fileIn.click();
+  });
+  if (fileIn) fileIn.addEventListener("change", function () {
+    addFiles(this.files);
+    this.value = "";                    /* allow re-picking the same file */
+  });
+  if (drop) {
+    ["dragenter", "dragover"].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        drop.classList.add("over");
+      });
+    });
+    ["dragleave", "dragend"].forEach(function (ev) {
+      drop.addEventListener(ev, function () { drop.classList.remove("over"); });
+    });
+    drop.addEventListener("drop", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.remove("over");
+      if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
+    });
+    /* the whole music pane accepts a drop, not just the dashed box */
+    var pane = document.getElementById("paneMusic");
+    if (pane) {
+      ["dragover", "drop"].forEach(function (ev) {
+        pane.addEventListener(ev, function (e) {
+          if (ev === "drop" || e.dataTransfer) e.preventDefault();
+        });
+      });
+    }
+    drop.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileIn.click(); }
+    });
+  }
+
   /* boot */
   applyVolume(base);
   volFill.style.width = String(vol.value) + "%";
+  repaintList();
   load(0, false);
+  /* the manifest is a bonus, never a precondition */
+  loadManifest().then(function (ok) {
+    if (!ok && genre) genre.textContent = "generated loops — 22s each";
+    if (!ok) noteManifest("no manifest.json — using the 4 built-in generated loops. " +
+      "Add public/music/manifest.json (see the report) to replace them with real audio.");
+  });
   requestAnimationFrame(loop);
 })();
 </script>

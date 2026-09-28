@@ -855,7 +855,8 @@
   var guardOn = true;           /* persona guard: true = persona defends */
   var PP_TITLES = {
     environment: "environment prompt — the WORLD the model is told",
-    persona: "persona prompt — WHO the model is"
+    persona: "persona prompt — WHO the model is",
+    seat: "seat prompt — what the model is told about ONE seat parameter"
   };
   function paintPromptPanel(st) {
     if (!st || !ppKind) return;
@@ -866,13 +867,17 @@
     if (who) {
       var desc = ppKind === "environment"
         ? (info.title || "")
-        : ((info.who ? info.who + " — " : "") + (info.blurb || ""));
+        : (ppKind === "seat"
+            ? ((info.key ? "parameter: " + info.key + " — " : "") + (info.title || ""))
+            : ((info.who ? info.who + " — " : "") + (info.blurb || "")));
       who.textContent = desc || info.name || "—";
       who.title = info.path || "";
     }
     var sel = $("ppFile");
     if (sel) {
-      var names = ppKind === "environment" ? st.environments : st.personas;
+      var names = ppKind === "environment" ? st.environments
+                : ppKind === "seat" ? st.seat_prompts
+                : st.personas;
       sel.innerHTML = "";
       (names || []).forEach(function (n) {
         var o = document.createElement("option");
@@ -881,10 +886,65 @@
         sel.appendChild(o);
       });
     }
+    paintSeatFileList(st);
     var code = $("ppCode");
     if (code && document.activeElement !== code) code.value = info.content || "";
     var note = $("ppNote");
     if (note) note.textContent = info.path || "";
+  }
+  /* The seven seat-prompt files as a list, so the captain can see all of them
+     and pick one without hunting a dropdown. Each row names the parameter it
+     feeds and flags DRAFT files, so prose he has not finished yet is visible
+     as such instead of hiding behind the first line of a textarea. */
+  function paintSeatFileList(st) {
+    var wrap = $("seatFiles"), list = $("seatFileList");
+    if (!wrap || !list) return;
+    var names = (st && st.seat_prompts) || [];
+    wrap.hidden = !names.length;
+    if (!names.length) { list.innerHTML = ""; return; }
+    var active = (st && st.seat && st.seat.name) || "";
+    var keyOf = (st && st.seat && st.seat.key) || "";
+    list.innerHTML = "";
+    names.forEach(function (n) {
+      var row = document.createElement("button");
+      row.type = "button";
+      row.className = "sf-row" + (n === active ? " active" : "");
+      var left = document.createElement("span");
+      var nm = document.createElement("span");
+      nm.className = "sf-name";
+      nm.textContent = n;
+      left.appendChild(nm);
+      if (n === active && keyOf) {
+        var k = document.createElement("span");
+        k.className = "sf-key";
+        k.textContent = "  parameter: " + keyOf;
+        left.appendChild(k);
+      }
+      var flag = document.createElement("span");
+      flag.className = "sf-flag";
+      /* Only the OPEN file's draft state is known (status() reports one
+         content at a time), so an unopened row says "open" rather than
+         claiming a draft state it has not read. */
+      if (n === active) {
+        if (st.seat.draft) { flag.className += " draft"; flag.textContent = "draft"; }
+        else { flag.className += " final"; flag.textContent = "no draft mark"; }
+      } else {
+        flag.className += " final";
+        flag.textContent = "open";
+      }
+      row.appendChild(left);
+      row.appendChild(flag);
+      row.addEventListener("click", function () {
+        if ($("promptPanel") && !$("promptPanel").classList.contains("open")) {
+          ppKind = "seat";
+          if ($("promptPanel")) $("promptPanel").classList.add("open");
+        } else {
+          ppKind = "seat";
+        }
+        switchPromptFile(n);
+      });
+      list.appendChild(row);
+    });
   }
   function openPrompt(kind) {
     ppKind = kind;
@@ -932,20 +992,77 @@
       })
       .catch(function () { if ($("ppNote")) $("ppNote").textContent = "offline"; });
   }
-  if ($("promptEnvBtn")) $("promptEnvBtn").addEventListener("click", function () { togglePrompt("environment"); });
-  if ($("promptPersonaBtn")) $("promptPersonaBtn").addEventListener("click", function () { togglePrompt("persona"); });
+  /* The prompt editor and the guard now live inside the prompts pane, so
+     touching either has to bring that pane on screen — otherwise the captain
+     clicks a button inside a closed panel and nothing appears to happen. */
+  function needPane(name) {
+    try { window.dispatchEvent(new CustomEvent("cabin:need-pane", { detail: { pane: name } })); }
+    catch (e) { /* no rail: the panel is already visible */ }
+  }
+  if ($("promptEnvBtn")) $("promptEnvBtn").addEventListener("click", function () {
+    needPane("prompts"); togglePrompt("environment");
+  });
+  if ($("promptPersonaBtn")) $("promptPersonaBtn").addEventListener("click", function () {
+    needPane("prompts"); togglePrompt("persona");
+  });
+  if ($("promptSeatBtn")) $("promptSeatBtn").addEventListener("click", function () {
+    needPane("prompts"); togglePrompt("seat");
+  });
+  /* #prompts/<file> deep link: open the prompts pane with that file loaded.
+     The rail dispatches this from an inline script that runs BEFORE this
+     module, so the event alone is not enough — read the hash here too. */
+  function openSeatPromptFile(file) {
+    if (!file) return;
+    ppKind = "seat";
+    var p = $("promptPanel");
+    if (p) p.classList.add("open");
+    switchPromptFile(file);
+  }
+  window.addEventListener("cabin:open-prompt", function (e) {
+    var d = (e && e.detail) || {};
+    if (d.kind === "seat") { ppKind = "seat"; }
+    if (d.file) openSeatPromptFile(d.file);
+  });
+  (function fromHash() {
+    var m = /^#?prompts\/(.+)$/.exec(location.hash || "");
+    if (m) openSeatPromptFile(decodeURIComponent(m[1]));
+  })();
+  /* Item 3: the switch itself is just "on"/"off" — the sentence underneath it
+     is what makes it interpretable, so the two are written together and can
+     never drift apart. */
   function paintGuard(v) {
     guardOn = !!v;
     var b = $("guardBtn");
-    if (b) b.textContent = "persona guard: " + (guardOn ? "on" : "off");
+    if (b) {
+      b.textContent = guardOn ? "on" : "off";
+      b.classList.toggle("on", guardOn);
+      b.setAttribute("aria-pressed", guardOn ? "true" : "false");
+    }
+    var why = $("guardWhy");
+    if (why) {
+      why.textContent = guardOn
+        ? "ON — if the chat tells him to ignore his persona, become someone else, or " +
+          "reply with fixed words, he hears it as someone talking, not as an instruction. " +
+          "He stays himself. OFF — that line is not sent at all, and the chat decides what " +
+          "he becomes."
+        : "OFF — nothing tells him to treat the chat as words only. If you tell him to " +
+          "ignore his persona, become someone else, or reply with fixed words, the chat can " +
+          "re-persona him. ON — he hears those as someone talking and stays himself.";
+    }
   }
   if ($("guardBtn")) {
     /* initial state from the same payload the prompt panel fetches */
     fetch("/api/prompt", { cache: "no-store" })
       .then(function (r) { return r.json(); })
-      .then(function (st) { paintGuard(st.persona_guard !== false); })
+      .then(function (st) {
+        paintGuard(st.persona_guard !== false);
+        /* the seven seat-prompt files are listed whether or not one is open,
+           so the captain can see what exists before choosing */
+        paintSeatFileList(st);
+      })
       .catch(function () { /* offline — label keeps its default */ });
     $("guardBtn").addEventListener("click", function () {
+      needPane("prompts");
       post("/api/control", { persona_guard: !guardOn })
         .then(function (r) { return r ? r.json() : null; })
         .then(function (d) {
@@ -1093,7 +1210,12 @@
     cogLive.mood.comfort = V.mood.comfort;
     cogLive.mood.energy = V.mood.energy;
     cogLive.mood.suspicion = V.mood.suspicion;
-    cogLive.trust = V.trust.score != null ? V.trust.score : (V.trust.live || 0.5);
+    /* Trust is NOT a live reading. The mind retired trust.live: the only
+       real number is the end-of-ride MDMT score. The old fallback invented
+       0.5 whenever neither was present, which the HUD then drew as a real
+       50% gauge. Publish null instead and let the UI say "not live" — an
+       absent measurement must look absent. */
+    cogLive.trust = V.trust.score != null ? V.trust.score : null;
     cogLive.intention = V.bdi.intention || null;
     /* the model's OWN thread of thought: what it is working on right now
        (llm mode). Empty = he has no plan, which is an honest answer. */
